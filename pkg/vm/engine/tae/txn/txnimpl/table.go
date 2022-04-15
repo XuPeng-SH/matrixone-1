@@ -45,10 +45,14 @@ type Table interface {
 	AddUpdateNode(txnif.UpdateNode) error
 	IsDeleted() bool
 	PreCommit() error
+	PreCommitDededup() error
 	PrepareCommit() error
 	PrepareRollback() error
 	ApplyCommit() error
 	ApplyRollback() error
+
+	LogSegmentID(sid uint64)
+	LogBlockID(bid uint64)
 
 	WaitSynced()
 
@@ -83,6 +87,8 @@ type txnTable struct {
 	warChecker  *warChecker
 	dataFactory *tables.DataFactory
 	logs        []txnbase.NodeEntry
+	maxSegId    uint64
+	maxBlkId    uint64
 }
 
 func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver txnbase.NodeDriver, mgr base.INodeManager, checker *warChecker, dataFactory *tables.DataFactory) *txnTable {
@@ -102,6 +108,18 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver txnbase.Node
 		logs:        make([]txnbase.NodeEntry, 0),
 	}
 	return tbl
+}
+
+func (tbl *txnTable) LogSegmentID(sid uint64) {
+	if tbl.maxSegId < sid {
+		tbl.maxSegId = sid
+	}
+}
+
+func (tbl *txnTable) LogBlockID(bid uint64) {
+	if tbl.maxBlkId < bid {
+		tbl.maxBlkId = bid
+	}
 }
 
 func (tbl *txnTable) WaitSynced() {
@@ -522,6 +540,46 @@ func (tbl *txnTable) Rows() uint32 {
 	return (uint32(cnt)-1)*txnbase.MaxNodeRows + tbl.inodes[cnt-1].Rows()
 }
 
+func (tbl *txnTable) PreCommitDededup() (err error) {
+	if tbl.index == nil {
+		return
+	}
+	schema := tbl.entry.GetSchema()
+	pks := tbl.index.KeyToVector(schema.ColDefs[schema.PrimaryKey].Type)
+	segIt := tbl.entry.MakeSegmentIt(false)
+	for segIt.Valid() {
+		seg := segIt.Get().GetPayload().(*catalog.SegmentEntry)
+		if seg.GetID() < tbl.maxSegId {
+			return
+		}
+		segData := seg.GetSegmentData()
+		// TODO: Add a new batch dedup method later
+		if err = segData.BatchDedup(tbl.txn, pks); err == data.ErrDuplicate {
+			return
+		}
+		if err == nil {
+			segIt.Next()
+			continue
+		}
+		err = nil
+		blkIt := seg.MakeBlockIt(false)
+		for blkIt.Valid() {
+			blk := blkIt.Get().GetPayload().(*catalog.BlockEntry)
+			if blk.GetID() < tbl.maxBlkId {
+				return
+			}
+			blkData := blk.GetBlockData()
+			// TODO: Add a new batch dedup method later
+			if err = blkData.BatchDedup(tbl.txn, pks); err != nil {
+				return
+			}
+			blkIt.Next()
+		}
+		segIt.Next()
+	}
+	return
+}
+
 func (tbl *txnTable) BatchDedup(pks *gvec.Vector) (err error) {
 	if err = tbl.BatchDedupLocalByCol(pks); err != nil {
 		return err
@@ -529,7 +587,21 @@ func (tbl *txnTable) BatchDedup(pks *gvec.Vector) (err error) {
 	segIt := tbl.handle.MakeSegmentIt()
 	for segIt.Valid() {
 		seg := segIt.GetSegment()
-		if err = seg.BatchDedup(pks); err != nil {
+		if err = seg.BatchDedup(pks); err == data.ErrDuplicate {
+			break
+		}
+		if err == data.ErrPossibleDuplicate {
+			err = nil
+			blkIt := seg.MakeBlockIt()
+			for blkIt.Valid() {
+				block := blkIt.GetBlock()
+				if err = block.BatchDedup(pks); err != nil {
+					break
+				}
+				blkIt.Next()
+			}
+		}
+		if err != nil {
 			break
 		}
 		segIt.Next()
