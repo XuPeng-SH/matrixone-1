@@ -9,6 +9,7 @@ import (
 	gbat "github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/buffer/base"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -19,7 +20,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -314,17 +314,17 @@ func (tbl *txnTable) Append(data *batch.Batch) error {
 		n := h.GetNode().(*insertNode)
 		toAppend := n.PrepareAppend(data, offset)
 		size := compute.EstimateSize(data, offset, toAppend)
-		logrus.Debugf("Offset=%d, ToAppend=%d, EstimateSize=%d", offset, toAppend, size)
+		logutil.Debugf("Offset=%d, ToAppend=%d, EstimateSize=%d", offset, toAppend, size)
 		err = n.Expand(size, func() error {
 			appended, err = n.Append(data, offset)
 			return err
 		})
 		if err != nil {
-			logrus.Info(tbl.nodesMgr.String())
+			logutil.Info(tbl.nodesMgr.String())
 			panic(err)
 		}
 		space := n.GetSpace()
-		logrus.Debugf("Appended: %d, Space:%d", appended, space)
+		logutil.Debugf("Appended: %d, Space:%d", appended, space)
 		start := tbl.rows
 		// logrus.Infof("s,offset=%d,appended=%d,start=%d", data.Vecs[tbl.GetSchema().PrimaryKey], offset, appended, start)
 		if err = tbl.index.BatchInsert(data.Vecs[tbl.GetSchema().PrimaryKey], int(offset), int(appended), start, false); err != nil {
@@ -568,6 +568,7 @@ func (tbl *txnTable) PreCommitDededup() (err error) {
 			if blk.GetID() < tbl.maxBlkId {
 				return
 			}
+			// logutil.Infof("%s: %d-%d, %d-%d: %s", tbl.txn.String(), tbl.maxSegId, tbl.maxBlkId, seg.GetID(), blk.GetID(), pks.String())
 			blkData := blk.GetBlockData()
 			// TODO: Add a new batch dedup method later
 			if err = blkData.BatchDedup(tbl.txn, pks); err != nil {
@@ -680,14 +681,14 @@ func (tbl *txnTable) applyAppendInode(node InsertNode) (err error) {
 			}
 		}
 		toAppend, err := appender.PrepareAppend(node.Rows() - appended)
-		bat, err := node.Window(0, toAppend-1)
+		bat, err := node.Window(appended, appended+toAppend-1)
 		var destOff uint32
 		if destOff, err = appender.ApplyAppend(bat, 0, toAppend, nil); err != nil {
 			panic(err)
 		}
 		appender.Close()
 		info := node.AddApplyInfo(appended, toAppend, destOff, toAppend, appender.GetID())
-		logrus.Debug(info.String())
+		logutil.Debug(info.String())
 		appended += toAppend
 		if appended == node.Rows() {
 			break
@@ -725,13 +726,13 @@ func (tbl *txnTable) PrepareCommit() (err error) {
 	}
 
 	for _, seg := range tbl.csegs {
-		logrus.Debugf("PrepareCommit: %s", seg.String())
+		logutil.Debugf("PrepareCommit: %s", seg.String())
 		if err = seg.PrepareCommit(); err != nil {
 			return
 		}
 	}
 	for _, blk := range tbl.cblks {
-		logrus.Debugf("PrepareCommit: %s", blk.String())
+		logutil.Debugf("PrepareCommit: %s", blk.String())
 		if err = blk.PrepareCommit(); err != nil {
 			return
 		}

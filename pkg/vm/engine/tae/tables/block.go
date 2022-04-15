@@ -191,5 +191,6 @@ func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err erro
 	if blk.updatableIndexHolder == nil {
 		panic("unexpected error")
 	}
+	// logutil.Infof("BatchDedup %s: PK=%s", txn.String(), pks.String())
 	return blk.updatableIndexHolder.BatchDedup(pks)
 }
