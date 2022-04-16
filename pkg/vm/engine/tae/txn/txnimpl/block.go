@@ -82,8 +82,12 @@ func newBlock(txn txnif.AsyncTxn, meta *catalog.BlockEntry) *txnBlock {
 	return blk
 }
 
-func (blk *txnBlock) GetMeta() interface{}    { return blk.entry }
-func (blk *txnBlock) String() string          { return blk.entry.String() }
+func (blk *txnBlock) GetMeta() interface{} { return blk.entry }
+func (blk *txnBlock) String() string {
+	blkData := blk.entry.GetBlockData()
+	return blkData.PPString(common.PPL1, 0, "")
+	// return blk.entry.String()
+}
 func (blk *txnBlock) ID() uint64              { return blk.entry.GetID() }
 func (blk *txnBlock) Fingerprint() *common.ID { return blk.entry.AsCommonID() }
 func (blk *txnBlock) BatchDedup(pks *gvec.Vector) (err error) {

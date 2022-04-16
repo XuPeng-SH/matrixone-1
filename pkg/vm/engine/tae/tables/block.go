@@ -2,8 +2,10 @@ package tables
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/accessif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/impl"
@@ -65,6 +67,16 @@ func (blk *dataBlock) Rows(txn txnif.AsyncTxn, coarse bool) int {
 		return rows
 	}
 	return int(blk.file.Rows())
+}
+
+func (blk *dataBlock) PPString(level common.PPLevel, depth int, prefix string) string {
+	blk.RLock()
+	defer blk.RUnlock()
+	s := fmt.Sprintf("%s | [Rows=%d]", blk.meta.PPString(level, depth, prefix), blk.Rows(nil, true))
+	if blk.chain != nil {
+		s = fmt.Sprintf("%s\n%s", s, blk.chain.StringLocked())
+	}
+	return s
 }
 
 func (blk *dataBlock) MakeAppender() (appender data.BlockAppender, err error) {
