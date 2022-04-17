@@ -9,7 +9,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/accessif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/impl"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates2"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates"
 
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/buffer/base"
@@ -27,7 +27,7 @@ type dataBlock struct {
 	file                 dataio.BlockFile
 	bufMgr               base.INodeManager
 	updatableIndexHolder accessif.IAppendableBlockIndexHolder
-	controller           *updates2.MutationController
+	controller           *updates.MutationController
 }
 
 func newBlock(meta *catalog.BlockEntry, segFile dataio.SegmentFile, bufMgr base.INodeManager) *dataBlock {
@@ -47,7 +47,7 @@ func newBlock(meta *catalog.BlockEntry, segFile dataio.SegmentFile, bufMgr base.
 		file:                 file,
 		node:                 node,
 		updatableIndexHolder: holder,
-		controller:           updates2.NewMutationNode(meta),
+		controller:           updates.NewMutationNode(meta),
 	}
 }
 
@@ -111,7 +111,7 @@ func (blk *dataBlock) getVectorCopy(txn txnif.AsyncTxn, attr string, compressed,
 	updateMask, updateVals := chain.CollectUpdatesLocked(txn.GetStartTS())
 	chain.RUnlock()
 	deleteChain := blk.controller.GetDeleteChain()
-	dnode := deleteChain.CollectDeletesLocked(txn.GetStartTS()).(*updates2.DeleteNode)
+	dnode := deleteChain.CollectDeletesLocked(txn.GetStartTS()).(*updates.DeleteNode)
 	readLock.Unlock()
 
 	blk.RLock()

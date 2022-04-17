@@ -19,7 +19,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates2"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates"
 )
 
 var (
@@ -73,8 +73,8 @@ type txnTable struct {
 	dropEntry   txnif.TxnEntry
 	inodes      []InsertNode
 	appendable  base.INodeHandle
-	updateNodes map[common.ID]*updates2.ColumnNode
-	deleteNodes map[common.ID]*updates2.DeleteNode
+	updateNodes map[common.ID]*updates.ColumnNode
+	deleteNodes map[common.ID]*updates.DeleteNode
 	driver      txnbase.NodeDriver
 	entry       *catalog.TableEntry
 	handle      handle.Relation
@@ -102,8 +102,8 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver txnbase.Node
 		entry:       handle.GetMeta().(*catalog.TableEntry),
 		driver:      driver,
 		index:       NewSimpleTableIndex(),
-		updateNodes: make(map[common.ID]*updates2.ColumnNode),
-		deleteNodes: make(map[common.ID]*updates2.DeleteNode),
+		updateNodes: make(map[common.ID]*updates.ColumnNode),
+		deleteNodes: make(map[common.ID]*updates.DeleteNode),
 		csegs:       make([]*catalog.SegmentEntry, 0),
 		dsegs:       make([]*catalog.SegmentEntry, 0),
 		dataFactory: dataFactory,
@@ -299,7 +299,7 @@ func (tbl *txnTable) registerInsertNode() error {
 	return nil
 }
 
-func (tbl *txnTable) AddDeleteNode(id *common.ID, node *updates2.DeleteNode) error {
+func (tbl *txnTable) AddDeleteNode(id *common.ID, node *updates.DeleteNode) error {
 	nid := *id
 	u := tbl.deleteNodes[nid]
 	if u != nil {
@@ -315,7 +315,7 @@ func (tbl *txnTable) AddUpdateNode(node txnif.UpdateNode) error {
 	if u != nil {
 		return ErrDuplicateNode
 	}
-	tbl.updateNodes[id] = node.(*updates2.ColumnNode)
+	tbl.updateNodes[id] = node.(*updates.ColumnNode)
 	return nil
 }
 
@@ -420,7 +420,7 @@ func (tbl *txnTable) RangeDelete(inode uint32, segmentId, blockId uint64, start,
 	}
 	node := tbl.deleteNodes[common.ID{TableID: tbl.GetID(), SegmentID: segmentId, BlockID: blockId}]
 	if node != nil {
-		chain := node.GetChain().(*updates2.DeleteChain)
+		chain := node.GetChain().(*updates.DeleteChain)
 		controller := chain.GetController()
 		writeLock := controller.GetExclusiveLock()
 		err = controller.CheckNotDeleted(start, end, tbl.txn.GetStartTS())
@@ -443,7 +443,7 @@ func (tbl *txnTable) RangeDelete(inode uint32, segmentId, blockId uint64, start,
 	blkData := blk.GetBlockData()
 	node2, err := blkData.RangeDelete(tbl.txn, start, end)
 	if err == nil {
-		tbl.AddDeleteNode(blk.AsCommonID(), node2.(*updates2.DeleteNode))
+		tbl.AddDeleteNode(blk.AsCommonID(), node2.(*updates.DeleteNode))
 	}
 	return
 }
@@ -497,7 +497,7 @@ func (tbl *txnTable) Update(inode uint32, segmentId, blockId uint64, row uint32,
 		Idx:       col,
 	}]
 	if node != nil {
-		chain := node.GetChain().(*updates2.ColumnChain)
+		chain := node.GetChain().(*updates.ColumnChain)
 		controller := chain.GetController()
 		sharedLock := controller.GetSharedLock()
 		err = controller.CheckNotDeleted(row, row, tbl.txn.GetStartTS())

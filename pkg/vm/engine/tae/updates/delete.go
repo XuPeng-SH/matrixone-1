@@ -1,4 +1,4 @@
-package updates2
+package updates
 
 import (
 	"encoding/binary"

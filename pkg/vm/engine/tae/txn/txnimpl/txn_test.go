@@ -19,7 +19,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates2"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/RoaringBitmap/roaring/roaring64"
@@ -406,8 +406,8 @@ func TestApplyToColumn1(t *testing.T) {
 	deletes := &roaring.Bitmap{}
 	deletes.Add(1)
 	ts := common.NextGlobalSeqNum()
-	chain := updates2.MockColumnUpdateChain()
-	node := updates2.NewCommittedColumnNode(ts, ts, nil, nil)
+	chain := updates.MockColumnUpdateChain()
+	node := updates.NewCommittedColumnNode(ts, ts, nil, nil)
 	node.AttachTo(chain)
 	node.UpdateLocked(3, []byte("update"))
 	deletes.AddRange(3, 4)
@@ -444,8 +444,8 @@ func TestApplyToColumn2(t *testing.T) {
 	deletes := &roaring.Bitmap{}
 	deletes.Add(1)
 	ts := common.NextGlobalSeqNum()
-	chain := updates2.MockColumnUpdateChain()
-	node := updates2.NewCommittedColumnNode(ts, ts, nil, nil)
+	chain := updates.MockColumnUpdateChain()
+	node := updates.NewCommittedColumnNode(ts, ts, nil, nil)
 	node.AttachTo(chain)
 	node.UpdateLocked(0, int32(8))
 	deletes.AddRange(2, 4)
@@ -468,8 +468,8 @@ func TestApplyToColumn2(t *testing.T) {
 
 func TestApplyToColumn3(t *testing.T) {
 	ts := common.NextGlobalSeqNum()
-	chain := updates2.MockColumnUpdateChain()
-	node := updates2.NewCommittedColumnNode(ts, ts, nil, nil)
+	chain := updates.MockColumnUpdateChain()
+	node := updates.NewCommittedColumnNode(ts, ts, nil, nil)
 	node.AttachTo(chain)
 	node.UpdateLocked(3, []byte("update"))
 
@@ -497,8 +497,8 @@ func TestApplyToColumn3(t *testing.T) {
 
 func TestApplyToColumn4(t *testing.T) {
 	ts := common.NextGlobalSeqNum()
-	chain := updates2.MockColumnUpdateChain()
-	node := updates2.NewCommittedColumnNode(ts, ts, nil, nil)
+	chain := updates.MockColumnUpdateChain()
+	node := updates.NewCommittedColumnNode(ts, ts, nil, nil)
 	node.AttachTo(chain)
 	node.UpdateLocked(3, int32(8))
 
