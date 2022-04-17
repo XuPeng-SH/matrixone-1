@@ -59,9 +59,26 @@ func NewColumnNode(txn txnif.AsyncTxn, id *common.ID, rwlocker *sync.RWMutex) *C
 	return n
 }
 
+func (n *ColumnNode) MakeCommand(id uint32, forceFlush bool) (cmd txnif.TxnCmd, entry txnbase.NodeEntry, err error) {
+	cmd = NewUpdateCmd(id, n)
+	return
+}
+
 func (n *ColumnNode) AttachTo(chain *ColumnChain) {
 	n.chain = chain
 	n.DLNode = chain.Insert(n)
+}
+
+func (n *ColumnNode) GetID() *common.ID {
+	return n.id
+}
+
+func (n *ColumnNode) GetChain() txnif.UpdateChain {
+	return n.chain
+}
+
+func (n *ColumnNode) GetDLNode() *common.DLNode {
+	return n.DLNode
 }
 
 func (n *ColumnNode) Compare(o common.NodePayload) int {
@@ -215,6 +232,12 @@ func (n *ColumnNode) ApplyToColumn(vec *gvec.Vector, deletes *roaring.Bitmap) *g
 	vec = compute.ApplyUpdateToVector(vec, n.txnMask, n.txnVals)
 	vec = compute.ApplyDeleteToVector(vec, deletes)
 	return vec
+}
+
+func (n *ColumnNode) String() string {
+	n.RLock()
+	defer n.RUnlock()
+	return n.StringLocked()
 }
 
 func (n *ColumnNode) StringLocked() string {

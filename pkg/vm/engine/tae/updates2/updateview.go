@@ -11,15 +11,32 @@ import (
 
 type ColumnView struct {
 	links map[uint32]*common.Link
-	// chain *ColumnChain
+	mask  *roaring.Bitmap
 }
 
 // func NewColumnView(chain *ColumnChain) *ColumnView {
 func NewColumnView() *ColumnView {
 	return &ColumnView{
-		// chain: chain,
 		links: make(map[uint32]*common.Link),
+		mask:  roaring.New(),
 	}
+}
+
+func (view *ColumnView) CollectUpdates(ts uint64) (mask *roaring.Bitmap, vals map[uint32]interface{}) {
+	mask = roaring.New()
+	vals = make(map[uint32]interface{})
+	it := view.mask.Iterator()
+	var err error
+	var v interface{}
+	for it.HasNext() {
+		row := it.Next()
+		v, err = view.GetValue(row, ts)
+		if err == nil {
+			vals[row] = v
+			mask.Add(row)
+		}
+	}
+	return
 }
 
 func (view *ColumnView) GetValue(key uint32, startTs uint64) (v interface{}, err error) {
@@ -88,6 +105,7 @@ func (view *ColumnView) Insert(key uint32, n *ColumnNode) (err error) {
 	if link = view.links[key]; link == nil {
 		link = new(common.Link)
 		link.Insert(n)
+		view.mask.Add(key)
 		view.links[key] = link
 		return
 	}
@@ -105,6 +123,7 @@ func (view *ColumnView) Insert(key uint32, n *ColumnNode) (err error) {
 		node.RUnlock()
 		// 1.2 The update was committed before txn start. use it
 		link.Insert(n)
+		view.mask.Add(key)
 		return
 	}
 	// 2. The specified row was updated by the same txn

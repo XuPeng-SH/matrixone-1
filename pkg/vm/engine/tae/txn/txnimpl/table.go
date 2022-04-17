@@ -19,7 +19,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/updates2"
 )
 
 var (
@@ -73,7 +73,7 @@ type txnTable struct {
 	dropEntry   txnif.TxnEntry
 	inodes      []InsertNode
 	appendable  base.INodeHandle
-	updateNodes map[uint64]*updates.BlockUpdateNode
+	updateNodes map[common.ID]*updates2.ColumnNode
 	driver      txnbase.NodeDriver
 	entry       *catalog.TableEntry
 	handle      handle.Relation
@@ -101,7 +101,7 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver txnbase.Node
 		entry:       handle.GetMeta().(*catalog.TableEntry),
 		driver:      driver,
 		index:       NewSimpleTableIndex(),
-		updateNodes: make(map[uint64]*updates.BlockUpdateNode),
+		updateNodes: make(map[common.ID]*updates2.ColumnNode),
 		csegs:       make([]*catalog.SegmentEntry, 0),
 		dsegs:       make([]*catalog.SegmentEntry, 0),
 		dataFactory: dataFactory,
@@ -288,11 +288,11 @@ func (tbl *txnTable) registerInsertNode() error {
 
 func (tbl *txnTable) AddUpdateNode(node txnif.UpdateNode) error {
 	id := *node.GetID()
-	u := tbl.updateNodes[id.BlockID]
+	u := tbl.updateNodes[id]
 	if u != nil {
 		return ErrDuplicateNode
 	}
-	tbl.updateNodes[id.BlockID] = node.(*updates.BlockUpdateNode)
+	tbl.updateNodes[id] = node.(*updates2.ColumnNode)
 	return nil
 }
 
@@ -392,45 +392,46 @@ func (tbl *txnTable) GetLocalPhysicalAxis(row uint32) (int, uint32) {
 }
 
 func (tbl *txnTable) RangeDelete(inode uint32, segmentId, blockId uint64, start, end uint32) (err error) {
-	if inode != 0 {
-		return tbl.RangeDeleteLocalRows(start, end)
-	}
-	node := tbl.updateNodes[blockId]
-	if node != nil {
-		chain := node.GetChain()
-		chain.RLock()
-		if err = chain.CheckDeletedLocked(start, end, tbl.txn); err != nil {
-			chain.RUnlock()
-			return
-		}
-		for col := range tbl.entry.GetSchema().ColDefs {
-			for row := start; row <= end; row++ {
-				if err = chain.CheckColumnUpdatedLocked(row, uint16(col), tbl.txn); err != nil {
-					chain.RUnlock()
-					return
-				}
-			}
-		}
-		node.Lock()
-		chain.RUnlock()
-		node.ApplyDeleteRowsLocked(start, end)
-		node.Unlock()
-		return
-	}
-	seg, err := tbl.entry.GetSegmentByID(segmentId)
-	if err != nil {
-		return
-	}
-	blk, err := seg.GetBlockEntryByID(blockId)
-	if err != nil {
-		return
-	}
-	blkData := blk.GetBlockData()
-	node2, err := blkData.RangeDelete(tbl.txn, start, end)
-	if err == nil {
-		tbl.AddUpdateNode(node2)
-	}
 	return
+	// if inode != 0 {
+	// 	return tbl.RangeDeleteLocalRows(start, end)
+	// }
+	// node := tbl.updateNodes[blockId]
+	// if node != nil {
+	// 	chain := node.GetChain()
+	// 	chain.RLock()
+	// 	if err = chain.CheckDeletedLocked(start, end, tbl.txn); err != nil {
+	// 		chain.RUnlock()
+	// 		return
+	// 	}
+	// 	for col := range tbl.entry.GetSchema().ColDefs {
+	// 		for row := start; row <= end; row++ {
+	// 			if err = chain.CheckColumnUpdatedLocked(row, uint16(col), tbl.txn); err != nil {
+	// 				chain.RUnlock()
+	// 				return
+	// 			}
+	// 		}
+	// 	}
+	// 	node.Lock()
+	// 	chain.RUnlock()
+	// 	node.ApplyDeleteRowsLocked(start, end)
+	// 	node.Unlock()
+	// 	return
+	// }
+	// seg, err := tbl.entry.GetSegmentByID(segmentId)
+	// if err != nil {
+	// 	return
+	// }
+	// blk, err := seg.GetBlockEntryByID(blockId)
+	// if err != nil {
+	// 	return
+	// }
+	// blkData := blk.GetBlockData()
+	// node2, err := blkData.RangeDelete(tbl.txn, start, end)
+	// if err == nil {
+	// 	tbl.AddUpdateNode(node2)
+	// }
+	// return
 }
 
 func (tbl *txnTable) GetByFilter(filter *handle.Filter) (id *common.ID, offset uint32, err error) {
@@ -475,22 +476,17 @@ func (tbl *txnTable) Update(inode uint32, segmentId, blockId uint64, row uint32,
 	if inode != 0 {
 		return tbl.UpdateLocalValue(row, col, v)
 	}
-	node := tbl.updateNodes[blockId]
+	node := tbl.updateNodes[common.ID{
+		TableID:   tbl.GetID(),
+		SegmentID: segmentId,
+		BlockID:   blockId,
+		Idx:       col,
+	}]
 	if node != nil {
 		chain := node.GetChain()
-		chain.RLock()
-		if err = chain.CheckDeletedLocked(row, row, tbl.txn); err != nil {
-			chain.RUnlock()
-			return
-		}
-		if err = chain.CheckColumnUpdatedLocked(row, col, tbl.txn); err != nil {
-			chain.RUnlock()
-			return
-		}
-		node.Lock()
-		chain.RUnlock()
-		node.ApplyUpdateColLocked(row, col, v)
-		node.Unlock()
+		chain.Lock()
+		err = node.UpdateLocked(row, v)
+		chain.Unlock()
 		return
 	}
 	seg, err := tbl.entry.GetSegmentByID(segmentId)
@@ -645,10 +641,8 @@ func (tbl *txnTable) PrepareRollback() (err error) {
 		}
 	}
 	for _, node := range tbl.updateNodes {
-		chain := node.GetChain().(*updates.BlockUpdateChain)
-		chain.Lock()
-		chain.DeleteUncommittedNodeLocked(node)
-		chain.Unlock()
+		chain := node.GetChain()
+		chain.DeleteNode(node.GetDLNode())
 	}
 	// TODO: remove all inserts and updates
 	return

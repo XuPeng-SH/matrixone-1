@@ -26,7 +26,7 @@ type Block interface {
 	RangeDelete(txn txnif.AsyncTxn, start, end uint32) (txnif.UpdateNode, error)
 	Update(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (txnif.UpdateNode, error)
 
-	GetUpdateChain() txnif.UpdateChain
+	// GetUpdateChain() txnif.UpdateChain
 	BatchDedup(txn txnif.AsyncTxn, pks *vector.Vector) error
 	GetByFilter(txn txnif.AsyncTxn, filter *handle.Filter) (uint32, error)
 	GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (interface{}, error)

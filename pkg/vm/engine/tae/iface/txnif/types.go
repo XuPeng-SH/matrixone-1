@@ -87,8 +87,16 @@ type UpdateChain interface {
 	RLock()
 	RUnlock()
 	GetID() *common.ID
-	CheckDeletedLocked(start, end uint32, txn AsyncTxn) error
-	CheckColumnUpdatedLocked(row uint32, colIdx uint16, txn AsyncTxn) error
+
+	DeleteNode(*common.DLNode)
+	DeleteNodeLocked(*common.DLNode)
+
+	AddNode(txn AsyncTxn) UpdateNode
+	AddNodeLocked(txn AsyncTxn) UpdateNode
+
+	GetValueLocked(row uint32, ts uint64) (interface{}, error)
+	// CheckDeletedLocked(start, end uint32, txn AsyncTxn) error
+	// CheckColumnUpdatedLocked(row uint32, colIdx uint16, txn AsyncTxn) error
 }
 
 type UpdateNode interface {
@@ -99,8 +107,13 @@ type UpdateNode interface {
 	String() string
 	GetChain() UpdateChain
 	PrepareCommit() error
-	ApplyDeleteRowsLocked(start, end uint32)
-	ApplyUpdateColLocked(row uint32, colIdx uint16, v interface{})
+	ApplyCommit() error
+	GetDLNode() *common.DLNode
+
+	// Update(row uint32, v interface{}) error
+	UpdateLocked(row uint32, v interface{}) error
+	// ApplyDeleteRowsLocked(start, end uint32)
+	// ApplyUpdateColLocked(row uint32, colIdx uint16, v interface{})
 	// MakeCommand(id uint32, forceFlush bool) (txnif.TxnCmd, txnbase.NodeEntry, error)
 }
 

@@ -20,6 +20,16 @@ func initTestPath(t *testing.T) string {
 	return dir
 }
 
+func mockTxn() *txnbase.Txn {
+	txn := new(txnbase.Txn)
+	txn.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
+	return txn
+}
+
+func commitTxn(txn *txnbase.Txn) {
+	txn.CommitTS = common.NextGlobalSeqNum()
+}
+
 func TestColumnChain1(t *testing.T) {
 	schema := catalog.MockSchema(1)
 	c := catalog.MockCatalog(initTestPath(t), "mock", nil)
@@ -112,12 +122,10 @@ func TestColumnChain2(t *testing.T) {
 			txn.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
 			n := chain.AddNode(txn)
 			for j := 0; j < 4; j++ {
-				n.chain.Lock()
-				n.Lock()
+				n.GetChain().Lock()
 				err := n.UpdateLocked(uint32(i*2000+j), int32(i*20000+j))
-				n.Unlock()
 				assert.Nil(t, err)
-				n.chain.Unlock()
+				n.GetChain().Unlock()
 			}
 		}
 	}
@@ -150,7 +158,92 @@ func TestColumnChain2(t *testing.T) {
 	v, err = chain.view.GetValue(2000, common.NextGlobalSeqNum())
 	assert.NotNil(t, err)
 
+	mask, vals := chain.view.CollectUpdates(txn1.GetStartTS())
+	assert.True(t, mask.Contains(1))
+	assert.True(t, mask.Contains(2))
+	assert.True(t, mask.Contains(3))
+	assert.Equal(t, int32(111), vals[uint32(1)])
+	assert.Equal(t, int32(22), vals[uint32(2)])
+	assert.Equal(t, int32(33), vals[uint32(3)])
+	t.Log(mask.String())
+	t.Log(vals)
+
 	// t.Log(chain.view.StringLocked())
 	// t.Log(chain.StringLocked())
 	// t.Log(chain.GetHead().GetPayload().(*ColumnNode).StringLocked())
+}
+
+func TestDeleteChain1(t *testing.T) {
+	chain := NewDeleteChain(nil, nil)
+	txn1 := new(txnbase.Txn)
+	txn1.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
+	n1 := chain.AddNodeLocked(txn1)
+	assert.Equal(t, 1, chain.Depth())
+
+	// 1. Txn1 delete from 1 to 10 -- PASS
+	err := chain.PrepareRangeDelete(1, 10, txn1.GetStartTS())
+	assert.Nil(t, err)
+	n1.RangeDeleteLocked(1, 10)
+	assert.Equal(t, uint32(10), n1.GetCardinalityLocked())
+	t.Log(n1.mask.String())
+
+	// 2. Txn1 delete 10 -- FAIL
+	err = chain.PrepareRangeDelete(10, 10, txn1.GetStartTS())
+	assert.NotNil(t, err)
+
+	txn2 := mockTxn()
+	// 3. Txn2 delete 2 -- FAIL
+	err = chain.PrepareRangeDelete(2, 2, txn2.GetStartTS())
+	assert.NotNil(t, err)
+
+	// 4. Txn2 delete from 21 to 30 -- PASS
+	err = chain.PrepareRangeDelete(20, 30, txn2.GetStartTS())
+	assert.Nil(t, err)
+	n2 := chain.AddNodeLocked(txn2)
+	n2.RangeDeleteLocked(20, 30)
+	assert.Equal(t, uint32(11), n2.GetCardinalityLocked())
+	t.Log(n2.mask.String())
+
+	merged := chain.AddMergeNode()
+	assert.Nil(t, merged)
+	assert.Equal(t, 2, chain.Depth())
+
+	collected := chain.CollectDeletesLocked(txn1.GetStartTS())
+	assert.Equal(t, uint32(10), collected.GetCardinalityLocked())
+	collected = chain.CollectDeletesLocked(txn2.GetStartTS())
+	assert.Equal(t, uint32(11), collected.GetCardinalityLocked())
+
+	collected = chain.CollectDeletesLocked(0)
+	assert.Nil(t, collected)
+	collected = chain.CollectDeletesLocked(common.NextGlobalSeqNum())
+	assert.Nil(t, collected)
+
+	commitTxn(txn1)
+	assert.Nil(t, n1.PrepareCommit())
+	assert.Nil(t, n1.ApplyCommit())
+	t.Log(chain.StringLocked())
+
+	collected = chain.CollectDeletesLocked(0)
+	assert.Nil(t, collected)
+	collected = chain.CollectDeletesLocked(common.NextGlobalSeqNum())
+	assert.Equal(t, uint32(10), collected.GetCardinalityLocked())
+	collected = chain.CollectDeletesLocked(txn2.GetStartTS())
+	assert.Equal(t, uint32(11), collected.GetCardinalityLocked())
+
+	txn3 := mockTxn()
+	err = chain.PrepareRangeDelete(5, 5, txn3.GetStartTS())
+	assert.NotNil(t, err)
+	err = chain.PrepareRangeDelete(31, 33, txn3.GetStartTS())
+	assert.Nil(t, err)
+	n3 := chain.AddNodeLocked(txn3)
+	n3.RangeDeleteLocked(31, 33)
+
+	collected = chain.CollectDeletesLocked(txn3.GetStartTS())
+	assert.Equal(t, uint32(13), collected.GetCardinalityLocked())
+	t.Log(chain.StringLocked())
+
+	merged = chain.AddMergeNode()
+	assert.NotNil(t, merged)
+	t.Log(chain.StringLocked())
+	assert.Equal(t, 4, chain.DepthLocked())
 }

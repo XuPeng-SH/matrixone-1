@@ -1,9 +1,9 @@
 package updates2
 
 import (
-	"fmt"
 	"sync"
 
+	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
@@ -42,7 +42,23 @@ func (chain *ColumnChain) GetColumnName() string {
 	return chain.meta.GetSchema().ColDefs[chain.id.Idx].Name
 }
 
-func (chain *ColumnChain) AddNode(txn txnif.AsyncTxn) *ColumnNode {
+func (chain *ColumnChain) AddNodeLocked(txn txnif.AsyncTxn) txnif.UpdateNode {
+	node := NewColumnNode(txn, chain.id, nil)
+	node.AttachTo(chain)
+	return node
+}
+
+func (chain *ColumnChain) DeleteNode(node *common.DLNode) {
+	chain.Lock()
+	defer chain.Unlock()
+	chain.Delete(node)
+}
+
+func (chain *ColumnChain) DeleteNodeLocked(node *common.DLNode) {
+	chain.Delete(node)
+}
+
+func (chain *ColumnChain) AddNode(txn txnif.AsyncTxn) txnif.UpdateNode {
 	col := NewColumnNode(txn, chain.id, nil)
 	chain.Lock()
 	defer chain.Unlock()
@@ -72,14 +88,23 @@ func (chain *ColumnChain) UpdateLocked(node *ColumnNode) {
 }
 
 func (chain *ColumnChain) StringLocked() string {
-	msg := fmt.Sprintf("Block-%s-Col[%d]-Chain:", chain.id.ToBlockFileName(), chain.id.Idx)
-	line := 1
-	chain.LoopChainLocked(func(n *ColumnNode) bool {
-		n.RLock()
-		msg = fmt.Sprintf("%s\n%d. %s", msg, line, n.StringLocked())
-		n.RUnlock()
-		line++
-		return true
-	}, false)
-	return msg
+	return chain.view.StringLocked()
+	// msg := fmt.Sprintf("Block-%s-Col[%d]-Chain:", chain.id.ToBlockFileName(), chain.id.Idx)
+	// line := 1
+	// chain.LoopChainLocked(func(n *ColumnNode) bool {
+	// 	n.RLock()
+	// 	msg = fmt.Sprintf("%s\n%d. %s", msg, line, n.StringLocked())
+	// 	n.RUnlock()
+	// 	line++
+	// 	return true
+	// }, false)
+	// return msg
+}
+
+func (chain *ColumnChain) GetValueLocked(row uint32, ts uint64) (v interface{}, err error) {
+	return chain.view.GetValue(row, ts)
+}
+
+func (chain *ColumnChain) CollectUpdatesLocked(ts uint64) (*roaring.Bitmap, map[uint32]interface{}) {
+	return chain.view.CollectUpdates(ts)
 }
