@@ -12,34 +12,53 @@ import (
 type ColumnChain struct {
 	*common.Link
 	*sync.RWMutex
-	meta *catalog.BlockEntry
-	id   *common.ID
-	view *ColumnView
+	id         *common.ID
+	view       *ColumnView
+	controller *MutationController
 }
 
-func NewColumnChain(rwlocker *sync.RWMutex, colIdx uint16, meta *catalog.BlockEntry) *ColumnChain {
-	if rwlocker == nil {
-		rwlocker = new(sync.RWMutex)
-	}
-	id := meta.AsCommonID()
-	id.Idx = colIdx
+func MockColumnUpdateChain() *ColumnChain {
 	chain := &ColumnChain{
 		Link:    new(common.Link),
-		RWMutex: rwlocker,
-		meta:    meta,
-		id:      id,
+		RWMutex: new(sync.RWMutex),
+		id:      &common.ID{},
 	}
 	chain.view = NewColumnView()
 	return chain
 }
 
-func (chain *ColumnChain) GetMeta() *catalog.BlockEntry { return chain.meta }
-func (chain *ColumnChain) GetBlockID() *common.ID       { id := chain.id.AsBlockID(); return &id }
-func (chain *ColumnChain) GetID() *common.ID            { return chain.id }
-func (chain *ColumnChain) GetColumnIdx() uint16         { return chain.id.Idx }
+func NewColumnChain(rwlocker *sync.RWMutex, colIdx uint16, controller *MutationController) *ColumnChain {
+	if rwlocker == nil {
+		rwlocker = new(sync.RWMutex)
+	}
+	id := *controller.GetID()
+	id.Idx = colIdx
+	chain := &ColumnChain{
+		Link:       new(common.Link),
+		RWMutex:    rwlocker,
+		controller: controller,
+		id:         &id,
+	}
+	chain.view = NewColumnView()
+	return chain
+}
+
+func (chain *ColumnChain) GetMeta() *catalog.BlockEntry       { return chain.controller.meta }
+func (chain *ColumnChain) GetBlockID() *common.ID             { id := chain.id.AsBlockID(); return &id }
+func (chain *ColumnChain) GetID() *common.ID                  { return chain.id }
+func (chain *ColumnChain) GetColumnIdx() uint16               { return chain.id.Idx }
+func (chain *ColumnChain) GetController() *MutationController { return chain.controller }
 
 func (chain *ColumnChain) GetColumnName() string {
-	return chain.meta.GetSchema().ColDefs[chain.id.Idx].Name
+	return chain.controller.meta.GetSchema().ColDefs[chain.id.Idx].Name
+}
+
+func (chain *ColumnChain) TryUpdateNodeLocked(row uint32, v interface{}, n txnif.UpdateNode) (err error) {
+	if err = chain.view.Insert(row, n); err != nil {
+		return
+	}
+	n.UpdateLocked(row, v)
+	return
 }
 
 func (chain *ColumnChain) AddNodeLocked(txn txnif.AsyncTxn) txnif.UpdateNode {
@@ -51,10 +70,14 @@ func (chain *ColumnChain) AddNodeLocked(txn txnif.AsyncTxn) txnif.UpdateNode {
 func (chain *ColumnChain) DeleteNode(node *common.DLNode) {
 	chain.Lock()
 	defer chain.Unlock()
-	chain.Delete(node)
+	chain.DeleteNodeLocked(node)
 }
 
 func (chain *ColumnChain) DeleteNodeLocked(node *common.DLNode) {
+	n := node.GetPayload().(*ColumnNode)
+	for row, _ := range n.txnVals {
+		chain.view.Delete(row, n)
+	}
 	chain.Delete(node)
 }
 
@@ -81,6 +104,10 @@ func (chain *ColumnChain) DepthLocked() int {
 		return true
 	}, false)
 	return depth
+}
+
+func (chain *ColumnChain) PrepareUpdate(row uint32, n txnif.UpdateNode) error {
+	return chain.view.Insert(row, n)
 }
 
 func (chain *ColumnChain) UpdateLocked(node *ColumnNode) {

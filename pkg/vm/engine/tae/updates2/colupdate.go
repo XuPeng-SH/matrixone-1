@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
+	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -158,14 +159,17 @@ func (n *ColumnNode) ReadFrom(r io.Reader) error {
 		return err
 	}
 	vals := gvec.Vector{}
+	vals.Nsp = &nulls.Nulls{}
 	if err := vals.Read(buf); err != nil {
 		return err
 	}
 	it := n.txnMask.Iterator()
+	row := uint32(0)
 	for it.HasNext() {
-		row := it.Next()
+		key := it.Next()
 		v := compute.GetValue(&vals, row)
-		n.txnVals[row] = v
+		n.txnVals[key] = v
+		row++
 	}
 	return nil
 }
@@ -189,7 +193,7 @@ func (n *ColumnNode) WriteTo(w io.Writer) error {
 		return err
 	}
 
-	col := gvec.New(n.chain.meta.GetSchema().ColDefs[n.chain.id.Idx].Type)
+	col := gvec.New(n.chain.GetMeta().GetSchema().ColDefs[n.chain.id.Idx].Type)
 	it := n.txnMask.Iterator()
 	for it.HasNext() {
 		row := it.Next()
@@ -207,9 +211,6 @@ func (n *ColumnNode) WriteTo(w io.Writer) error {
 }
 
 func (n *ColumnNode) UpdateLocked(row uint32, v interface{}) error {
-	if err := n.chain.view.Insert(row, n); err != nil {
-		return err
-	}
 	n.txnMask.Add(row)
 	n.txnVals[row] = v
 	return nil

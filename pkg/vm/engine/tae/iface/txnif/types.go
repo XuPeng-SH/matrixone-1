@@ -93,10 +93,38 @@ type UpdateChain interface {
 
 	AddNode(txn AsyncTxn) UpdateNode
 	AddNodeLocked(txn AsyncTxn) UpdateNode
+	PrepareUpdate(uint32, UpdateNode) error
 
 	GetValueLocked(row uint32, ts uint64) (interface{}, error)
+	TryUpdateNodeLocked(row uint32, v interface{}, n UpdateNode) error
 	// CheckDeletedLocked(start, end uint32, txn AsyncTxn) error
 	// CheckColumnUpdatedLocked(row uint32, colIdx uint16, txn AsyncTxn) error
+}
+
+type DeleteChain interface {
+	sync.Locker
+	RLock()
+	RUnlock()
+	// GetID() *common.ID
+	RemoveNodeLocked(DeleteNode)
+
+	AddNodeLocked(txn AsyncTxn) DeleteNode
+	AddMergeNode() DeleteNode
+
+	PrepareRangeDelete(start, end uint32, ts uint64) error
+	DepthLocked() int
+	CollectDeletesLocked(ts uint64) DeleteNode
+}
+
+type DeleteNode interface {
+	sync.Locker
+	RLock()
+	RUnlock()
+	StringLocked() string
+	GetChain() DeleteChain
+	RangeDeleteLocked(start, end uint32)
+	GetCardinalityLocked() uint32
+	// MakeCommand(id uint32, forceFlush bool) (TxnCmd, txnbase.NodeEntry, error)
 }
 
 type UpdateNode interface {
@@ -114,7 +142,7 @@ type UpdateNode interface {
 	UpdateLocked(row uint32, v interface{}) error
 	// ApplyDeleteRowsLocked(start, end uint32)
 	// ApplyUpdateColLocked(row uint32, colIdx uint16, v interface{})
-	// MakeCommand(id uint32, forceFlush bool) (txnif.TxnCmd, txnbase.NodeEntry, error)
+	// MakeCommand(id uint32, forceFlush bool) (TxnCmd, txnbase.NodeEntry, error)
 }
 
 type TxnStore interface {

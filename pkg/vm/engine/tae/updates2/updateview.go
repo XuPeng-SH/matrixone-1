@@ -99,7 +99,41 @@ func (view *ColumnView) GetValue(key uint32, startTs uint64) (v interface{}, err
 	return
 }
 
-func (view *ColumnView) Insert(key uint32, n *ColumnNode) (err error) {
+func (view *ColumnView) PrepapreInsert(key uint32, ts uint64) (err error) {
+	// First update to key
+	var link *common.Link
+	if link = view.links[key]; link == nil {
+		return
+	}
+
+	node := link.GetHead().GetPayload().(*ColumnNode)
+	node.RLock()
+	// 1. The specified row has committed update
+	if node.txn == nil {
+		// 1.1 The update was committed after txn start. w-w conflict
+		if node.GetCommitTSLocked() > ts {
+			err = txnbase.ErrDuplicated
+			node.RUnlock()
+			return
+		}
+		node.RUnlock()
+		// 1.2 The update was committed before txn start. use it
+		return
+	}
+	// 2. The specified row was updated by the same txn
+	if node.txn.GetStartTS() == ts {
+		node.RUnlock()
+		return
+	}
+	// 3. The specified row has other uncommitted change
+	// Note: Here we have some overkill to proactivelly w-w with committing txn
+	node.RUnlock()
+	err = txnbase.ErrDuplicated
+	return
+}
+
+func (view *ColumnView) Insert(key uint32, un txnif.UpdateNode) (err error) {
+	n := un.(*ColumnNode)
 	// First update to key
 	var link *common.Link
 	if link = view.links[key]; link == nil {
@@ -153,6 +187,9 @@ func (view *ColumnView) Delete(key uint32, n *ColumnNode) (err error) {
 		panic("logic error")
 	}
 	link.Delete(target)
+	if link.GetHead() == nil {
+		delete(view.links, key)
+	}
 	return
 }
 

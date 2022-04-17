@@ -26,8 +26,8 @@ type dataBlock struct {
 	node                 *appendableNode
 	file                 dataio.BlockFile
 	bufMgr               base.INodeManager
-	colUpdates           map[uint16]*updates2.ColumnChain
 	updatableIndexHolder accessif.IAppendableBlockIndexHolder
+	controller           *updates2.MutationController
 }
 
 func newBlock(meta *catalog.BlockEntry, segFile dataio.SegmentFile, bufMgr base.INodeManager) *dataBlock {
@@ -47,6 +47,7 @@ func newBlock(meta *catalog.BlockEntry, segFile dataio.SegmentFile, bufMgr base.
 		file:                 file,
 		node:                 node,
 		updatableIndexHolder: holder,
+		controller:           updates2.NewMutationNode(meta),
 	}
 }
 
@@ -72,9 +73,12 @@ func (blk *dataBlock) PPString(level common.PPLevel, depth int, prefix string) s
 	blk.RLock()
 	defer blk.RUnlock()
 	s := fmt.Sprintf("%s | [Rows=%d]", blk.meta.PPString(level, depth, prefix), blk.Rows(nil, true))
-	if blk.colUpdates != nil {
-		for _, col := range blk.colUpdates {
-			s = fmt.Sprintf("%s\n%s", s, col.StringLocked())
+	if level >= common.PPL1 {
+		readLock := blk.controller.GetSharedLock()
+		s2 := blk.controller.StringLocked()
+		readLock.Unlock()
+		if s2 != "" {
+			s = fmt.Sprintf("%s\n%s", s, s2)
 		}
 	}
 	return s
@@ -99,76 +103,60 @@ func (blk *dataBlock) getVectorCopy(txn txnif.AsyncTxn, attr string, compressed,
 		panic("not expected")
 	}
 	defer h.Close()
+	colIdx := blk.meta.GetSegment().GetTable().GetSchema().GetColIdx(attr)
+
+	readLock := blk.controller.GetSharedLock()
+	chain := blk.controller.GetColumnChain(uint16(colIdx))
+	chain.RLock()
+	updateMask, updateVals := chain.CollectUpdatesLocked(txn.GetStartTS())
+	chain.RUnlock()
+	deleteChain := blk.controller.GetDeleteChain()
+	dnode := deleteChain.CollectDeletesLocked(txn.GetStartTS()).(*updates2.DeleteNode)
+	readLock.Unlock()
+
 	blk.RLock()
 	vec, err = blk.node.GetVectorCopy(txn, attr, compressed, decompressed)
-	if err != nil || raw {
-		blk.RUnlock()
-		return
-	}
-	if blk.colUpdates != nil {
-		colIdx := blk.meta.GetSegment().GetTable().GetSchema().GetColIdx(attr)
-		col := blk.colUpdates[uint16(colIdx)]
-		blk.RUnlock()
-		if col == nil {
-			return
-		}
-		col.RLock()
-		mask, vals := col.CollectUpdatesLocked(txn.GetStartTS())
-		col.RUnlock()
-		vec = compute.ApplyUpdateToVector(vec, mask, vals)
-		return
-	}
 	blk.RUnlock()
+	if err != nil || raw {
+		return
+	}
+	vec = compute.ApplyUpdateToVector(vec, updateMask, updateVals)
+	if dnode != nil {
+		vec = dnode.ApplyDeletes(vec)
+	}
 	return
 }
 
 func (blk *dataBlock) Update(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (node txnif.UpdateNode, err error) {
-	blk.Lock()
-	if blk.colUpdates == nil {
-		blk.colUpdates = make(map[uint16]*updates2.ColumnChain)
+	locker := blk.controller.GetSharedLock()
+	err = blk.controller.CheckNotDeleted(row, row, txn.GetStartTS())
+	if err == nil {
+		chain := blk.controller.GetColumnChain(colIdx)
+		chain.Lock()
+		node = chain.AddNodeLocked(txn)
+		err = blk.controller.PrepareUpdate(row, colIdx, node)
+		if err != nil {
+			blk.controller.DropUpdateNode(colIdx, node)
+		} else {
+			node.UpdateLocked(row, v)
+		}
+		chain.Unlock()
 	}
-	col := blk.colUpdates[colIdx]
-	if col == nil {
-		col = updates2.NewColumnChain(nil, colIdx, blk.meta)
-		blk.colUpdates[colIdx] = col
-	}
-	blk.Unlock()
-	col.Lock()
-	node = col.AddNodeLocked(txn)
-	err = node.UpdateLocked(row, v)
-	if err != nil {
-		col.DeleteNodeLocked(node.GetDLNode())
-	}
-	col.Unlock()
+	locker.Unlock()
 	return
 }
 
-func (blk *dataBlock) RangeDelete(txn txnif.AsyncTxn, start, end uint32) (node txnif.UpdateNode, err error) {
+func (blk *dataBlock) RangeDelete(txn txnif.AsyncTxn, start, end uint32) (node txnif.DeleteNode, err error) {
+	locker := blk.controller.GetExclusiveLock()
+	err = blk.controller.CheckNotDeleted(start, end, txn.GetStartTS())
+	if err == nil {
+		if err = blk.controller.CheckNotUpdated(start, end, txn.GetStartTS()); err == nil {
+			node = blk.controller.CreateDeleteNode(txn)
+			node.RangeDeleteLocked(start, end)
+		}
+	}
+	locker.Unlock()
 	return
-	// blk.Lock()
-	// defer blk.Unlock()
-	// // First update
-	// if blk.chain == nil {
-	// 	blk.chain = updates.NewUpdateChain(blk.RWMutex, blk.meta)
-	// 	node = blk.chain.AddNodeLocked(txn)
-	// 	node.ApplyDeleteRowsLocked(start, end)
-	// 	return
-	// }
-	// err = blk.chain.CheckDeletedLocked(start, end, txn)
-	// if err != nil {
-	// 	return
-	// }
-
-	// for col := range blk.meta.GetSegment().GetTable().GetSchema().ColDefs {
-	// 	for row := start; row <= end; row++ {
-	// 		if err = blk.chain.CheckColumnUpdatedLocked(row, uint16(col), txn); err != nil {
-	// 			return
-	// 		}
-	// 	}
-	// }
-	// node = blk.chain.AddNodeLocked(txn)
-	// node.ApplyDeleteRowsLocked(start, end)
-	// return
 }
 
 // func (blk *dataBlock) GetUpdateChain() txnif.UpdateChain {
@@ -178,19 +166,19 @@ func (blk *dataBlock) RangeDelete(txn txnif.AsyncTxn, start, end uint32) (node t
 // }
 
 func (blk *dataBlock) GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (v interface{}, err error) {
-	blk.RLock()
-	defer blk.RUnlock()
-	if blk.colUpdates != nil {
-		chain := blk.colUpdates[col]
-		if chain != nil {
-			chain.RLock()
-			v, err = chain.GetValueLocked(row, txn.GetStartTS())
-			chain.RUnlock()
-		}
+	sharedLock := blk.controller.GetSharedLock()
+	deleteChain := blk.controller.GetDeleteChain()
+	deleted := deleteChain.IsDeleted(row, txn.GetStartTS())
+	if !deleted {
+		chain := blk.controller.GetColumnChain(col)
+		chain.RLock()
+		v, err = chain.GetValueLocked(row, txn.GetStartTS())
+		chain.RUnlock()
 	}
 	if v != nil && err == nil {
 		return
 	}
+	sharedLock.Unlock()
 	var comp bytes.Buffer
 	var decomp bytes.Buffer
 	attr := blk.meta.GetSegment().GetTable().GetSchema().ColDefs[col].Name

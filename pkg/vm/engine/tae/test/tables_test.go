@@ -252,6 +252,10 @@ func TestTxn3(t *testing.T) {
 		t.Log(bat.Vecs[colIdx].String())
 	}
 	{
+		// 1. Update ROW=5, VAL=99 -- PASS
+		// 2. Update ROW=5, VAL=100 -- PASS
+		// 3. Delete ROWS=[0,2] -- PASS
+		// 4. Update ROW=1 -- FAIL
 		txn := mgr.StartTxn(nil)
 		db, _ := txn.GetDatabase("db")
 		rel, _ := db.GetRelationByName(schema.Name)

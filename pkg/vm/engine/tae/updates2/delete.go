@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	"github.com/RoaringBitmap/roaring"
+	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 )
@@ -28,12 +30,6 @@ type DeleteNode struct {
 	startTs  uint64
 	commitTs uint64
 	nt       NodeType
-}
-
-type DeleteChain struct {
-	*sync.RWMutex
-	*common.Link
-	holder *BlockNode
 }
 
 func NewMergedNode(commitTs uint64) *DeleteNode {
@@ -59,149 +55,6 @@ func NewDeleteNode(txn txnif.AsyncTxn) *DeleteNode {
 		n.commitTs = txn.GetCommitTS()
 	}
 	return n
-}
-
-func NewDeleteChain(rwlocker *sync.RWMutex, holder *BlockNode) *DeleteChain {
-	if rwlocker == nil {
-		rwlocker = new(sync.RWMutex)
-	}
-	chain := &DeleteChain{
-		RWMutex: rwlocker,
-		Link:    new(common.Link),
-		holder:  holder,
-	}
-	return chain
-}
-
-func (chain *DeleteChain) StringLocked() string {
-	msg := fmt.Sprintf("DeleteChain:")
-	line := 1
-	chain.LoopChainLocked(func(n *DeleteNode) bool {
-		n.RLock()
-		msg = fmt.Sprintf("%s\n%d. %s", msg, line, n.StringLocked())
-		n.RUnlock()
-		line++
-		return true
-	}, false)
-	return msg
-}
-
-func (chain *DeleteChain) LoopChainLocked(fn func(node *DeleteNode) bool, reverse bool) {
-	wrapped := func(n *common.DLNode) bool {
-		dnode := n.GetPayload().(*DeleteNode)
-		return fn(dnode)
-	}
-	chain.Loop(wrapped, reverse)
-}
-
-func (chain *DeleteChain) PrepareRangeDelete(start, end uint32, ts uint64) (err error) {
-	chain.LoopChainLocked(func(n *DeleteNode) bool {
-		n.RLock()
-		defer n.RUnlock()
-		overlap := n.HasOverlapLocked(start, end)
-		if overlap {
-			err = txnif.TxnWWConflictErr
-		}
-		return true
-	}, false)
-	return
-}
-
-func (chain *DeleteChain) UpdateLocked(node *DeleteNode) {
-	chain.Update(node.DLNode)
-}
-
-func (chain *DeleteChain) RemoveNodeLocked(node *DeleteNode) {
-	chain.Delete(node.DLNode)
-}
-
-func (chain *DeleteChain) DepthLocked() int { return chain.Link.Depth() }
-
-func (chain *DeleteChain) AddNodeLocked(txn txnif.AsyncTxn) *DeleteNode {
-	node := NewDeleteNode(txn)
-	node.AttachTo(chain)
-	return node
-}
-
-func (chain *DeleteChain) AddMergeNode() *DeleteNode {
-	var merged *DeleteNode
-	chain.RLock()
-	chain.LoopChainLocked(func(n *DeleteNode) bool {
-		// Already have a latest merged node
-		if n.IsMerged() && merged == nil {
-			return false
-		} else if n.IsMerged() && merged != nil {
-			merged.MergeLocked(n)
-			return false
-		}
-		n.RLock()
-		txn := n.txn
-		n.RUnlock()
-		if txn != nil {
-			return true
-		}
-		if merged == nil {
-			merged = NewMergedNode(n.commitTs)
-		}
-		merged.MergeLocked(n)
-		return true
-	}, false)
-	if merged != nil {
-		merged.AttachTo(chain)
-	}
-	chain.RUnlock()
-	return merged
-}
-
-func (chain *DeleteChain) CollectDeletesLocked(ts uint64) *DeleteNode {
-	var merged *DeleteNode
-	chain.LoopChainLocked(func(n *DeleteNode) bool {
-		// Merged node is a loop breaker
-		if n.IsMerged() {
-			if n.GetCommitTSLocked() > ts {
-				return false
-			}
-			if merged == nil {
-				merged = NewMergedNode(n.GetCommitTSLocked())
-			}
-			merged.MergeLocked(n)
-			return false
-		}
-		n.RLock()
-		txn := n.txn
-		if txn != nil && txn.GetStartTS() == ts {
-			// Use the delete from the same active txn
-			if merged == nil {
-				merged = NewMergedNode(n.GetCommitTSLocked())
-			}
-			merged.MergeLocked(n)
-		} else if txn != nil && n.GetCommitTSLocked() > ts {
-			// Skip txn deletes committed after ts
-			n.RUnlock()
-			return true
-		} else if txn != nil {
-			// Wait committing txn with commit ts before ts
-			n.RUnlock()
-			state := txn.GetTxnState(true)
-			// If the txn is rollbacked. skip to the next
-			if state == txnif.TxnStateRollbacked {
-				return true
-			}
-			n.RLock()
-			if merged == nil {
-				merged = NewMergedNode(n.GetCommitTSLocked())
-			}
-			merged.MergeLocked(n)
-		} else if n.GetCommitTSLocked() < ts {
-			if merged == nil {
-				merged = NewMergedNode(n.GetCommitTSLocked())
-			}
-			merged.MergeLocked(n)
-		}
-		n.RUnlock()
-		return true
-	}, false)
-	return merged
 }
 
 func (node *DeleteNode) IsMerged() bool { return node.nt == NT_Merge }
@@ -232,7 +85,7 @@ func (node *DeleteNode) Compare(o common.NodePayload) int {
 	return 0
 }
 
-func (node *DeleteNode) GetChain() *DeleteChain { return node.chain }
+func (node *DeleteNode) GetChain() txnif.DeleteChain { return node.chain }
 
 func (node *DeleteNode) HasOverlapLocked(start, end uint32) bool {
 	if node.mask == nil || node.mask.GetCardinality() == 0 {
@@ -332,4 +185,11 @@ func (node *DeleteNode) ReadFrom(r io.Reader) (err error) {
 func (node *DeleteNode) MakeCommand(id uint32, forceFlush bool) (cmd txnif.TxnCmd, entry txnbase.NodeEntry, err error) {
 	cmd = NewDeleteCmd(id, node)
 	return
+}
+
+func (node *DeleteNode) ApplyDeletes(vec *gvec.Vector) *gvec.Vector {
+	if node == nil {
+		return vec
+	}
+	return compute.ApplyDeleteToVector(vec, node.mask)
 }

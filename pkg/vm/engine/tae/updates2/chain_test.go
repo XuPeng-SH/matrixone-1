@@ -1,6 +1,7 @@
 package updates2
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"sync"
@@ -39,9 +40,10 @@ func TestColumnChain1(t *testing.T) {
 	table, _ := db.CreateTableEntry(schema, nil, nil)
 	seg, _ := table.CreateSegment(nil, catalog.ES_Appendable, nil)
 	blk, _ := seg.CreateBlock(nil, catalog.ES_Appendable, nil)
+	controller := NewMutationNode(blk)
 
 	// uncommitted := new(common.Link)
-	chain := NewColumnChain(nil, 0, blk)
+	chain := NewColumnChain(nil, 0, controller)
 	cnt1 := 2
 	cnt2 := 3
 	cnt3 := 4
@@ -71,27 +73,28 @@ func TestColumnChain2(t *testing.T) {
 	seg, _ := table.CreateSegment(nil, catalog.ES_Appendable, nil)
 	blk, _ := seg.CreateBlock(nil, catalog.ES_Appendable, nil)
 
-	chain := NewColumnChain(nil, 0, blk)
+	controller := NewMutationNode(blk)
+	chain := NewColumnChain(nil, 0, controller)
 	txn1 := new(txnbase.Txn)
 	txn1.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
 	n1 := chain.AddNode(txn1)
 
-	err := n1.UpdateLocked(1, int32(11))
+	err := chain.TryUpdateNodeLocked(1, int32(11), n1)
 	assert.Nil(t, err)
-	err = n1.UpdateLocked(2, int32(22))
+	err = chain.TryUpdateNodeLocked(2, int32(22), n1)
 	assert.Nil(t, err)
-	err = n1.UpdateLocked(3, int32(33))
+	err = chain.TryUpdateNodeLocked(3, int32(33), n1)
 	assert.Nil(t, err)
-	err = n1.UpdateLocked(1, int32(111))
+	err = chain.TryUpdateNodeLocked(1, int32(111), n1)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, chain.view.RowCnt())
 
 	txn2 := new(txnbase.Txn)
 	txn2.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
 	n2 := chain.AddNode(txn2)
-	err = n2.UpdateLocked(2, int32(222))
+	err = chain.TryUpdateNodeLocked(2, int32(222), n2)
 	assert.Equal(t, txnbase.ErrDuplicated, err)
-	err = n2.UpdateLocked(4, int32(44))
+	err = chain.TryUpdateNodeLocked(4, int32(44), n2)
 	assert.Nil(t, err)
 	assert.Equal(t, 4, chain.view.RowCnt())
 
@@ -99,7 +102,7 @@ func TestColumnChain2(t *testing.T) {
 	n1.PrepareCommit()
 	n1.ApplyCommit()
 
-	err = n2.UpdateLocked(2, int32(222))
+	err = chain.TryUpdateNodeLocked(2, int32(222), n2)
 	assert.Equal(t, txnbase.ErrDuplicated, err)
 
 	assert.Equal(t, 1, chain.view.links[1].Depth())
@@ -110,7 +113,7 @@ func TestColumnChain2(t *testing.T) {
 	txn3 := new(txnbase.Txn)
 	txn3.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
 	n3 := chain.AddNode(txn3)
-	err = n3.UpdateLocked(2, int32(2222))
+	err = chain.TryUpdateNodeLocked(2, int32(2222), n3)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, chain.view.links[2].Depth())
 
@@ -123,7 +126,7 @@ func TestColumnChain2(t *testing.T) {
 			n := chain.AddNode(txn)
 			for j := 0; j < 4; j++ {
 				n.GetChain().Lock()
-				err := n.UpdateLocked(uint32(i*2000+j), int32(i*20000+j))
+				err := chain.TryUpdateNodeLocked(uint32(i*2000+j), int32(i*20000+j), n)
 				assert.Nil(t, err)
 				n.GetChain().Unlock()
 			}
@@ -173,11 +176,65 @@ func TestColumnChain2(t *testing.T) {
 	// t.Log(chain.GetHead().GetPayload().(*ColumnNode).StringLocked())
 }
 
+func TestColumnChain3(t *testing.T) {
+	ncnt := 100
+	schema := catalog.MockSchema(1)
+	c := catalog.MockCatalog(initTestPath(t), "mock", nil)
+	defer c.Close()
+
+	db, _ := c.CreateDBEntry("db", nil)
+	table, _ := db.CreateTableEntry(schema, nil, nil)
+	seg, _ := table.CreateSegment(nil, catalog.ES_Appendable, nil)
+	blk, _ := seg.CreateBlock(nil, catalog.ES_Appendable, nil)
+
+	controller := NewMutationNode(blk)
+	chain := NewColumnChain(nil, 0, controller)
+
+	start := time.Now()
+	ecnt := 10
+	for i := 0; i < ncnt; i++ {
+		txn := mockTxn()
+		node := chain.AddNode(txn)
+		for j := i * ecnt; j < i*ecnt+ecnt; j++ {
+			chain.TryUpdateNodeLocked(uint32(j), int32(j), node)
+		}
+		commitTxn(txn)
+		node.PrepareCommit()
+		node.ApplyCommit()
+	}
+	t.Log(time.Since(start))
+	start = time.Now()
+	t.Log(time.Since(start))
+	// t.Log(chain.StringLocked())
+	assert.Equal(t, ncnt, chain.DepthLocked())
+
+	node := chain.GetHead().GetPayload().(*ColumnNode)
+	cmd, _, err := node.MakeCommand(1, false)
+	assert.Nil(t, err)
+
+	var w bytes.Buffer
+	err = cmd.WriteTo(&w)
+	assert.Nil(t, err)
+	buf := w.Bytes()
+	r := bytes.NewBuffer(buf)
+
+	cmd2, err := txnbase.BuildCommandFrom(r)
+	assert.Nil(t, err)
+	updateCmd := cmd2.(*UpdateCmd)
+	assert.Equal(t, txnbase.CmdUpdate, updateCmd.GetType())
+	assert.Equal(t, *node.id, *updateCmd.update.id)
+	assert.True(t, node.txnMask.Equals(updateCmd.update.txnMask))
+	// t.Log(updateCmd.update.StringLocked())
+	// assert.Equal(t, node.txnVals, updateCmd.update.txnVals)
+	// t.Log(updateCmd.update.id.BlockString())
+	// t.Log(updateCmd.update.txnMask.String())
+}
+
 func TestDeleteChain1(t *testing.T) {
 	chain := NewDeleteChain(nil, nil)
 	txn1 := new(txnbase.Txn)
 	txn1.TxnCtx = txnbase.NewTxnCtx(nil, common.NextGlobalSeqNum(), common.NextGlobalSeqNum(), nil)
-	n1 := chain.AddNodeLocked(txn1)
+	n1 := chain.AddNodeLocked(txn1).(*DeleteNode)
 	assert.Equal(t, 1, chain.Depth())
 
 	// 1. Txn1 delete from 1 to 10 -- PASS
@@ -199,12 +256,12 @@ func TestDeleteChain1(t *testing.T) {
 	// 4. Txn2 delete from 21 to 30 -- PASS
 	err = chain.PrepareRangeDelete(20, 30, txn2.GetStartTS())
 	assert.Nil(t, err)
-	n2 := chain.AddNodeLocked(txn2)
+	n2 := chain.AddNodeLocked(txn2).(*DeleteNode)
 	n2.RangeDeleteLocked(20, 30)
 	assert.Equal(t, uint32(11), n2.GetCardinalityLocked())
 	t.Log(n2.mask.String())
 
-	merged := chain.AddMergeNode()
+	merged := chain.AddMergeNode().(*DeleteNode)
 	assert.Nil(t, merged)
 	assert.Equal(t, 2, chain.Depth())
 
@@ -242,8 +299,25 @@ func TestDeleteChain1(t *testing.T) {
 	assert.Equal(t, uint32(13), collected.GetCardinalityLocked())
 	t.Log(chain.StringLocked())
 
-	merged = chain.AddMergeNode()
+	merged = chain.AddMergeNode().(*DeleteNode)
 	assert.NotNil(t, merged)
 	t.Log(chain.StringLocked())
 	assert.Equal(t, 4, chain.DepthLocked())
+
+	cmd, _, err := merged.MakeCommand(1, false)
+	assert.Nil(t, err)
+	assert.NotNil(t, cmd)
+
+	var w bytes.Buffer
+	err = cmd.WriteTo(&w)
+	assert.Nil(t, err)
+
+	buf := w.Bytes()
+	r := bytes.NewBuffer(buf)
+
+	cmd2, err := txnbase.BuildCommandFrom(r)
+	assert.Nil(t, err)
+	assert.Equal(t, txnbase.CmdDelete, cmd2.GetType())
+	assert.Equal(t, txnbase.CmdDelete, cmd2.(*UpdateCmd).cmdType)
+	assert.True(t, cmd2.(*UpdateCmd).delete.mask.Equals(merged.mask))
 }
