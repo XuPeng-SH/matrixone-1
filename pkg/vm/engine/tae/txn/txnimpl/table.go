@@ -705,7 +705,7 @@ func (tbl *txnTable) applyAppendInode(node InsertNode) (err error) {
 		toAppend, err := appender.PrepareAppend(node.Rows() - appended)
 		bat, err := node.Window(appended, appended+toAppend-1)
 		var destOff uint32
-		if destOff, err = appender.ApplyAppend(bat, 0, toAppend, nil); err != nil {
+		if destOff, err = appender.ApplyAppend(bat, 0, toAppend, tbl.txn); err != nil {
 			panic(err)
 		}
 		appender.Close()

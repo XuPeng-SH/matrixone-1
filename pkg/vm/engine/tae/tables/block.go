@@ -35,22 +35,19 @@ type dataBlock struct {
 func newBlock(meta *catalog.BlockEntry, segFile dataio.SegmentFile, bufMgr base.INodeManager) *dataBlock {
 	file := segFile.GetBlockFile(meta.GetID())
 	var node *appendableNode
-	var holder accessif.IAppendableBlockIndexHolder
+	block := &dataBlock{
+		RWMutex:    new(sync.RWMutex),
+		meta:       meta,
+		file:       file,
+		controller: updates.NewMutationNode(meta),
+	}
 	if meta.IsAppendable() {
-		node = newNode(bufMgr, meta, file)
-		schema := meta.GetSegment().GetTable().GetSchema()
-		pkIdx := schema.PrimaryKey
-		pkType := schema.Types()[pkIdx]
-		holder = impl.NewAppendableBlockIndexHolder(pkType)
+		node = newNode(bufMgr, block, file)
+		block.node = node
+		pkType := meta.GetSegment().GetTable().GetSchema().GetPKType()
+		block.updatableIndexHolder = impl.NewAppendableBlockIndexHolder(pkType)
 	}
-	return &dataBlock{
-		RWMutex:              new(sync.RWMutex),
-		meta:                 meta,
-		file:                 file,
-		node:                 node,
-		updatableIndexHolder: holder,
-		controller:           updates.NewMutationNode(meta),
-	}
+	return block
 }
 
 func (blk *dataBlock) IsAppendable() bool {
@@ -105,7 +102,7 @@ func (blk *dataBlock) getVectorCopy(txn txnif.AsyncTxn, attr string, compressed,
 		panic("not expected")
 	}
 	defer h.Close()
-	colIdx := blk.meta.GetSegment().GetTable().GetSchema().GetColIdx(attr)
+	colIdx := blk.meta.GetSchema().GetColIdx(attr)
 
 	readLock := blk.controller.GetSharedLock()
 	chain := blk.controller.GetColumnChain(uint16(colIdx))
