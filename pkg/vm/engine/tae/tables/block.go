@@ -133,17 +133,37 @@ func (blk *dataBlock) getVectorCopy(txn txnif.AsyncTxn, attr string, compressed,
 }
 
 func (blk *dataBlock) Update(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (node txnif.UpdateNode, err error) {
+	return blk.updateWithFineLock(txn, row, colIdx, v)
+}
+
+func (blk *dataBlock) updateWithCoarseLock(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (node txnif.UpdateNode, err error) {
+	locker := blk.controller.GetExclusiveLock()
+	err = blk.controller.CheckNotDeleted(row, row, txn.GetStartTS())
+	if err == nil {
+		if err = blk.controller.CheckNotUpdated(row, row, txn.GetStartTS()); err != nil {
+			return
+		}
+		chain := blk.controller.GetColumnChain(colIdx)
+		chain.Lock()
+		node = chain.AddNodeLocked(txn)
+		if err = chain.TryUpdateNodeLocked(row, v, node); err != nil {
+			chain.DeleteNodeLocked(node.GetDLNode())
+		}
+		chain.Unlock()
+	}
+	locker.Unlock()
+	return
+}
+
+func (blk *dataBlock) updateWithFineLock(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (node txnif.UpdateNode, err error) {
 	locker := blk.controller.GetSharedLock()
 	err = blk.controller.CheckNotDeleted(row, row, txn.GetStartTS())
 	if err == nil {
 		chain := blk.controller.GetColumnChain(colIdx)
 		chain.Lock()
 		node = chain.AddNodeLocked(txn)
-		err = blk.controller.PrepareUpdate(row, colIdx, node)
-		if err != nil {
-			blk.controller.DropUpdateNode(colIdx, node)
-		} else {
-			node.UpdateLocked(row, v)
+		if err = chain.TryUpdateNodeLocked(row, v, node); err != nil {
+			chain.DeleteNodeLocked(node.GetDLNode())
 		}
 		chain.Unlock()
 	}
