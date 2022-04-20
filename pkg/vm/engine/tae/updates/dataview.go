@@ -110,22 +110,32 @@ func (view *BlockView) Marshal() (buf []byte, err error) {
 	// Ts
 	byteBuf.Write(encoding.EncodeUint64(view.Ts))
 	// DeleteMask
-	cardinality := view.DeleteMask.GetCardinality()
-	byteBuf.Write(encoding.EncodeUint64(cardinality))
-	iterator := view.DeleteMask.Iterator()
-	for iterator.HasNext() {
-		idx := iterator.Next()
-		byteBuf.Write(encoding.EncodeUint32(idx))
+	if view.DeleteMask == nil {
+		cardinality := uint64(0)
+		byteBuf.Write(encoding.EncodeUint64(cardinality))
+	} else {
+		cardinality := view.DeleteMask.GetCardinality()
+		byteBuf.Write(encoding.EncodeUint64(cardinality))
+		iterator := view.DeleteMask.Iterator()
+		for iterator.HasNext() {
+			idx := iterator.Next()
+			byteBuf.Write(encoding.EncodeUint32(idx))
+		}
 	}
 	// Applied
-	batBuf, err := view.Applied.Marshal()
-	if err != nil {
-		return nil, err
+	if view.Applied == nil {
+		batLength := 0
+		byteBuf.Write(encoding.EncodeUint64(uint64(batLength)))
+	} else {
+		batBuf, err := view.Applied.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		batLength := len(batBuf)
+		byteBuf.Write(encoding.EncodeUint64(uint64(batLength)))
+		byteBuf.Write(batBuf)
 	}
-	batLength := len(batBuf)
-	byteBuf.Write(encoding.EncodeUint64(uint64(batLength)))
-	byteBuf.Write(batBuf)
-	buf=byteBuf.Bytes()
+	buf = byteBuf.Bytes()
 	return
 }
 
@@ -146,6 +156,9 @@ func (view *BlockView) Unmarshal(buf []byte) (err error) {
 	// Applied
 	batLength := encoding.DecodeUint64(buf[pos : pos+8])
 	pos += 8
+	if batLength == uint64(0) {
+		return
+	}
 	view.Applied = &batch.Batch{}
 	view.Applied.Unmarshal(buf[pos : pos+int(batLength)])
 	return

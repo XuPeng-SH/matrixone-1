@@ -94,3 +94,61 @@ func TestMarshal(t *testing.T) {
 
 	assert.Equal(t,len(view.Applied.GetAttrs()),len(view2.Applied.GetAttrs()))
 }
+
+func TestMarshal2(t *testing.T) {
+	view := NewBlockView(123455)
+
+	view.Applied = nil
+
+	view.DeleteMask = &roaring.Bitmap{}
+	view.DeleteMask.Add(0)
+	view.DeleteMask.Add(3)
+	view.DeleteMask.Add(88)
+
+	// _, err = view.Marshal()
+	// assert.Nil(t, err)
+	buf, err := view.Marshal()
+	assert.Nil(t, err)
+	view2 := NewBlockView(0)
+	view2.Unmarshal(buf)
+
+	assert.Equal(t, uint64(123455), view2.Ts)
+
+	assert.Equal(t,3,int(view2.DeleteMask.GetCardinality()))
+	assert.True(t,view2.DeleteMask.Contains(0))
+	assert.True(t,view2.DeleteMask.Contains(3))
+	assert.True(t,view2.DeleteMask.Contains(88))
+
+	assert.Nil(t,view2.Applied)
+}
+
+func TestMarshal3(t *testing.T) {
+	view := NewBlockView(123455)
+
+	colTypes := mock.MockColTypes(14)
+	rows := uint64(64)
+	attrs1 := make([]int, 0)
+	vecs1 := make([]vector.IVector, 0)
+	for i, colType := range colTypes {
+		attrs1 = append(attrs1, i)
+		vec := vector.MockVector(colType, rows)
+		vec.ResetReadonly()
+		vecs1 = append(vecs1, vec)
+	}
+	bat, err := batch.NewBatch(attrs1, vecs1)
+	assert.Nil(t, err)
+	view.Applied = bat
+
+	// _, err = view.Marshal()
+	// assert.Nil(t, err)
+	buf, err := view.Marshal()
+	assert.Nil(t, err)
+	view2 := NewBlockView(0)
+	view2.Unmarshal(buf)
+
+	assert.Equal(t, uint64(123455), view2.Ts)
+
+	assert.Equal(t,0,int(view2.DeleteMask.GetCardinality()))
+
+	assert.Equal(t,len(view.Applied.GetAttrs()),len(view2.Applied.GetAttrs()))
+}
