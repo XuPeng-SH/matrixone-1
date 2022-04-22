@@ -417,3 +417,55 @@ func TestDeleteChain1(t *testing.T) {
 	assert.Equal(t, txnbase.CmdDelete, cmd2.(*UpdateCmd).cmdType)
 	assert.True(t, cmd2.(*UpdateCmd).delete.mask.Equals(merged.mask))
 }
+
+func TestDeleteChain2(t *testing.T) {
+	chain := NewDeleteChain(nil, nil)
+
+	txn1 := mockTxn()
+	n1 := chain.AddNodeLocked(txn1).(*DeleteNode)
+	chain.PrepareRangeDelete(1, 4, txn1.GetStartTS())
+	n1.RangeDeleteLocked(1, 4)
+	commitTxn(txn1)
+	n1.PrepareCommit()
+	n1.ApplyCommit()
+	t.Log(chain.StringLocked())
+
+	txn2 := mockTxn()
+	n2 := chain.AddNodeLocked(txn2).(*DeleteNode)
+	chain.PrepareRangeDelete(5, 8, txn2.GetStartTS())
+	n2.RangeDeleteLocked(5, 8)
+	t.Log(chain.StringLocked())
+
+	txn3 := mockTxn()
+	n3 := chain.AddNodeLocked(txn3).(*DeleteNode)
+	chain.PrepareRangeDelete(9, 12, txn3.GetStartTS())
+	n3.RangeDeleteLocked(9, 12)
+	commitTxn(txn3)
+	n3.PrepareCommit()
+	n3.ApplyCommit()
+	t.Log(chain.StringLocked())
+
+	m := chain.CollectDeletesLocked(common.NextGlobalSeqNum())
+	mask := m.(*DeleteNode).mask
+	assert.Equal(t, uint64(8), mask.GetCardinality())
+	m = chain.CollectDeletesLocked(txn3.GetCommitTS())
+	mask = m.(*DeleteNode).mask
+	assert.Equal(t, uint64(8), mask.GetCardinality())
+	m = chain.CollectDeletesLocked(txn1.GetCommitTS())
+	mask = m.(*DeleteNode).mask
+	assert.Equal(t, uint64(4), mask.GetCardinality())
+	m = chain.CollectDeletesLocked(txn1.GetCommitTS() - 1)
+	assert.Nil(t, m)
+
+	mask = chain.CollectDeletesInRange(0, txn3.GetCommitTS())
+	t.Log(mask.String())
+	assert.Equal(t, uint64(4), mask.GetCardinality())
+
+	mask = chain.CollectDeletesInRange(0, txn3.GetCommitTS()+1)
+	t.Log(mask.String())
+	assert.Equal(t, uint64(8), mask.GetCardinality())
+
+	mask = chain.CollectDeletesInRange(txn1.GetCommitTS(), txn3.GetCommitTS()+1)
+	t.Log(mask.String())
+	assert.Equal(t, uint64(4), mask.GetCardinality())
+}
