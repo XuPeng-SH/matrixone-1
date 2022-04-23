@@ -614,15 +614,24 @@ func findDeleteRange(pos uint32, ranges []*deleteRange) *deleteRange {
 	return ranges[mid]
 }
 
-func ShuffleByDeletes(origMask *roaring.Bitmap, origVals map[uint32]interface{}, deletes *roaring.Bitmap) (*roaring.Bitmap, map[uint32]interface{}) {
+func ShuffleByDeletes(origMask *roaring.Bitmap, origVals map[uint32]interface{}, deletes *roaring.Bitmap) (*roaring.Bitmap, map[uint32]interface{}, *roaring.Bitmap) {
+	if deletes == nil {
+		return origMask, origVals, deletes
+	}
+	destDelets := roaring.New()
 	ranges := make([]*deleteRange, 0, 10)
 	deletesIt := deletes.Iterator()
 	deletedCnt := uint32(0)
 	for deletesIt.HasNext() {
 		pos := deletesIt.Next()
+		destDelets.Add(pos - deletedCnt)
 		ranges = append(ranges, &deleteRange{pos: pos, deleted: deletedCnt})
 		deletedCnt++
 	}
+	if origMask == nil || origMask.GetCardinality() == 0 {
+		return origMask, origVals, destDelets
+	}
+
 	ranges = append(ranges, &deleteRange{pos: math.MaxUint32, deleted: deletedCnt})
 	destMask := roaring.New()
 	destVals := make(map[uint32]interface{})
@@ -636,5 +645,5 @@ func ShuffleByDeletes(origMask *roaring.Bitmap, origVals map[uint32]interface{},
 	// for i, r := range ranges {
 	// 	logutil.Infof("%d range.pos=%d,range.deleted=%d", i, r.pos, r.deleted)
 	// }
-	return destMask, destVals
+	return destMask, destVals, destDelets
 }
