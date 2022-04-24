@@ -10,7 +10,6 @@ import (
 
 	gbat "github.com/matrixorigin/matrixone/pkg/container/batch"
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/buffer"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/buffer/base"
@@ -350,7 +349,6 @@ func (n *insertNode) Window(start, end uint32) (*gbat.Batch, error) {
 		srcVec = compute.ApplyDeleteToVector(srcVec, deletes)
 		ret.Vecs[i] = srcVec
 	}
-	logutil.Infof("[%d,%d)", start, end)
 	return ret, nil
 }
 

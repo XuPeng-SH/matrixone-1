@@ -798,7 +798,7 @@ func (tbl *txnTable) ApplyAppend() {
 			appendNode txnif.AppendNode
 		)
 		bat, _ := ctx.node.Window(ctx.start, ctx.start+ctx.count-1)
-		if appendNode, destOff, err = ctx.driver.ApplyAppend(bat, ctx.start, ctx.count, tbl.txn); err != nil {
+		if appendNode, destOff, err = ctx.driver.ApplyAppend(bat, 0, ctx.count, tbl.txn); err != nil {
 			panic(err)
 		}
 		ctx.driver.Close()
