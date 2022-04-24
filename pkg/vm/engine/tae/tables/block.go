@@ -66,11 +66,16 @@ func (blk *dataBlock) GetBlockFile() file.Block {
 	return blk.file
 }
 
-func (blk *dataBlock) GetID() uint64 { return blk.meta.ID }
-func (blk *dataBlock) IsDirty() bool { return true }
-func (blk *dataBlock) TryCheckpoint() {
+func (blk *dataBlock) GetID() uint64                       { return blk.meta.ID }
+func (blk *dataBlock) EstimateScore(base int) int          { return 0 }
+func (blk *dataBlock) TryCheckpoint(score int) (err error) { return }
 
-}
+// func (blk *dataBlock) BuildCheckpointTask(score int) (err error) {
+// 	if !blk.meta.IsAppendable() {
+// 		blk.OnCheckpoint()
+// 	}
+// 	return
+// }
 
 func (blk *dataBlock) IsAppendable() bool {
 	if !blk.meta.IsAppendable() {
