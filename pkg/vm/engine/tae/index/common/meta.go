@@ -32,14 +32,14 @@ func Decompress(src []byte, dst []byte, ctyp CompressType) error {
 }
 
 type IndexMeta struct {
-	IdxType  IndexType
-	CompType CompressType
-	ColIdx   uint16
+	IdxType     IndexType
+	CompType    CompressType
+	ColIdx      uint16
 	InternalIdx uint16
 	//PartOffset uint32
 	//StartOffset uint32
-	Size        uint32
-	RawSize     uint32
+	Size    uint32
+	RawSize uint32
 }
 
 func NewEmptyIndexMeta() *IndexMeta {

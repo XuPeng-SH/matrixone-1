@@ -13,8 +13,8 @@ import (
 )
 
 type nonAppendableBlockIndexHolder struct {
-	host         data.Block
-	schema *catalog.Schema
+	host              data.Block
+	schema            *catalog.Schema
 	zoneMapIndex      *io.BlockZoneMapIndexReader
 	staticFilterIndex *io.StaticFilterIndexReader
 }
@@ -117,9 +117,9 @@ func (holder *nonAppendableBlockIndexHolder) InitFromHost(host data.Block, schem
 			reader := io.NewStaticFilterIndexReader()
 			// TODO: refactor id generation
 			id := gCommon.ID{
-				BlockID: host.GetID(),
+				BlockID:   host.GetID(),
 				SegmentID: uint64(meta.InternalIdx),
-				Idx:     meta.ColIdx,
+				Idx:       meta.ColIdx,
 			}
 			err = reader.Init(bufManager, idxFile, &id)
 			if err != nil {

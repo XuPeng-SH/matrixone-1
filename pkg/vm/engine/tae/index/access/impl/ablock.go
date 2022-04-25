@@ -5,14 +5,13 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/data"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/acif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/basic"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common/errors"
 )
 
 type appendableBlockIndexHolder struct {
 	host         data.Block
-	schema *catalog.Schema
+	schema       *catalog.Schema
 	treeIndex    basic.ARTMap
 	zoneMapIndex *basic.ZoneMap
 }
@@ -75,26 +74,6 @@ func (holder *appendableBlockIndexHolder) BatchDedup(keys *vector.Vector) error 
 		return errors.ErrKeyDuplicate
 	}
 	return nil
-}
-
-func (holder *appendableBlockIndexHolder) Upgrade() (acif.INonAppendableBlockIndexHolder, error) {
-	//var indexMeta *common.IndexMeta
-	//upgradedHolder := NewNonAppendableBlockIndexHolder(holder.host)
-	//zoneMapIndexWriter := io.NewBlockZoneMapIndexWriter()
-	//pkType := holder.schema.GetPKType()
-	//pkIdx := holder.schema.PrimaryKey
-	//
-	//blockFile := holder.host.GetBlockFile()
-	//colBlockFile, err := blockFile.OpenColumn(int(pkIdx))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//indexFile, err := colBlockFile.OpenIndexFile(int(pkIdx))
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	return nil, nil
 }
 
 func (holder *appendableBlockIndexHolder) GetHostBlockId() uint64 {

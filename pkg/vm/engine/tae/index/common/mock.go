@@ -99,5 +99,5 @@ func MockVec(typ types.Type, rows int, offset int) *vector.Vector {
 var MockIndexBufferManager base.INodeManager
 
 func init() {
-	MockIndexBufferManager = buffer.NewNodeManager(1024 * 1024 * 150, nil)
+	MockIndexBufferManager = buffer.NewNodeManager(1024*1024*150, nil)
 }

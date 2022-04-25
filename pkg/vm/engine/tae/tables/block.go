@@ -77,7 +77,7 @@ func (blk *dataBlock) RefreshIndex() error {
 	if blk.indexHolder == nil {
 		blk.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
 	}
-	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), common2.MockIndexBufferManager/* TODO: use dedicated index buffer manager */)
+	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), common2.MockIndexBufferManager /* TODO: use dedicated index buffer manager */)
 }
 
 func (blk *dataBlock) RunCalibration() {

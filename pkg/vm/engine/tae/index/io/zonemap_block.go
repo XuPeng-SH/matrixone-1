@@ -101,10 +101,10 @@ func (reader *BlockZoneMapIndexReader) MayContainsKey(key interface{}) (bool, er
 }
 
 type BlockZoneMapIndexWriter struct {
-	cType  common.CompressType
-	host   gCommon.IRWFile
-	inner  *basic.ZoneMap
-	colIdx uint16
+	cType       common.CompressType
+	host        gCommon.IRWFile
+	inner       *basic.ZoneMap
+	colIdx      uint16
 	internalIdx uint16
 }
 
