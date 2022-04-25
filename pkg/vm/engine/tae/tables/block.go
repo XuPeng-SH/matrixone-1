@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -34,6 +35,7 @@ type dataBlock struct {
 	indexHolder acif.IBlockIndexHolder
 	controller  *updates.MutationController
 	maxCkp      uint64
+	nice        uint32
 }
 
 func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeManager) *dataBlock {
@@ -67,9 +69,51 @@ func (blk *dataBlock) GetBlockFile() file.Block {
 	return blk.file
 }
 
-func (blk *dataBlock) GetID() uint64                       { return blk.meta.ID }
-func (blk *dataBlock) EstimateScore(base int) int          { return 0 }
-func (blk *dataBlock) TryCheckpoint(score int) (err error) { return }
+func (blk *dataBlock) GetID() uint64 { return blk.meta.ID }
+
+func (blk *dataBlock) RunCalibration() {
+	score := blk.estimateRawScore()
+	if score == 0 {
+		return
+	}
+	atomic.AddUint32(&blk.nice, uint32(1))
+}
+
+func (blk *dataBlock) estimateRawScore() int {
+	if blk.controller.GetChangeNodeCnt() == 0 {
+		return 0
+	}
+	cols := 0
+	factor := float64(0)
+	rows := blk.Rows(nil, true)
+	for i := range blk.meta.GetSchema().ColDefs {
+		cols++
+		cnt := blk.controller.GetColumnUpdateCnt(uint16(i))
+		colFactor := float64(cnt) / float64(rows)
+		if colFactor < 0.005 {
+			colFactor *= 10
+		} else if colFactor >= 0.005 && colFactor < 0.10 {
+			colFactor *= 20
+		} else if colFactor >= 0.10 {
+			colFactor *= 40
+		}
+		factor += colFactor
+	}
+	factor = factor / float64(cols)
+	deleteCnt := blk.controller.GetDeleteCnt()
+	factor += float64(deleteCnt) / float64(rows) * 50
+	ret := int(factor * 100)
+	if ret == 0 {
+		ret += 1
+	}
+	return ret
+}
+
+func (blk *dataBlock) EstimateScore() int {
+	score := blk.estimateRawScore()
+	score += int(atomic.LoadUint32(&blk.nice))
+	return score
+}
 
 func (blk *dataBlock) BuildCheckpointTaskFactory() (factory tasks.TxnTaskFactory, err error) {
 	if !blk.meta.IsAppendable() {

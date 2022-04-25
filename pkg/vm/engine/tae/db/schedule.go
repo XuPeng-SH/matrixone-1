@@ -4,6 +4,26 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
+type ioScheduler struct {
+	*tasks.BaseScheduler
+	db *DB
+}
+
+func newIOScheduler(db *DB) *ioScheduler {
+	s := &ioScheduler{
+		BaseScheduler: tasks.NewBaseScheduler("ioScheduler"),
+		db:            db,
+	}
+	dispatcher := tasks.NewBaseDispatcher()
+	handler := tasks.NewPoolHandler(8)
+	handler.Start()
+
+	dispatcher.RegisterHandler(tasks.TxnTask, handler)
+	s.RegisterDispatcher(tasks.TxnTask, dispatcher)
+	s.Start()
+	return s
+}
+
 type taskScheduler struct {
 	*tasks.BaseScheduler
 	db *DB

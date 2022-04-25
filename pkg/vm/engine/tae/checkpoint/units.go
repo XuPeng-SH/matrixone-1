@@ -77,7 +77,7 @@ func NewLeveledUnits(schedule tasks.Scheduler, policy LeveledPolicy) *LeveledUni
 }
 
 func (lunits *LeveledUnits) AddUnit(unit data.CheckpointUnit) {
-	score := unit.EstimateScore(0)
+	score := unit.EstimateScore()
 	if score == 0 {
 		return
 	}
@@ -111,7 +111,7 @@ func (lunits *LeveledUnits) Scan() {
 }
 
 func (lunits *LeveledUnits) ProcessUnit(currLevel int, unit data.CheckpointUnit) {
-	score := unit.EstimateScore(0)
+	score := unit.EstimateScore()
 	if score == 0 {
 		return
 	}

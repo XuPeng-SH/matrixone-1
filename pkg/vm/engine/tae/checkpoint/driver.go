@@ -27,10 +27,10 @@ import (
 type ckpDriver struct {
 	common.ClosedState
 	sm.StateMachine
-	schedule tasks.Scheduler
+	schedule tasks.TaskScheduler
 }
 
-func NewDriver(schedule tasks.Scheduler) *ckpDriver {
+func NewDriver(schedule tasks.TaskScheduler) *ckpDriver {
 	f := &ckpDriver{}
 	wg := new(sync.WaitGroup)
 	rqueue := sm.NewSafeQueue(10000, 100, f.onRequests)

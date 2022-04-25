@@ -80,6 +80,7 @@ func (db *DB) Close() error {
 	db.Closed.Store(ErrClosed)
 	close(db.ClosedC)
 	db.TaskScheduler.Stop()
+	db.IOScheduler.Stop()
 	db.TxnMgr.Stop()
 	db.TxnLogDriver.Close()
 	db.Opts.Catalog.Close()

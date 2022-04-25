@@ -5,6 +5,7 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/buffer"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/checkpoint"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/dataio/mockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
@@ -43,7 +44,6 @@ func Open(dirname string, opts *options.Options) (db *DB, err error) {
 		ClosedC:     make(chan struct{}),
 		Closed:      new(atomic.Value),
 	}
-	// db.CKPDriver = checkpoint.NewDriver()
 
 	db.Opts.Catalog = catalog.MockCatalog(dirname, CATALOGDir, nil)
 
@@ -55,6 +55,8 @@ func Open(dirname string, opts *options.Options) (db *DB, err error) {
 
 	db.DBLocker, dbLocker = dbLocker, nil
 	db.TxnMgr.Start()
+	db.IOScheduler = newIOScheduler(db)
 	db.TaskScheduler = newTaskScheduler(db)
+	db.CKPDriver = checkpoint.NewDriver(db.TaskScheduler)
 	return
 }

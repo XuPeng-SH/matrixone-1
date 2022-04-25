@@ -15,9 +15,8 @@ import (
 )
 
 type CheckpointUnit interface {
-	// GetID() uint64
-	// TryCheckpoint(score int) error
-	EstimateScore(base int) int
+	RunCalibration()
+	EstimateScore() int
 	BuildCheckpointTaskFactory() (tasks.TxnTaskFactory, error)
 }
 
