@@ -9,16 +9,16 @@ type taskScheduler struct {
 	db *DB
 }
 
-func NewScheduler(db *DB) *taskScheduler {
+func newTaskScheduler(db *DB) *taskScheduler {
 	s := &taskScheduler{
-		BaseScheduler: tasks.NewBaseScheduler("tae"),
+		BaseScheduler: tasks.NewBaseScheduler("taskScheduler"),
 		db:            db,
 	}
 	dispatcher := tasks.NewBaseDispatcher()
-	ioHandlers := tasks.NewPoolHandler(1)
-	ioHandlers.Start()
 	txnHandler := tasks.NewPoolHandler(1)
 	txnHandler.Start()
+	// ioHandlers := tasks.NewPoolHandler(1)
+	// ioHandlers.Start()
 
 	dispatcher.RegisterHandler(tasks.TxnTask, txnHandler)
 	dispatcher.RegisterHandler(tasks.CompactBlockTask, txnHandler)

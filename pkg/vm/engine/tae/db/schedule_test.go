@@ -13,8 +13,6 @@ import (
 
 func TestSchedule1(t *testing.T) {
 	db := initDB(t, nil)
-	schedule := NewScheduler(db)
-	defer schedule.Stop()
 	schema := catalog.MockSchema(13)
 	schema.BlockMaxRows = 10
 	schema.SegmentMaxBlocks = 2
@@ -36,7 +34,7 @@ func TestSchedule1(t *testing.T) {
 		blkMeta := blk.GetMeta().(*catalog.BlockEntry)
 		factory := tables.CompactBlockTaskFactory(blkMeta)
 		ctx := tasks.Context{Waitable: true}
-		task, err := schedule.ScheduleTxnTask(&ctx, factory)
+		task, err := db.TaskScheduler.ScheduleTxnTask(&ctx, factory)
 		assert.Nil(t, err)
 		err = task.WaitDone()
 		assert.Nil(t, err)

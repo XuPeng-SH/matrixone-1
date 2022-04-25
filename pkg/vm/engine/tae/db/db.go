@@ -9,6 +9,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/checkpoint"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 )
 
@@ -28,6 +29,9 @@ type DB struct {
 	TxnLogDriver txnbase.NodeDriver
 
 	CKPDriver checkpoint.Driver
+
+	TaskScheduler tasks.TaskScheduler
+	IOScheduler   tasks.Scheduler
 
 	DBLocker io.Closer
 
@@ -75,6 +79,7 @@ func (db *DB) Close() error {
 	}
 	db.Closed.Store(ErrClosed)
 	close(db.ClosedC)
+	db.TaskScheduler.Stop()
 	db.TxnMgr.Stop()
 	db.TxnLogDriver.Close()
 	db.Opts.Catalog.Close()

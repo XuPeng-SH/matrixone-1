@@ -15,10 +15,15 @@ var (
 	ErrSchedule           = errors.New("tae sched: cannot schedule")
 )
 
-type Schedule interface {
+type Scheduler interface {
 	Start()
 	Stop()
 	Schedule(Task) error
+}
+
+type TaskScheduler interface {
+	Scheduler
+	ScheduleTxnTask(ctx *Context, factory TxnTaskFactory) (Task, error)
 }
 
 type BaseScheduler struct {

@@ -62,10 +62,10 @@ func (units *Units) PrepareConsume(maxDuration time.Duration) bool {
 type LeveledUnits struct {
 	levels   []*Units
 	policy   LeveledPolicy
-	schedule tasks.Schedule
+	schedule tasks.Scheduler
 }
 
-func NewLeveledUnits(schedule tasks.Schedule, policy LeveledPolicy) *LeveledUnits {
+func NewLeveledUnits(schedule tasks.Scheduler, policy LeveledPolicy) *LeveledUnits {
 	lunits := &LeveledUnits{
 		levels: make([]*Units, policy.TotalLevels()),
 		policy: policy,
@@ -124,6 +124,6 @@ func (lunits *LeveledUnits) ProcessUnit(currLevel int, unit data.CheckpointUnit)
 		logutil.Warnf("Build checkpoint task failed:  %v", err)
 	}
 	if taskFactory != nil {
-		// lunits.schedule.Schedule()
+		// lunits.schedule.Scheduler()
 	}
 }

@@ -55,5 +55,6 @@ func Open(dirname string, opts *options.Options) (db *DB, err error) {
 
 	db.DBLocker, dbLocker = dbLocker, nil
 	db.TxnMgr.Start()
+	db.TaskScheduler = newTaskScheduler(db)
 	return
 }
