@@ -13,6 +13,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/acif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/impl"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/updates"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
@@ -70,12 +71,13 @@ func (blk *dataBlock) GetID() uint64                       { return blk.meta.ID 
 func (blk *dataBlock) EstimateScore(base int) int          { return 0 }
 func (blk *dataBlock) TryCheckpoint(score int) (err error) { return }
 
-// func (blk *dataBlock) BuildCheckpointTask(score int) (err error) {
-// 	if !blk.meta.IsAppendable() {
-// 		blk.OnCheckpoint()
-// 	}
-// 	return
-// }
+func (blk *dataBlock) BuildCheckpointTaskFactory(ctx *tasks.Context) (factory tasks.TxnTaskFactory, err error) {
+	if !blk.meta.IsAppendable() {
+		factory = CompactBlockTaskFactory(ctx, blk.meta)
+		return
+	}
+	return
+}
 
 func (blk *dataBlock) IsAppendable() bool {
 	if !blk.meta.IsAppendable() {
