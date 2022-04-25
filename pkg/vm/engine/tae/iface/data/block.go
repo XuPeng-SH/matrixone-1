@@ -32,6 +32,7 @@ type BlockAppender interface {
 type Block interface {
 	CheckpointUnit
 	GetID() uint64
+	MutationInfo() string
 	MakeAppender() (BlockAppender, error)
 	IsAppendable() bool
 	Rows(txn txnif.AsyncTxn, coarse bool) int

@@ -28,7 +28,7 @@ const (
 
 func initDB(t *testing.T, opts *options.Options) *DB {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	db, _ := Open(dir, nil)
+	db, _ := Open(dir, opts)
 	return db
 }
 
@@ -189,7 +189,10 @@ func TestNonAppendableBlock(t *testing.T) {
 }
 
 func TestCompactBlock1(t *testing.T) {
-	db := initDB(t, nil)
+	opts := new(options.Options)
+	opts.CheckpointCfg = new(options.CheckpointCfg)
+	opts.CheckpointCfg.CalibrationInterval = 10
+	db := initDB(t, opts)
 	defer db.Close()
 	schema := catalog.MockSchemaAll(13)
 	schema.BlockMaxRows = 10

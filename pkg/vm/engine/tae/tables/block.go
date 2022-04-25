@@ -109,6 +109,27 @@ func (blk *dataBlock) estimateRawScore() int {
 	return ret
 }
 
+func (blk *dataBlock) MutationInfo() string {
+	totalChanges := blk.controller.GetChangeNodeCnt()
+	s := fmt.Sprintf("Block %s Mutation Info: Changes=%d", blk.meta.AsCommonID().ToBlockFilePath(), totalChanges)
+	if totalChanges == 0 {
+		return s
+	}
+	rows := blk.Rows(nil, true)
+	for i := range blk.meta.GetSchema().ColDefs {
+		cnt := blk.controller.GetColumnUpdateCnt(uint16(i))
+		if cnt == 0 {
+			continue
+		}
+		s = fmt.Sprintf("%s, Col[%d]:%d/%d", s, i, cnt, rows)
+	}
+	deleteCnt := blk.controller.GetDeleteCnt()
+	if deleteCnt != 0 {
+		s = fmt.Sprintf("%s, Del:%d/%d", s, deleteCnt, rows)
+	}
+	return s
+}
+
 func (blk *dataBlock) EstimateScore() int {
 	score := blk.estimateRawScore()
 	score += int(atomic.LoadUint32(&blk.nice))

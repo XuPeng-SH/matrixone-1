@@ -220,3 +220,18 @@ func (catalog *Catalog) CreateDBEntry(name string, txnCtx txnif.AsyncTxn) (*DBEn
 
 	return entry, err
 }
+
+func (catalog *Catalog) RecurLoop(processor Processor) (err error) {
+	dbIt := catalog.MakeDBIt(true)
+	for dbIt.Valid() {
+		dbEntry := dbIt.Get().GetPayload().(*DBEntry)
+		if err = processor.OnDatabase(dbEntry); err != nil {
+			return
+		}
+		if err = dbEntry.RecurLoop(processor); err != nil {
+			return
+		}
+		dbIt.Next()
+	}
+	return err
+}

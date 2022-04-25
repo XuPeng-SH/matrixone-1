@@ -198,3 +198,18 @@ func (e *DBEntry) MakeCommand(id uint32) (txnif.TxnCmd, error) {
 }
 
 func (e *DBEntry) GetCatalog() *Catalog { return e.catalog }
+
+func (e *DBEntry) RecurLoop(processor Processor) (err error) {
+	tableIt := e.MakeTableIt(true)
+	for tableIt.Valid() {
+		table := tableIt.Get().GetPayload().(*TableEntry)
+		if err = processor.OnTable(table); err != nil {
+			return
+		}
+		if err = table.RecurLoop(processor); err != nil {
+			return
+		}
+		tableIt.Next()
+	}
+	return err
+}
