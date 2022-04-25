@@ -14,9 +14,11 @@
 
 package checkpoint
 
+import "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/aware"
+
 type Driver interface {
 	// aware.ChangeAware
-	// aware.DataMutationAware
+	aware.DataMutationAware
 	Start()
 	Stop()
 	String() string

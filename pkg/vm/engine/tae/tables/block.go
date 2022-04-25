@@ -71,9 +71,9 @@ func (blk *dataBlock) GetID() uint64                       { return blk.meta.ID 
 func (blk *dataBlock) EstimateScore(base int) int          { return 0 }
 func (blk *dataBlock) TryCheckpoint(score int) (err error) { return }
 
-func (blk *dataBlock) BuildCheckpointTaskFactory(ctx *tasks.Context) (factory tasks.TxnTaskFactory, err error) {
+func (blk *dataBlock) BuildCheckpointTaskFactory() (factory tasks.TxnTaskFactory, err error) {
 	if !blk.meta.IsAppendable() {
-		factory = CompactBlockTaskFactory(ctx, blk.meta)
+		factory = CompactBlockTaskFactory(blk.meta)
 		return
 	}
 	return
