@@ -2,6 +2,7 @@ package mockio
 
 import (
 	"bytes"
+	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
 
 	"github.com/RoaringBitmap/roaring"
 	gbat "github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -22,6 +23,7 @@ type blockFile struct {
 	ts      uint64
 	columns []*columnBlock
 	deletes *deletesFile
+	indexMeta *dataFile
 }
 
 func newBlock(id uint64, seg file.Segment, colCnt int, indexCnt map[int]int) *blockFile {
@@ -30,6 +32,7 @@ func newBlock(id uint64, seg file.Segment, colCnt int, indexCnt map[int]int) *bl
 		id:      id,
 		columns: make([]*columnBlock, colCnt),
 	}
+	bf.indexMeta = newData(nil)
 	bf.deletes = newDeletes(bf)
 	bf.OnZeroCB = bf.close
 	for i, _ := range bf.columns {
@@ -91,6 +94,25 @@ func (bf *blockFile) OpenColumn(colIdx int) (colBlk file.ColumnBlock, err error)
 	bf.columns[colIdx].Ref()
 	colBlk = bf.columns[colIdx]
 	return
+}
+
+func (bf *blockFile) WriteIndexMeta(buf []byte) (err error) {
+	_, err = bf.indexMeta.Write(buf)
+	return
+}
+
+func (bf *blockFile) LoadIndexMeta() (*idxCommon.IndicesMeta, error) {
+	size := bf.indexMeta.Stat().Size()
+	buf := make([]byte, size)
+	_, err := bf.indexMeta.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	indices := idxCommon.NewEmptyIndicesMeta()
+	if err = indices.Unmarshal(buf); err != nil {
+		return nil, err
+	}
+	return indices, nil
 }
 
 func (bf *blockFile) Close() error {

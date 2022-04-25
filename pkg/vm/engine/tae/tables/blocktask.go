@@ -7,6 +7,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/io"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
@@ -89,12 +91,75 @@ func (task *compactBlockTask) Execute() (err error) {
 	}
 	newBlkData := newBlk.GetMeta().(*catalog.BlockEntry).GetBlockData()
 	blockFile := newBlkData.GetBlockFile()
+
+	// write indexes, collect their meta, and refresh host's index holder
+	schema := task.meta.GetSchema()
+	pkColumn, err := blockFile.OpenColumn(int(schema.PrimaryKey))
+	if err != nil {
+		return
+	}
+	pkColumnData := data.Vecs[schema.PrimaryKey]
+	zmIdx := uint16(0)
+	sfIdx := uint16(1)
+	metas := common.NewEmptyIndicesMeta()
+
+	zoneMapWriter := io.NewBlockZoneMapIndexWriter()
+	zmFile, err := pkColumn.OpenIndexFile(int(zmIdx))
+	if err != nil {
+		return err
+	}
+	err = zoneMapWriter.Init(zmFile, common.Plain, uint16(schema.PrimaryKey), zmIdx)
+	if err != nil {
+		return err
+	}
+	err = zoneMapWriter.AddValues(pkColumnData)
+	if err != nil {
+		return err
+	}
+	meta, err := zoneMapWriter.Finalize()
+	if err != nil {
+		return err
+	}
+	metas.AddIndex(*meta)
+
+	staticFilterWriter := io.NewStaticFilterIndexWriter()
+	sfFile, err := pkColumn.OpenIndexFile(int(sfIdx))
+	if err != nil {
+		return err
+	}
+	err = staticFilterWriter.Init(sfFile, common.Plain, uint16(schema.PrimaryKey), sfIdx)
+	if err != nil {
+		return err
+	}
+	err = staticFilterWriter.AddValues(pkColumnData)
+	if err != nil {
+		return err
+	}
+	meta2, err := staticFilterWriter.Finalize()
+	if err != nil {
+		return err
+	}
+	metas.AddIndex(*meta2)
+	metaBuf, err := metas.Marshal()
+	if err != nil {
+		return err
+	}
+
+	err = blockFile.WriteIndexMeta(metaBuf)
+	if err != nil {
+		return err
+	}
+
 	if err = blockFile.WriteBatch(data, task.txn.GetStartTS()); err != nil {
 		return
+	}
+	if err = newBlkData.RefreshIndex(); err != nil {
+		return err
 	}
 	if err = rel.PrepareCompactBlock(task.compacted.Fingerprint(), newBlk.Fingerprint()); err != nil {
 		return
 	}
 	task.created = newBlk
+	//logutil.Info(common.MockIndexBufferManager.String())
 	return
 }

@@ -2,8 +2,8 @@ package impl
 
 import (
 	"github.com/RoaringBitmap/roaring"
-	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/data"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/access/acif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/basic"
@@ -12,13 +12,16 @@ import (
 
 type appendableBlockIndexHolder struct {
 	host         data.Block
+	schema *catalog.Schema
 	treeIndex    basic.ARTMap
 	zoneMapIndex *basic.ZoneMap
 }
 
-func NewAppendableBlockIndexHolder(pkType types.Type, host data.Block) *appendableBlockIndexHolder {
+func NewAppendableBlockIndexHolder(host data.Block, schema *catalog.Schema) *appendableBlockIndexHolder {
 	holder := new(appendableBlockIndexHolder)
 	holder.host = host
+	holder.schema = schema
+	pkType := schema.GetPKType()
 	holder.treeIndex = basic.NewSimpleARTMap(pkType, nil)
 	holder.zoneMapIndex = basic.NewZoneMap(pkType, nil)
 	return holder
@@ -75,7 +78,22 @@ func (holder *appendableBlockIndexHolder) BatchDedup(keys *vector.Vector) error 
 }
 
 func (holder *appendableBlockIndexHolder) Upgrade() (acif.INonAppendableBlockIndexHolder, error) {
-	// TODO: implement
+	//var indexMeta *common.IndexMeta
+	//upgradedHolder := NewNonAppendableBlockIndexHolder(holder.host)
+	//zoneMapIndexWriter := io.NewBlockZoneMapIndexWriter()
+	//pkType := holder.schema.GetPKType()
+	//pkIdx := holder.schema.PrimaryKey
+	//
+	//blockFile := holder.host.GetBlockFile()
+	//colBlockFile, err := blockFile.OpenColumn(int(pkIdx))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//indexFile, err := colBlockFile.OpenIndexFile(int(pkIdx))
+	//if err != nil {
+	//	return nil, err
+	//}
+
 	return nil, nil
 }
 

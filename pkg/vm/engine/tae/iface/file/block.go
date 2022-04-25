@@ -1,6 +1,7 @@
 package file
 
 import (
+	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
 	"io"
 
 	"github.com/RoaringBitmap/roaring"
@@ -24,6 +25,8 @@ type Block interface {
 	ReadDeletes(buf []byte) error
 
 	OpenColumn(colIdx int) (ColumnBlock, error)
+	LoadIndexMeta() (*idxCommon.IndicesMeta, error)
+	WriteIndexMeta(buf []byte) (err error)
 	// WriteColumn(colIdx int, ts uint64, data []byte, updates []byte) (common.IVFile, error)
 
 	// TODO: Remove later

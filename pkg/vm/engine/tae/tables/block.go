@@ -3,6 +3,8 @@ package tables
 import (
 	"bytes"
 	"fmt"
+	common2 "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common/errors"
 	"sync"
 	"sync/atomic"
 
@@ -56,12 +58,10 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 	if meta.IsAppendable() {
 		node = newNode(bufMgr, block, file)
 		block.node = node
-		pkType := meta.GetSegment().GetTable().GetSchema().GetPKType()
-		block.indexHolder = impl.NewAppendableBlockIndexHolder(pkType, block)
-	} else {
-		// TODO: deal with initializing non-appendable block index holder from meta
-		block.indexHolder = impl.NewNonAppendableBlockIndexHolder()
+		schema := meta.GetSchema()
+		block.indexHolder = impl.NewAppendableBlockIndexHolder(block, schema)
 	}
+	// Non-appendable index holder would be initialized during compaction
 	return block
 }
 
@@ -70,6 +70,15 @@ func (blk *dataBlock) GetBlockFile() file.Block {
 }
 
 func (blk *dataBlock) GetID() uint64 { return blk.meta.ID }
+func (blk *dataBlock) RefreshIndex() error {
+	if blk.meta.IsAppendable() {
+		panic("unexpected error")
+	}
+	if blk.indexHolder == nil {
+		blk.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
+	}
+	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), common2.MockIndexBufferManager/* TODO: use dedicated index buffer manager */)
+}
 
 func (blk *dataBlock) RunCalibration() {
 	score := blk.estimateRawScore()
@@ -470,9 +479,17 @@ func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err erro
 		readLock := blk.controller.GetSharedLock()
 		defer readLock.Unlock()
 		// logutil.Infof("BatchDedup %s: PK=%s", txn.String(), pks.String())
-		return blk.indexHolder.(acif.IAppendableBlockIndexHolder).BatchDedup(pks)
+		if err := blk.indexHolder.(acif.IAppendableBlockIndexHolder).BatchDedup(pks); err != nil {
+			if err == errors.ErrKeyDuplicate {
+				return txnbase.ErrDuplicated
+			}
+			return err
+		}
+		return nil
 	}
-	return
+	if blk.indexHolder == nil {
+		return nil
+	}
 	var visibilityMap *roaring.Bitmap
 	err, visibilityMap = blk.indexHolder.(acif.INonAppendableBlockIndexHolder).MayContainsAnyKeys(pks)
 	if err == nil {
