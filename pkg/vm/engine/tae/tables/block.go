@@ -495,9 +495,26 @@ func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err erro
 	if err == nil {
 		return nil
 	}
-	// TODO: use the visibility map of the `pks` with `txn` to confirm the duplicated rows in `pks`
 	if visibilityMap == nil {
 		panic("unexpected error")
+	}
+	pkIdx := blk.meta.GetSchema().PrimaryKey
+	pkColumnData, deletes, err := blk.GetVectorCopy(txn, blk.meta.GetSchema().Attrs()[pkIdx], nil, nil)
+	if err != nil {
+		return err
+	}
+	leftData := compute.ApplyDeleteToVector(pkColumnData, deletes)
+	if gvec.Length(leftData) == 0 {
+		return nil
+	}
+	deduplicate := func(v interface{}) error {
+		if compute.CheckRowExists(leftData, v) {
+			return txnbase.ErrDuplicated
+		}
+		return nil
+	}
+	if err = common.ProcessVector(pks, 0, -1, deduplicate, visibilityMap); err != nil {
+		return err
 	}
 	return
 }
