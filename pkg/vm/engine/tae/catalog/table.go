@@ -185,3 +185,9 @@ func (entry *TableEntry) RecurLoop(processor Processor) (err error) {
 	}
 	return err
 }
+
+func (entry *TableEntry) RemoveEntry(segment *SegmentEntry) (err error) {
+	entry.Lock()
+	defer entry.Unlock()
+	return entry.deleteEntryLocked(segment)
+}

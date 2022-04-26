@@ -470,6 +470,71 @@ func TestCompactBlock2(t *testing.T) {
 	}
 }
 
+func TestRollback1(t *testing.T) {
+	db := initDB(t, nil)
+	defer db.Close()
+	schema := catalog.MockSchema(2)
+
+	txn, _ := db.StartTxn(nil)
+	database, _ := txn.CreateDatabase("db")
+	database.CreateRelation(schema)
+	assert.Nil(t, txn.Commit())
+
+	segCnt := 0
+	onSegFn := func(segment *catalog.SegmentEntry) error {
+		segCnt++
+		return nil
+	}
+	blkCnt := 0
+	onBlkFn := func(block *catalog.BlockEntry) error {
+		blkCnt++
+		return nil
+	}
+	processor := new(catalog.LoopProcessor)
+	processor.SegmentFn = onSegFn
+	processor.BlockFn = onBlkFn
+	txn, _ = db.StartTxn(nil)
+	database, _ = txn.GetDatabase("db")
+	rel, _ := database.GetRelationByName(schema.Name)
+	rel.CreateSegment()
+
+	tableMeta := rel.GetMeta().(*catalog.TableEntry)
+	tableMeta.RecurLoop(processor)
+	assert.Equal(t, segCnt, 1)
+
+	assert.Nil(t, txn.Rollback())
+	segCnt = 0
+	tableMeta.RecurLoop(processor)
+	assert.Equal(t, segCnt, 0)
+
+	txn, _ = db.StartTxn(nil)
+	database, _ = txn.GetDatabase("db")
+	rel, _ = database.GetRelationByName(schema.Name)
+	seg, _ := rel.CreateSegment()
+	segMeta := seg.GetMeta().(*catalog.SegmentEntry)
+	assert.Nil(t, txn.Commit())
+	segCnt = 0
+	tableMeta.RecurLoop(processor)
+	assert.Equal(t, segCnt, 1)
+
+	txn, _ = db.StartTxn(nil)
+	database, _ = txn.GetDatabase("db")
+	rel, _ = database.GetRelationByName(schema.Name)
+	seg, _ = rel.GetSegment(segMeta.GetID())
+	_, err := seg.CreateBlock()
+	assert.Nil(t, err)
+	blkCnt = 0
+	tableMeta.RecurLoop(processor)
+	assert.Equal(t, blkCnt, 1)
+
+	txn.Rollback()
+	blkCnt = 0
+	tableMeta.RecurLoop(processor)
+	assert.Equal(t, blkCnt, 0)
+
+	t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
+}
+
 func TestMVCC1(t *testing.T) {
 	db := initDB(t, nil)
 	defer db.Close()
