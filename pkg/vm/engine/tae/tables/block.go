@@ -110,12 +110,12 @@ func (blk *dataBlock) estimateRawScore() int {
 }
 
 func (blk *dataBlock) MutationInfo() string {
+	rows := blk.Rows(nil, true)
 	totalChanges := blk.controller.GetChangeNodeCnt()
-	s := fmt.Sprintf("Block %s Mutation Info: Changes=%d", blk.meta.AsCommonID().ToBlockFilePath(), totalChanges)
+	s := fmt.Sprintf("Block %s Mutation Info: Changes=%d/%d", blk.meta.AsCommonID().ToBlockFilePath(), totalChanges, rows)
 	if totalChanges == 0 {
 		return s
 	}
-	rows := blk.Rows(nil, true)
 	for i := range blk.meta.GetSchema().ColDefs {
 		cnt := blk.controller.GetColumnUpdateCnt(uint16(i))
 		if cnt == 0 {
@@ -137,11 +137,11 @@ func (blk *dataBlock) EstimateScore() int {
 }
 
 func (blk *dataBlock) BuildCheckpointTaskFactory() (factory tasks.TxnTaskFactory, err error) {
-	if !blk.meta.IsAppendable() {
-		factory = CompactBlockTaskFactory(blk.meta)
-		return
-	}
+	factory = CompactBlockTaskFactory(blk.meta)
 	return
+	// if !blk.meta.IsAppendable() {
+	// }
+	// return
 }
 
 func (blk *dataBlock) IsAppendable() bool {
