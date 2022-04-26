@@ -108,6 +108,8 @@ func (catalog *Catalog) addEntryLocked(database *DBEntry) error {
 }
 
 func (catalog *Catalog) MakeDBIt(reverse bool) *common.LinkIt {
+	catalog.RLock()
+	defer catalog.RUnlock()
 	return common.NewLinkIt(catalog.RWMutex, catalog.link, reverse)
 }
 

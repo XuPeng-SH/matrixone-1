@@ -54,6 +54,8 @@ func (e *DBEntry) String() string {
 }
 
 func (e *DBEntry) MakeTableIt(reverse bool) *common.LinkIt {
+	e.RLock()
+	defer e.RUnlock()
 	return common.NewLinkIt(e.RWMutex, e.link, reverse)
 }
 

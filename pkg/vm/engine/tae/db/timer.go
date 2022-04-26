@@ -9,10 +9,12 @@ import (
 
 type calibrationProcessor struct {
 	*catalog.LoopProcessor
+	db *DB
 }
 
-func newCalibrationProcessor() *calibrationProcessor {
+func newCalibrationProcessor(db *DB) *calibrationProcessor {
 	processor := &calibrationProcessor{
+		db:            db,
 		LoopProcessor: new(catalog.LoopProcessor),
 	}
 	processor.BlockFn = processor.onBlock
@@ -24,6 +26,18 @@ func (processor *calibrationProcessor) onBlock(blockEntry *catalog.BlockEntry) (
 	data := blockEntry.GetBlockData()
 	data.RunCalibration()
 	logutil.Infof("%s Score: %d, Time: %s", data.MutationInfo(), data.EstimateScore(), time.Since(now))
+	// blockEntry.RLock()
+	// if blockEntry.IsDroppedCommitted() {
+	// 	blockEntry.RUnlock()
+	// 	return
+	// }
+	// blockEntry.RUnlock()
+	// if data.EstimateScore() > 20 {
+	// 	factory := tables.CompactBlockTaskFactory(blockEntry)
+	// 	ctx := tasks.Context{Waitable: true}
+	// 	task, _ := processor.db.TaskScheduler.ScheduleTxnTask(&ctx, factory)
+	// 	err = task.WaitDone()
+	// }
 	return
 }
 

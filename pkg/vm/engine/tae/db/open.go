@@ -60,7 +60,7 @@ func Open(dirname string, opts *options.Options) (db *DB, err error) {
 	db.IOScheduler = newIOScheduler(db)
 	db.TaskScheduler = newTaskScheduler(db)
 	db.CKPDriver = checkpoint.NewDriver(db.TaskScheduler)
-	handle := newTimedLooper(db, newCalibrationProcessor())
+	handle := newTimedLooper(db, newCalibrationProcessor(db))
 	db.CalibrationTimer = w.NewHeartBeater(time.Duration(opts.CheckpointCfg.CalibrationInterval)*time.Millisecond, handle)
 	db.startWorkers()
 
