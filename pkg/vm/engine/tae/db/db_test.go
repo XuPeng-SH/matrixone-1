@@ -781,27 +781,36 @@ func TestUnload2(t *testing.T) {
 
 	for i, data := range bats {
 		wg.Add(1)
-		name := schema2.Name
+		name := schema1.Name
 		if i%2 == 1 {
 			name = schema2.Name
 		}
 		p.Submit(doFn(name, data))
 	}
 	wg.Wait()
-	// {
-	// 	txn, _ := db.StartTxn(nil)
-	// 	database, _ := txn.GetDatabase("db")
-	// 	rel, _ := database.GetRelationByName(schema.Name)
-	// 	for i := 0; i < 10; i++ {
-	// 		it := rel.MakeBlockIt()
-	// 		for it.Valid() {
-	// 			blk := it.GetBlock()
-	// 			vec, _, _ := blk.GetVectorCopy(schema.ColDefs[schema.PrimaryKey].Name, nil, nil)
-	// 			assert.Equal(t, int(schema.BlockMaxRows), gvec.Length(vec))
-	// 			it.Next()
-	// 		}
-	// 	}
-	// }
-	t.Log(common.GPool.String())
+
+	{
+		txn, _ := db.StartTxn(nil)
+		database, _ := txn.GetDatabase("db")
+		rel, _ := database.GetRelationByName(schema1.Name)
+		filter := handle.Filter{
+			Op: handle.FilterEq,
+		}
+		for i := 0; i < len(bats); i += 2 {
+			data := bats[i]
+			filter.Val = compute.GetValue(data.Vecs[schema1.PrimaryKey], 0)
+			_, _, err := rel.GetByFilter(&filter)
+			assert.Nil(t, err)
+		}
+		rel, _ = database.GetRelationByName(schema2.Name)
+		for i := 1; i < len(bats); i += 2 {
+			data := bats[i]
+			filter.Val = compute.GetValue(data.Vecs[schema1.PrimaryKey], 0)
+			_, _, err := rel.GetByFilter(&filter)
+			assert.Nil(t, err)
+		}
+	}
+
 	t.Log(db.MTBufMgr.String())
+	// t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
 }
