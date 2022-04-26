@@ -3,9 +3,11 @@ package db
 import (
 	"bytes"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
+	gbat "github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
@@ -19,6 +21,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils"
 	ops "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/worker"
+	"github.com/panjf2000/ants/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -693,4 +696,112 @@ func TestMVCC2(t *testing.T) {
 			it.Next()
 		}
 	}
+}
+
+func TestUnload1(t *testing.T) {
+	opts := new(options.Options)
+	opts.CacheCfg = new(options.CacheCfg)
+	opts.CacheCfg.InsertCapacity = common.K
+	opts.CacheCfg.TxnCapacity = common.M
+	db := initDB(t, opts)
+	defer db.Close()
+
+	schema := catalog.MockSchemaAll(13)
+	schema.BlockMaxRows = 10
+	schema.SegmentMaxBlocks = 2
+	schema.PrimaryKey = 2
+
+	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows*2), int(schema.PrimaryKey), nil)
+
+	{
+		txn, _ := db.StartTxn(nil)
+		database, _ := txn.CreateDatabase("db")
+		rel, _ := database.CreateRelation(schema)
+		rel.Append(bat)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn, _ := db.StartTxn(nil)
+		database, _ := txn.GetDatabase("db")
+		rel, _ := database.GetRelationByName(schema.Name)
+		for i := 0; i < 10; i++ {
+			it := rel.MakeBlockIt()
+			for it.Valid() {
+				blk := it.GetBlock()
+				vec, _, _ := blk.GetVectorCopy(schema.ColDefs[schema.PrimaryKey].Name, nil, nil)
+				assert.Equal(t, int(schema.BlockMaxRows), gvec.Length(vec))
+				it.Next()
+			}
+		}
+	}
+	t.Log(common.GPool.String())
+}
+
+func TestUnload2(t *testing.T) {
+	opts := new(options.Options)
+	opts.CacheCfg = new(options.CacheCfg)
+	opts.CacheCfg.InsertCapacity = common.K * 2
+	opts.CacheCfg.TxnCapacity = common.M
+	db := initDB(t, opts)
+	defer db.Close()
+
+	schema1 := catalog.MockSchemaAll(13)
+	schema1.BlockMaxRows = 10
+	schema1.SegmentMaxBlocks = 2
+	schema1.PrimaryKey = 2
+
+	schema2 := catalog.MockSchemaAll(13)
+	schema2.BlockMaxRows = 10
+	schema2.SegmentMaxBlocks = 2
+	schema2.PrimaryKey = 2
+	{
+		txn, _ := db.StartTxn(nil)
+		database, _ := txn.CreateDatabase("db")
+		database.CreateRelation(schema1)
+		database.CreateRelation(schema2)
+		assert.Nil(t, txn.Commit())
+	}
+
+	bat := compute.MockBatch(schema1.Types(), uint64(schema1.BlockMaxRows*5)+5, int(schema1.PrimaryKey), nil)
+	bats := compute.SplitBatch(bat, gvec.Length(bat.Vecs[0]))
+
+	p, _ := ants.NewPool(10)
+	var wg sync.WaitGroup
+	doFn := func(name string, data *gbat.Batch) func() {
+		return func() {
+			defer wg.Done()
+			txn, _ := db.StartTxn(nil)
+			database, _ := txn.GetDatabase("db")
+			rel, _ := database.GetRelationByName(name)
+			err := rel.Append(data)
+			assert.Nil(t, err)
+			assert.Nil(t, txn.Commit())
+		}
+	}
+
+	for i, data := range bats {
+		wg.Add(1)
+		name := schema2.Name
+		if i%2 == 1 {
+			name = schema2.Name
+		}
+		p.Submit(doFn(name, data))
+	}
+	wg.Wait()
+	// {
+	// 	txn, _ := db.StartTxn(nil)
+	// 	database, _ := txn.GetDatabase("db")
+	// 	rel, _ := database.GetRelationByName(schema.Name)
+	// 	for i := 0; i < 10; i++ {
+	// 		it := rel.MakeBlockIt()
+	// 		for it.Valid() {
+	// 			blk := it.GetBlock()
+	// 			vec, _, _ := blk.GetVectorCopy(schema.ColDefs[schema.PrimaryKey].Name, nil, nil)
+	// 			assert.Equal(t, int(schema.BlockMaxRows), gvec.Length(vec))
+	// 			it.Next()
+	// 		}
+	// 	}
+	// }
+	t.Log(common.GPool.String())
+	t.Log(db.MTBufMgr.String())
 }
