@@ -38,8 +38,7 @@ func initDB(t *testing.T, opts *options.Options) *DB {
 func TestAppend(t *testing.T) {
 	db := initDB(t, nil)
 	defer db.Close()
-	txn, err := db.StartTxn(nil)
-	assert.Nil(t, err)
+	txn := db.StartTxn(nil)
 	schema := catalog.MockSchemaAll(14)
 	schema.BlockMaxRows = options.DefaultBlockMaxRows
 	schema.SegmentMaxBlocks = options.DefaultBlocksPerSegment
@@ -59,11 +58,11 @@ func TestAppend(t *testing.T) {
 	t.Log(vector.Length(bats[0].Vecs[0]))
 
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		{
-			txn, _ := db.StartTxn(nil)
+			txn := db.StartTxn(nil)
 			database, _ := txn.GetDatabase("db")
 			rel, _ := database.GetRelationByName(schema.Name)
 			err = rel.Append(bats[1])
@@ -80,7 +79,7 @@ func TestTableHandle(t *testing.T) {
 	db := initDB(t, nil)
 	defer db.Close()
 
-	txn, _ := db.StartTxn(nil)
+	txn := db.StartTxn(nil)
 	database, _ := txn.CreateDatabase("db")
 	schema := catalog.MockSchema(2)
 	schema.BlockMaxRows = 1000
@@ -101,7 +100,7 @@ func TestCreateBlock(t *testing.T) {
 	db := initDB(t, nil)
 	defer db.Close()
 
-	txn, _ := db.StartTxn(nil)
+	txn := db.StartTxn(nil)
 	database, _ := txn.CreateDatabase("db")
 	schema := catalog.MockSchemaAll(13)
 	rel, _ := database.CreateRelation(schema)
@@ -133,13 +132,13 @@ func TestNonAppendableBlock(t *testing.T) {
 	bat := compute.MockBatch(schema.Types(), 8, int(schema.PrimaryKey), nil)
 
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
 		database.CreateRelation(schema)
 		assert.Nil(t, txn.Commit())
 	}
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		seg, _ := rel.CreateSegment()
@@ -203,7 +202,7 @@ func TestCompactBlock1(t *testing.T) {
 	schema.PrimaryKey = 2
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
 		rel, _ := database.CreateRelation(schema)
 		err := rel.Append(bat)
@@ -220,7 +219,7 @@ func TestCompactBlock1(t *testing.T) {
 	ctx := tasks.Context{Waitable: true}
 	// 1. No updates and deletes
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		it := rel.MakeBlockIt()
@@ -252,7 +251,7 @@ func TestCompactBlock1(t *testing.T) {
 		assert.Nil(t, txn.Commit())
 	}
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		v = compute.GetValue(bat.Vecs[schema.PrimaryKey], 3)
@@ -269,7 +268,7 @@ func TestCompactBlock1(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, vector.Length(bat.Vecs[0])-1, vector.Length(data.Vecs[0]))
 		{
-			txn, _ := db.StartTxn(nil)
+			txn := db.StartTxn(nil)
 			database, _ := txn.GetDatabase("db")
 			rel, _ := database.GetRelationByName(schema.Name)
 			v = compute.GetValue(bat.Vecs[schema.PrimaryKey], 4)
@@ -289,7 +288,7 @@ func TestCompactBlock1(t *testing.T) {
 		assert.Equal(t, vector.Length(bat.Vecs[0])-1, vector.Length(data.Vecs[0]))
 		var maxTs uint64
 		{
-			txn, _ := db.StartTxn(nil)
+			txn := db.StartTxn(nil)
 			database, _ := txn.GetDatabase("db")
 			rel, _ := database.GetRelationByName(schema.Name)
 			seg, _ := rel.GetSegment(id.SegmentID)
@@ -335,7 +334,7 @@ func TestCompactBlock2(t *testing.T) {
 	schema.PrimaryKey = 2
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
 		rel, _ := database.CreateRelation(schema)
 		err := rel.Append(bat)
@@ -345,7 +344,7 @@ func TestCompactBlock2(t *testing.T) {
 	ctx := &tasks.Context{Waitable: true}
 	var newBlockFp *common.ID
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		it := rel.MakeBlockIt()
@@ -364,7 +363,7 @@ func TestCompactBlock2(t *testing.T) {
 	}
 	{
 		t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		t.Log(rel.SimplePPString(common.PPL1))
@@ -378,7 +377,7 @@ func TestCompactBlock2(t *testing.T) {
 	}
 	{
 		t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		t.Log(rel.SimplePPString(common.PPL1))
@@ -394,7 +393,7 @@ func TestCompactBlock2(t *testing.T) {
 	}
 	{
 		t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		t.Log(rel.SimplePPString(common.PPL1))
@@ -424,7 +423,7 @@ func TestCompactBlock2(t *testing.T) {
 		assert.Nil(t, err)
 		newBlockFp = task.GetNewBlock().Fingerprint()
 		{
-			txn, _ := db.StartTxn(nil)
+			txn := db.StartTxn(nil)
 			database, _ := txn.GetDatabase("db")
 			rel, _ := database.GetRelationByName(schema.Name)
 			seg, _ := rel.GetSegment(newBlockFp.SegmentID)
@@ -438,7 +437,7 @@ func TestCompactBlock2(t *testing.T) {
 		assert.Nil(t, txn.Commit())
 	}
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		t.Log(rel.SimplePPString(common.PPL1))
@@ -453,7 +452,7 @@ func TestCompactBlock2(t *testing.T) {
 		assert.Equal(t, int64(1999), v)
 		assert.Equal(t, gvec.Length(bat.Vecs[0])-2, gvec.Length(vec))
 
-		txn2, _ := db.StartTxn(nil)
+		txn2 := db.StartTxn(nil)
 		database2, _ := txn2.GetDatabase("db")
 		rel2, _ := database2.GetRelationByName(schema.Name)
 		seg2, _ := rel2.GetSegment(newBlockFp.SegmentID)
@@ -478,7 +477,7 @@ func TestRollback1(t *testing.T) {
 	defer db.Close()
 	schema := catalog.MockSchema(2)
 
-	txn, _ := db.StartTxn(nil)
+	txn := db.StartTxn(nil)
 	database, _ := txn.CreateDatabase("db")
 	database.CreateRelation(schema)
 	assert.Nil(t, txn.Commit())
@@ -496,7 +495,7 @@ func TestRollback1(t *testing.T) {
 	processor := new(catalog.LoopProcessor)
 	processor.SegmentFn = onSegFn
 	processor.BlockFn = onBlkFn
-	txn, _ = db.StartTxn(nil)
+	txn = db.StartTxn(nil)
 	database, _ = txn.GetDatabase("db")
 	rel, _ := database.GetRelationByName(schema.Name)
 	rel.CreateSegment()
@@ -510,7 +509,7 @@ func TestRollback1(t *testing.T) {
 	tableMeta.RecurLoop(processor)
 	assert.Equal(t, segCnt, 0)
 
-	txn, _ = db.StartTxn(nil)
+	txn = db.StartTxn(nil)
 	database, _ = txn.GetDatabase("db")
 	rel, _ = database.GetRelationByName(schema.Name)
 	seg, _ := rel.CreateSegment()
@@ -520,7 +519,7 @@ func TestRollback1(t *testing.T) {
 	tableMeta.RecurLoop(processor)
 	assert.Equal(t, segCnt, 1)
 
-	txn, _ = db.StartTxn(nil)
+	txn = db.StartTxn(nil)
 	database, _ = txn.GetDatabase("db")
 	rel, _ = database.GetRelationByName(schema.Name)
 	seg, _ = rel.GetSegment(segMeta.GetID())
@@ -548,7 +547,7 @@ func TestMVCC1(t *testing.T) {
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows)*10, int(schema.PrimaryKey), nil)
 	bats := compute.SplitBatch(bat, 40)
 
-	txn, _ := db.StartTxn(nil)
+	txn := db.StartTxn(nil)
 	database, _ := txn.CreateDatabase("db")
 	rel, _ := database.CreateRelation(schema)
 	err := rel.Append(bats[0])
@@ -569,7 +568,7 @@ func TestMVCC1(t *testing.T) {
 	assert.Equal(t, expectVal, actualVal)
 	assert.Nil(t, txn.Commit())
 
-	txn, _ = db.StartTxn(nil)
+	txn = db.StartTxn(nil)
 	database, _ = txn.GetDatabase("db")
 	rel, _ = database.GetRelationByName(schema.Name)
 	id, offset, err = rel.GetByFilter(filter)
@@ -580,7 +579,7 @@ func TestMVCC1(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, expectVal, actualVal)
 
-	txn2, _ := db.StartTxn(nil)
+	txn2 := db.StartTxn(nil)
 	database2, _ := txn2.GetDatabase("db")
 	rel2, _ := database2.GetRelationByName(schema.Name)
 
@@ -601,7 +600,7 @@ func TestMVCC1(t *testing.T) {
 	assert.NotNil(t, err)
 
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		id, offset, err = rel.GetByFilter(filter)
@@ -644,7 +643,7 @@ func TestMVCC2(t *testing.T) {
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
 	bats := compute.SplitBatch(bat, 10)
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
 		rel, _ := database.CreateRelation(schema)
 		rel.Append(bats[0])
@@ -658,7 +657,7 @@ func TestMVCC2(t *testing.T) {
 		assert.Nil(t, txn.Commit())
 	}
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		rel.Append(bats[1])
@@ -679,7 +678,7 @@ func TestMVCC2(t *testing.T) {
 		assert.Nil(t, txn.Commit())
 	}
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		it := rel.MakeBlockIt()
@@ -714,14 +713,14 @@ func TestUnload1(t *testing.T) {
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows*2), int(schema.PrimaryKey), nil)
 
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
 		rel, _ := database.CreateRelation(schema)
 		rel.Append(bat)
 		assert.Nil(t, txn.Commit())
 	}
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema.Name)
 		for i := 0; i < 10; i++ {
@@ -755,7 +754,7 @@ func TestUnload2(t *testing.T) {
 	schema2.SegmentMaxBlocks = 2
 	schema2.PrimaryKey = 2
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
 		database.CreateRelation(schema1)
 		database.CreateRelation(schema2)
@@ -770,7 +769,7 @@ func TestUnload2(t *testing.T) {
 	doFn := func(name string, data *gbat.Batch) func() {
 		return func() {
 			defer wg.Done()
-			txn, _ := db.StartTxn(nil)
+			txn := db.StartTxn(nil)
 			database, _ := txn.GetDatabase("db")
 			rel, _ := database.GetRelationByName(name)
 			err := rel.Append(data)
@@ -790,7 +789,7 @@ func TestUnload2(t *testing.T) {
 	wg.Wait()
 
 	{
-		txn, _ := db.StartTxn(nil)
+		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
 		rel, _ := database.GetRelationByName(schema1.Name)
 		filter := handle.Filter{
