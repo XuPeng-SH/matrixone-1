@@ -17,6 +17,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/txnnodes"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/updates"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils"
@@ -309,7 +310,9 @@ func TestCompactBlock1(t *testing.T) {
 
 		destBlock, err := seg.CreateNonAppendableBlock()
 		assert.Nil(t, err)
-		err = rel.PrepareCompactBlock(block.Fingerprint(), destBlock.Fingerprint())
+		txnNode := txnnodes.NewCompactBlockNode(txn, block, destBlock)
+		txn.LogTxnNode(destBlock.Fingerprint().TableID, txnNode, []*common.ID{block.Fingerprint()})
+		// err = rel.PrepareCompactBlock(block.Fingerprint(), destBlock.Fingerprint())
 		destBlockData := destBlock.GetMeta().(*catalog.BlockEntry).GetBlockData()
 		assert.Nil(t, err)
 		err = txn.Commit()

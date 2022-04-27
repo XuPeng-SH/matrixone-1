@@ -43,6 +43,7 @@ type TxnHandle interface {
 	DropDatabase(name string) (handle.Database, error)
 	GetDatabase(name string) (handle.Database, error)
 	UseDatabase(name string) error
+	CurrentDatabase() handle.Database
 }
 
 type TxnChanger interface {
@@ -60,6 +61,7 @@ type TxnChanger interface {
 }
 
 type TxnWriter interface {
+	LogTxnNode(tableId uint64, node TxnNode, readed []*common.ID) error
 }
 
 type TxnAsyncer interface {
@@ -120,15 +122,17 @@ type DeleteChain interface {
 	CollectDeletesLocked(ts uint64) DeleteNode
 }
 
-type AppendNode interface {
-	// sync.Locker
-	// RLock()
-	// RUnlock()
+type TxnNode interface {
 	PrepareCommit() error
 	ApplyCommit() error
 }
 
+type AppendNode interface {
+	TxnNode
+}
+
 type DeleteNode interface {
+	TxnNode
 	sync.Locker
 	RLock()
 	RUnlock()
@@ -136,18 +140,16 @@ type DeleteNode interface {
 	GetChain() DeleteChain
 	RangeDeleteLocked(start, end uint32)
 	GetCardinalityLocked() uint32
-	// MakeCommand(id uint32, forceFlush bool) (TxnCmd, txnbase.NodeEntry, error)
 }
 
 type UpdateNode interface {
+	TxnNode
 	sync.Locker
 	RLock()
 	RUnlock()
 	GetID() *common.ID
 	String() string
 	GetChain() UpdateChain
-	PrepareCommit() error
-	ApplyCommit() error
 	GetDLNode() *common.DLNode
 
 	// Update(row uint32, v interface{}) error
@@ -184,6 +186,7 @@ type TxnStore interface {
 	GetDatabase(name string) (handle.Database, error)
 	DropDatabase(name string) (handle.Database, error)
 	UseDatabase(name string) error
+	CurrentDatabase() handle.Database
 
 	GetSegment(id *common.ID) (handle.Segment, error)
 	CreateSegment(tid uint64) (handle.Segment, error)
@@ -194,7 +197,7 @@ type TxnStore interface {
 
 	AddTxnEntry(TxnEntryType, TxnEntry)
 
-	PrepareCompactBlock(from, to *common.ID) error
+	LogTxnNode(tableId uint64, node TxnNode, readed []*common.ID) error
 }
 
 type TxnEntryType int16

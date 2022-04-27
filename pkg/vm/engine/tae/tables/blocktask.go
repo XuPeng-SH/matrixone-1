@@ -4,9 +4,11 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/aoe/mergesort"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/txnnodes"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
@@ -79,7 +81,7 @@ func (task *compactBlockTask) Execute() (err error) {
 		return
 	}
 	seg := task.compacted.GetSegment()
-	rel := seg.GetRelation()
+	// rel := seg.GetRelation()
 	newBlk, err := seg.CreateNonAppendableBlock()
 	if err != nil {
 		return err
@@ -92,9 +94,10 @@ func (task *compactBlockTask) Execute() (err error) {
 	if err = blockFile.WriteBatch(data, task.txn.GetStartTS()); err != nil {
 		return
 	}
-	if err = rel.PrepareCompactBlock(task.compacted.Fingerprint(), newBlk.Fingerprint()); err != nil {
+	task.created = newBlk
+	txnNode := txnnodes.NewCompactBlockNode(task.txn, task.compacted, task.created)
+	if err = task.txn.LogTxnNode(task.meta.GetSegment().GetTable().GetID(), txnNode, []*common.ID{task.compacted.Fingerprint()}); err != nil {
 		return
 	}
-	task.created = newBlk
 	return
 }
