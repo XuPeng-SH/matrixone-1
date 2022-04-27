@@ -128,14 +128,11 @@ type TxnNode interface {
 }
 
 type AppendNode interface {
-	TxnNode
+	TxnEntry
 }
 
 type DeleteNode interface {
-	TxnNode
-	sync.Locker
-	RLock()
-	RUnlock()
+	TxnEntry
 	StringLocked() string
 	GetChain() DeleteChain
 	RangeDeleteLocked(start, end uint32)
@@ -143,20 +140,13 @@ type DeleteNode interface {
 }
 
 type UpdateNode interface {
-	TxnNode
-	sync.Locker
-	RLock()
-	RUnlock()
+	TxnEntry
 	GetID() *common.ID
 	String() string
 	GetChain() UpdateChain
 	GetDLNode() *common.DLNode
 
-	// Update(row uint32, v interface{}) error
 	UpdateLocked(row uint32, v interface{}) error
-	// ApplyDeleteRowsLocked(start, end uint32)
-	// ApplyUpdateColLocked(row uint32, colIdx uint16, v interface{})
-	// MakeCommand(id uint32, forceFlush bool) (TxnCmd, txnbase.NodeEntry, error)
 }
 
 type TxnStore interface {

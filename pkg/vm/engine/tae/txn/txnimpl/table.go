@@ -185,7 +185,7 @@ func (tbl *txnTable) CollectCmd(cmdMgr *commandManager) error {
 	}
 	for _, node := range tbl.updateNodes {
 		csn := cmdMgr.GetCSN()
-		updateCmd, _, err := node.MakeCommand(uint32(csn), false)
+		updateCmd, err := node.MakeCommand(uint32(csn))
 		if err != nil {
 			panic(err)
 		}
@@ -195,7 +195,7 @@ func (tbl *txnTable) CollectCmd(cmdMgr *commandManager) error {
 	}
 	for _, node := range tbl.deleteNodes {
 		csn := cmdMgr.GetCSN()
-		deleteCmd, _, err := node.MakeCommand(uint32(csn), false)
+		deleteCmd, err := node.MakeCommand(uint32(csn))
 		if err != nil {
 			panic(err)
 		}
@@ -1003,7 +1003,7 @@ func (tbl *txnTable) buildCommitCmd(cmdSeq *uint32) (cmd txnif.TxnCmd, entries [
 		h.Close()
 	}
 	for _, node := range tbl.updateNodes {
-		updateCmd, _, err := node.MakeCommand(*cmdSeq, false)
+		updateCmd, err := node.MakeCommand(*cmdSeq)
 		if err != nil {
 			return cmd, entries, err
 		}
