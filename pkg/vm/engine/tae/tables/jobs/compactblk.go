@@ -1,4 +1,4 @@
-package tables
+package jobs
 
 import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
