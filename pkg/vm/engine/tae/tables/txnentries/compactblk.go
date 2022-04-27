@@ -1,4 +1,4 @@
-package txnnodes
+package txnentries
 
 import (
 	"sync"

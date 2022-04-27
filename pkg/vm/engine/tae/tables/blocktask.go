@@ -8,7 +8,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/txnnodes"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/txnentries"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
@@ -95,7 +95,7 @@ func (task *compactBlockTask) Execute() (err error) {
 		return
 	}
 	task.created = newBlk
-	txnEntry := txnnodes.NewCompactBlockEntry(task.txn, task.compacted, task.created)
+	txnEntry := txnentries.NewCompactBlockEntry(task.txn, task.compacted, task.created)
 	if err = task.txn.LogTxnEntry(task.meta.GetSegment().GetTable().GetID(), txnEntry, []*common.ID{task.compacted.Fingerprint()}); err != nil {
 		return
 	}

@@ -1,4 +1,4 @@
-package txnnodes
+package txnentries
 
 import "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 
