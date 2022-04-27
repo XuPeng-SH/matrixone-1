@@ -62,7 +62,7 @@ func (rel *TxnRelation) GetValue(*common.ID, uint32, uint16) (v interface{}, err
 func (rel *TxnRelation) Update(*common.ID, uint32, uint16, interface{}) (err error)           { return }
 func (rel *TxnRelation) RangeDelete(*common.ID, uint32, uint32) (err error)                   { return }
 func (rel *TxnRelation) GetByFilter(*handle.Filter) (id *common.ID, offset uint32, err error) { return }
-func (rel *TxnRelation) LogTxnNode(node txnif.TxnNode, readed []*common.ID) (err error) {
+func (rel *TxnRelation) LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error) {
 	return
 }
 

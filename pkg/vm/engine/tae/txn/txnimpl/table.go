@@ -71,7 +71,7 @@ type Table interface {
 	CreateNonAppendableBlock(sid uint64) (handle.Block, error)
 	CollectCmd(*commandManager) error
 
-	LogTxnNode(node txnif.TxnNode, readed []*common.ID) (err error)
+	LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error)
 }
 
 type txnTable struct {
@@ -247,7 +247,7 @@ func (tbl *txnTable) SoftDeleteBlock(id *common.ID) (err error) {
 	return
 }
 
-func (tbl *txnTable) LogTxnNode(node txnif.TxnNode, readed []*common.ID) (err error) {
+func (tbl *txnTable) LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error) {
 	tbl.txnNodes = append(tbl.txnNodes, node)
 	for _, id := range readed {
 		tbl.warChecker.Read(id)

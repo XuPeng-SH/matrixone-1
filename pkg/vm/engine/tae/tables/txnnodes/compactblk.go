@@ -1,6 +1,8 @@
 package txnnodes
 
 import (
+	"sync"
+
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
@@ -9,6 +11,7 @@ import (
 )
 
 type compactBlockNode struct {
+	sync.RWMutex
 	txn  txnif.AsyncTxn
 	from handle.Block
 	to   handle.Block
@@ -22,7 +25,17 @@ func NewCompactBlockNode(txn txnif.AsyncTxn, from, to handle.Block) *compactBloc
 	}
 }
 
-func (node *compactBlockNode) ApplyCommit() (err error) { return }
+func (node *compactBlockNode) PrepareRollback() (err error) {
+	// TODO: remove block file? (should be scheduled and executed async)
+	return
+}
+func (node *compactBlockNode) ApplyRollback() (err error) { return }
+func (node *compactBlockNode) ApplyCommit() (err error)   { return }
+func (node *compactBlockNode) MakeCommand(csn uint32) (cmd txnif.TxnCmd, err error) {
+	// TODO:
+	// 1. make command
+	return
+}
 
 func (node *compactBlockNode) PrepareCommit() (err error) {
 	dataBlock := node.from.GetMeta().(*catalog.BlockEntry).GetBlockData()

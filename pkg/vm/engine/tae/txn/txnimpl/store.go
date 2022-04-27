@@ -52,12 +52,12 @@ func newStore(catalog *catalog.Catalog, driver txnbase.NodeDriver, txnBufMgr bas
 	}
 }
 
-func (store *txnStore) LogTxnNode(tableId uint64, node txnif.TxnNode, readed []*common.ID) (err error) {
+func (store *txnStore) LogTxnEntry(tableId uint64, node txnif.TxnNode, readed []*common.ID) (err error) {
 	table, err := store.getOrSetTable(tableId)
 	if err != nil {
 		return
 	}
-	return table.LogTxnNode(node, readed)
+	return table.LogTxnEntry(node, readed)
 }
 
 func (store *txnStore) LogSegmentID(tid, sid uint64) {

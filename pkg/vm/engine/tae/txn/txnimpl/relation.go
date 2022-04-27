@@ -142,6 +142,6 @@ func (h *txnRelation) GetValue(id *common.ID, row uint32, col uint16) (interface
 	return h.Txn.GetStore().GetValue(id, row, col)
 }
 
-func (h *txnRelation) LogTxnNode(node txnif.TxnNode, readed []*common.ID) (err error) {
-	return h.Txn.GetStore().LogTxnNode(h.entry.GetID(), node, readed)
+func (h *txnRelation) LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error) {
+	return h.Txn.GetStore().LogTxnEntry(h.entry.GetID(), node, readed)
 }

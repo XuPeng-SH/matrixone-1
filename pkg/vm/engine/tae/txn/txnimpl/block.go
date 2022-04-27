@@ -143,8 +143,8 @@ func (blk *txnBlock) GetVectorCopy(attr string, compressed, decompressed *bytes.
 	return blk.entry.GetBlockData().GetVectorCopy(blk.Txn, attr, compressed, decompressed)
 }
 
-func (blk *txnBlock) LogTxnNode(node txnif.TxnNode, readed []*common.ID) (err error) {
-	return blk.Txn.GetStore().LogTxnNode(blk.entry.GetSegment().GetTable().GetID(), node, readed)
+func (blk *txnBlock) LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error) {
+	return blk.Txn.GetStore().LogTxnEntry(blk.entry.GetSegment().GetTable().GetID(), node, readed)
 }
 
 func (blk *txnBlock) GetSegment() (seg handle.Segment) {

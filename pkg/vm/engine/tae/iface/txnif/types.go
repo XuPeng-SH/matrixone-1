@@ -61,7 +61,7 @@ type TxnChanger interface {
 }
 
 type TxnWriter interface {
-	LogTxnNode(tableId uint64, node TxnNode, readed []*common.ID) error
+	LogTxnEntry(tableId uint64, node TxnNode, readed []*common.ID) error
 }
 
 type TxnAsyncer interface {
@@ -123,8 +123,7 @@ type DeleteChain interface {
 }
 
 type TxnNode interface {
-	PrepareCommit() error
-	ApplyCommit() error
+	TxnEntry
 }
 
 type AppendNode interface {
@@ -187,7 +186,7 @@ type TxnStore interface {
 
 	AddTxnEntry(TxnEntryType, TxnEntry)
 
-	LogTxnNode(tableId uint64, node TxnNode, readed []*common.ID) error
+	LogTxnEntry(tableId uint64, node TxnNode, readed []*common.ID) error
 }
 
 type TxnEntryType int16
