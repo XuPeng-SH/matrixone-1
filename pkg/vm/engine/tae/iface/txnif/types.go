@@ -61,7 +61,7 @@ type TxnChanger interface {
 }
 
 type TxnWriter interface {
-	LogTxnEntry(tableId uint64, node TxnNode, readed []*common.ID) error
+	LogTxnEntry(tableId uint64, entry TxnEntry, readed []*common.ID) error
 }
 
 type TxnAsyncer interface {
@@ -120,10 +120,6 @@ type DeleteChain interface {
 	PrepareRangeDelete(start, end uint32, ts uint64) error
 	DepthLocked() int
 	CollectDeletesLocked(ts uint64) DeleteNode
-}
-
-type TxnNode interface {
-	TxnEntry
 }
 
 type AppendNode interface {
@@ -186,7 +182,7 @@ type TxnStore interface {
 
 	AddTxnEntry(TxnEntryType, TxnEntry)
 
-	LogTxnEntry(tableId uint64, node TxnNode, readed []*common.ID) error
+	LogTxnEntry(tableId uint64, entry TxnEntry, readed []*common.ID) error
 }
 
 type TxnEntryType int16

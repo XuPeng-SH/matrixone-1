@@ -47,6 +47,6 @@ func (txn *txnImpl) CurrentDatabase() (db handle.Database) {
 	return txn.Store.CurrentDatabase()
 }
 
-func (txn *txnImpl) LogTxnEntry(tableId uint64, node txnif.TxnNode, readed []*common.ID) (err error) {
-	return txn.Store.LogTxnEntry(tableId, node, readed)
+func (txn *txnImpl) LogTxnEntry(tableId uint64, entry txnif.TxnEntry, readed []*common.ID) (err error) {
+	return txn.Store.LogTxnEntry(tableId, entry, readed)
 }

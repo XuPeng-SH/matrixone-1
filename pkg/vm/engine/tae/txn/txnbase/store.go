@@ -59,6 +59,6 @@ func (store *NoopTxnStore) GetValue(*common.ID, uint32, uint16) (v interface{}, 
 
 func (store *NoopTxnStore) LogSegmentID(tid, sid uint64) {}
 func (store *NoopTxnStore) LogBlockID(tid, bid uint64)   {}
-func (store *NoopTxnStore) LogTxnEntry(tableId uint64, node txnif.TxnNode, readed []*common.ID) (err error) {
+func (store *NoopTxnStore) LogTxnEntry(tableId uint64, entry txnif.TxnEntry, readed []*common.ID) (err error) {
 	return
 }

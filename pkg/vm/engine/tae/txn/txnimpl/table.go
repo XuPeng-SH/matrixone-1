@@ -71,7 +71,7 @@ type Table interface {
 	CreateNonAppendableBlock(sid uint64) (handle.Block, error)
 	CollectCmd(*commandManager) error
 
-	LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error)
+	LogTxnEntry(entry txnif.TxnEntry, readed []*common.ID) (err error)
 }
 
 type txnTable struct {
@@ -101,7 +101,7 @@ type txnTable struct {
 	maxSegId    uint64
 	maxBlkId    uint64
 
-	txnNodes []txnif.TxnNode
+	txnEntries []txnif.TxnEntry
 }
 
 func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver txnbase.NodeDriver, mgr base.INodeManager, checker *warChecker, dataFactory *tables.DataFactory) *txnTable {
@@ -122,7 +122,7 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver txnbase.Node
 		dsegs:       make([]*catalog.SegmentEntry, 0),
 		dataFactory: dataFactory,
 		logs:        make([]txnbase.NodeEntry, 0),
-		txnNodes:    make([]txnif.TxnNode, 0),
+		txnEntries:  make([]txnif.TxnEntry, 0),
 	}
 	return tbl
 }
@@ -247,8 +247,8 @@ func (tbl *txnTable) SoftDeleteBlock(id *common.ID) (err error) {
 	return
 }
 
-func (tbl *txnTable) LogTxnEntry(node txnif.TxnNode, readed []*common.ID) (err error) {
-	tbl.txnNodes = append(tbl.txnNodes, node)
+func (tbl *txnTable) LogTxnEntry(entry txnif.TxnEntry, readed []*common.ID) (err error) {
+	tbl.txnEntries = append(tbl.txnEntries, entry)
 	for _, id := range readed {
 		tbl.warChecker.Read(id)
 	}
@@ -885,7 +885,7 @@ func (tbl *txnTable) PrepareCommit() (err error) {
 			return
 		}
 	}
-	for _, node := range tbl.txnNodes {
+	for _, node := range tbl.txnEntries {
 		if err = node.PrepareCommit(); err != nil {
 			return
 		}
@@ -958,7 +958,7 @@ func (tbl *txnTable) ApplyCommit() (err error) {
 			return
 		}
 	}
-	for _, node := range tbl.txnNodes {
+	for _, node := range tbl.txnEntries {
 		if err = node.ApplyCommit(); err != nil {
 			return
 		}

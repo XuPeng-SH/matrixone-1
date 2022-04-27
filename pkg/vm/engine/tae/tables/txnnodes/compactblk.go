@@ -10,34 +10,34 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/updates"
 )
 
-type compactBlockNode struct {
+type compactBlockEntry struct {
 	sync.RWMutex
 	txn  txnif.AsyncTxn
 	from handle.Block
 	to   handle.Block
 }
 
-func NewCompactBlockNode(txn txnif.AsyncTxn, from, to handle.Block) *compactBlockNode {
-	return &compactBlockNode{
+func NewCompactBlockEntry(txn txnif.AsyncTxn, from, to handle.Block) *compactBlockEntry {
+	return &compactBlockEntry{
 		txn:  txn,
 		from: from,
 		to:   to,
 	}
 }
 
-func (node *compactBlockNode) PrepareRollback() (err error) {
+func (node *compactBlockEntry) PrepareRollback() (err error) {
 	// TODO: remove block file? (should be scheduled and executed async)
 	return
 }
-func (node *compactBlockNode) ApplyRollback() (err error) { return }
-func (node *compactBlockNode) ApplyCommit() (err error)   { return }
-func (node *compactBlockNode) MakeCommand(csn uint32) (cmd txnif.TxnCmd, err error) {
+func (node *compactBlockEntry) ApplyRollback() (err error) { return }
+func (node *compactBlockEntry) ApplyCommit() (err error)   { return }
+func (node *compactBlockEntry) MakeCommand(csn uint32) (cmd txnif.TxnCmd, err error) {
 	// TODO:
 	// 1. make command
 	return
 }
 
-func (node *compactBlockNode) PrepareCommit() (err error) {
+func (node *compactBlockEntry) PrepareCommit() (err error) {
 	dataBlock := node.from.GetMeta().(*catalog.BlockEntry).GetBlockData()
 	v := dataBlock.CollectChangesInRange(node.txn.GetStartTS(), node.txn.GetCommitTS())
 	view := v.(*updates.BlockView)

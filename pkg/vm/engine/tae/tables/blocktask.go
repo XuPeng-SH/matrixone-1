@@ -95,8 +95,8 @@ func (task *compactBlockTask) Execute() (err error) {
 		return
 	}
 	task.created = newBlk
-	txnNode := txnnodes.NewCompactBlockNode(task.txn, task.compacted, task.created)
-	if err = task.txn.LogTxnEntry(task.meta.GetSegment().GetTable().GetID(), txnNode, []*common.ID{task.compacted.Fingerprint()}); err != nil {
+	txnEntry := txnnodes.NewCompactBlockEntry(task.txn, task.compacted, task.created)
+	if err = task.txn.LogTxnEntry(task.meta.GetSegment().GetTable().GetID(), txnEntry, []*common.ID{task.compacted.Fingerprint()}); err != nil {
 		return
 	}
 	return
