@@ -89,31 +89,35 @@ func (task *mergeBlocksTask) Execute() (err error) {
 	var decompressed bytes.Buffer
 	var vec *vector.Vector
 	vecs := make([]*vector.Vector, 0)
-	for _, block := range task.compacted {
+	rows := make([]uint32, len(task.compacted))
+	length := 0
+	for i, block := range task.compacted {
 		if vec, deletes, err = block.GetVectorCopy(attr, &compressed, &decompressed); err != nil {
 			return
 		}
 		vec = compute.ApplyDeleteToVector(vec, deletes)
 		vecs = append(vecs, vec)
+		rows[i] = uint32(gvec.Length(vec))
+		length += vector.Length(vec)
+		seg := block.GetSegment()
+		created, err := seg.CreateNonAppendableBlock()
+		if err != nil {
+			return err
+		}
+		task.created = append(task.created, created)
 	}
 
-	length := 0
-	for _, vec := range vecs {
-		length += vector.Length(vec)
-	}
-	rows := make([]uint32, len(task.created))
 	node := common.GPool.Alloc(uint64(length * 2))
-	buf := node.Buf[:0:length]
+	buf := node.Buf[:length]
 	defer common.GPool.Free(node)
 	sortedIdx := *(*[]uint16)(unsafe.Pointer(&buf))
 	task.mergeColumn(vecs, &sortedIdx, true)
 	for i, vec := range vecs {
 		created := task.created[i]
 		bf := created.GetMeta().(*catalog.BlockEntry).GetBlockData().GetBlockFile()
-		if bf.WriteColumnVec(task.txn.GetStartTS(), i, vec); err != nil {
+		if bf.WriteColumnVec(task.txn.GetStartTS(), int(schema.PrimaryKey), vec); err != nil {
 			return
 		}
-		rows[i] = uint32(gvec.Length(vec))
 	}
 
 	for i := 0; i < len(schema.ColDefs); i++ {
@@ -131,8 +135,8 @@ func (task *mergeBlocksTask) Execute() (err error) {
 			vecs = append(vecs, vec)
 		}
 		task.mergeColumn(vecs, &sortedIdx, false)
-		for i, vec := range vecs {
-			created := task.created[i]
+		for pos, vec := range vecs {
+			created := task.created[pos]
 			bf := created.GetMeta().(*catalog.BlockEntry).GetBlockData().GetBlockFile()
 			if bf.WriteColumnVec(task.txn.GetStartTS(), i, vec); err != nil {
 				return
@@ -143,6 +147,12 @@ func (task *mergeBlocksTask) Execute() (err error) {
 		bf := created.GetMeta().(*catalog.BlockEntry).GetBlockData().GetBlockFile()
 		bf.WriteTS(task.txn.GetStartTS())
 		bf.WriteRows(rows[i])
+	}
+	for _, compacted := range task.compacted {
+		seg := compacted.GetSegment()
+		if err = seg.SoftDeleteBlock(compacted.Fingerprint().BlockID); err != nil {
+			return
+		}
 	}
 
 	return
