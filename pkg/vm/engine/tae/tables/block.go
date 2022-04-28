@@ -3,10 +3,11 @@ package tables
 import (
 	"bytes"
 	"fmt"
-	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common/errors"
 	"sync"
 	"sync/atomic"
+
+	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common/errors"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -52,10 +53,11 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 	}
 	var node *appendableNode
 	block := &dataBlock{
-		RWMutex:    new(sync.RWMutex),
-		meta:       meta,
-		file:       file,
-		controller: updates.NewMutationNode(meta),
+		RWMutex:     new(sync.RWMutex),
+		meta:        meta,
+		file:        file,
+		controller:  updates.NewMutationNode(meta),
+		ioScheduler: ioScheduler,
 	}
 	if meta.IsAppendable() {
 		node = newNode(bufMgr, block, file)
@@ -93,6 +95,9 @@ func (blk *dataBlock) RunCalibration() {
 }
 
 func (blk *dataBlock) estimateRawScore() int {
+	if blk.Rows(nil, true) == int(blk.meta.GetSchema().BlockMaxRows) && blk.meta.IsAppendable() {
+		return 100
+	}
 	if blk.controller.GetChangeNodeCnt() == 0 {
 		return 0
 	}
@@ -316,7 +321,9 @@ func (blk *dataBlock) getVectorCopy(ts uint64, attr string, compressed, decompre
 	sharedLock := blk.controller.GetSharedLock()
 	err = blk.makeColumnView(uint16(colIdx), view)
 	deleteChain := blk.controller.GetDeleteChain()
+	deleteChain.RLock()
 	dnode := deleteChain.CollectDeletesLocked(ts).(*updates.DeleteNode)
+	deleteChain.RUnlock()
 	sharedLock.Unlock()
 	if dnode != nil {
 		view.DeleteMask = dnode.GetDeleteMaskLocked()
