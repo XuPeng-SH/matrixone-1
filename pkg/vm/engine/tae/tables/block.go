@@ -63,7 +63,6 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 		block.indexHolder = impl.NewAppendableBlockIndexHolder(block, schema)
 	} else {
 		// Non-appendable index holder would be initialized during compaction
-		block.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
 	}
 	return block
 }
