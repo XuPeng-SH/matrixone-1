@@ -144,7 +144,6 @@ func (task *mergeBlocksTask) Execute() (err error) {
 			vec = compute.ApplyDeleteToVector(vec, deletes)
 			vecs = append(vecs, vec)
 		}
-		logutil.Infof("len(vec)=%d",len(vecs))
 		vecs, _ = task.mergeColumn(vecs, &sortedIdx, false, rows, to)
 		for pos, vec := range vecs {
 			created := task.created[pos]
