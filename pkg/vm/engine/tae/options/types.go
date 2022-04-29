@@ -14,7 +14,8 @@ const (
 	DefaultBlocksPerSegment = uint16(40)
 
 	DefaultCalibrationInterval = int64(5000) // millisecond
-	DefaultExecutionInterval   = int64(1000) // millisecond
+	DefaultExecutionInterval   = int64(2000) // millisecond
+	DefaultExecutionLevels     = int16(30)
 )
 
 type Options struct {

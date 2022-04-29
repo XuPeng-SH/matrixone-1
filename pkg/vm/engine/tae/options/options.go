@@ -24,6 +24,7 @@ func (o *Options) FillDefaults(dirname string) *Options {
 		o.CheckpointCfg = &CheckpointCfg{
 			CalibrationInterval: DefaultCalibrationInterval,
 			ExecutionInterval:   DefaultExecutionInterval,
+			ExecutionLevels:     DefaultExecutionLevels,
 		}
 	}
 

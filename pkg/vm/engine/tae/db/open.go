@@ -59,7 +59,10 @@ func Open(dirname string, opts *options.Options) (db *DB, err error) {
 
 	db.DBLocker, dbLocker = dbLocker, nil
 	db.TxnMgr.Start()
-	db.CKPDriver = checkpoint.NewDriver(db.TaskScheduler)
+	policyCfg := new(checkpoint.PolicyCfg)
+	policyCfg.Levels = int(opts.CheckpointCfg.ExecutionLevels)
+	policyCfg.Interval = opts.CheckpointCfg.ExecutionInterval
+	db.CKPDriver = checkpoint.NewDriver(db.TaskScheduler, policyCfg)
 	handle := newTimedLooper(db, newCalibrationProcessor(db))
 	db.CalibrationTimer = w.NewHeartBeater(time.Duration(opts.CheckpointCfg.CalibrationInterval)*time.Millisecond, handle)
 	db.startWorkers()

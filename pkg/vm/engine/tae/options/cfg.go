@@ -14,4 +14,5 @@ type StorageCfg struct {
 type CheckpointCfg struct {
 	CalibrationInterval int64 `toml:"calibration-inerterval"`
 	ExecutionInterval   int64 `toml:"execution-inerterval"`
+	ExecutionLevels     int16 `toml:"execution-levels"`
 }
