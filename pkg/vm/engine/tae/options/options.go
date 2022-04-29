@@ -28,5 +28,12 @@ func (o *Options) FillDefaults(dirname string) *Options {
 		}
 	}
 
+	if o.SchedulerCfg == nil {
+		o.SchedulerCfg = &SchedulerCfg{
+			IOWorkers:      DefaultIOWorkers,
+			TxnTaskWorkers: DefaultTxnTaskWorkers,
+		}
+	}
+
 	return o
 }

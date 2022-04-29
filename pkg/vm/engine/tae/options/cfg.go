@@ -16,3 +16,8 @@ type CheckpointCfg struct {
 	ExecutionInterval   int64 `toml:"execution-inerterval"`
 	ExecutionLevels     int16 `toml:"execution-levels"`
 }
+
+type SchedulerCfg struct {
+	IOWorkers      int `toml:"io-workers"`
+	TxnTaskWorkers int `toml:"txntask-workers"`
+}
