@@ -68,7 +68,7 @@ func (task *mergeBlocksTask) mergeColumn(vecs []*vector.Vector, sortedIdx *[]uin
 	if isPrimary {
 		column, mapping = mergesort.MergeSortedColumn(vecs, sortedIdx, fromLayout, toLayout)
 	} else {
-		column = mergesort.ShuffleColumn(column, *sortedIdx, fromLayout, toLayout)
+		column = mergesort.ShuffleColumn(vecs, *sortedIdx, fromLayout, toLayout)
 	}
 	return
 }
@@ -105,17 +105,18 @@ func (task *mergeBlocksTask) Execute() (err error) {
 	}
 	to := make([]uint32, 0)
 	maxrow := task.compacted[0].GetMeta().(*catalog.BlockEntry).GetSchema().BlockMaxRows
-	for length > 0 {
-		if length > int(maxrow) {
+	totalRows:=length
+	for totalRows > 0 {
+		if totalRows > int(maxrow) {
 			to = append(to, maxrow)
-			length -= int(maxrow)
+			totalRows -= int(maxrow)
 		} else {
-			to = append(to, uint32(length))
+			to = append(to, uint32(totalRows))
 			break
 		}
 	}
 
-	node := common.GPool.Alloc(uint64(length * 2))
+	node := common.GPool.Alloc(uint64(length * 4))
 	buf := node.Buf[:length]
 	defer common.GPool.Free(node)
 	sortedIdx := *(*[]uint32)(unsafe.Pointer(&buf))
@@ -143,6 +144,7 @@ func (task *mergeBlocksTask) Execute() (err error) {
 			vec = compute.ApplyDeleteToVector(vec, deletes)
 			vecs = append(vecs, vec)
 		}
+		logutil.Infof("len(vec)=%d",len(vecs))
 		vecs, _ = task.mergeColumn(vecs, &sortedIdx, false, rows, to)
 		for pos, vec := range vecs {
 			created := task.created[pos]
