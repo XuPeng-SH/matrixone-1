@@ -162,7 +162,7 @@ func (blk *dataBlock) BuildCheckpointTaskFactory() (factory tasks.TxnTaskFactory
 	if dropped || inTxn {
 		return
 	}
-	factory = jobs.CompactBlockTaskFactory(blk.meta)
+	factory = jobs.CompactBlockTaskFactory(blk.meta, blk.ioScheduler)
 	return
 	// if !blk.meta.IsAppendable() {
 	// }

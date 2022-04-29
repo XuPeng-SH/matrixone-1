@@ -39,10 +39,8 @@ func newTaskScheduler(db *DB) *taskScheduler {
 		db:            db,
 	}
 	dispatcher := tasks.NewBaseDispatcher()
-	txnHandler := tasks.NewPoolHandler(1)
+	txnHandler := tasks.NewPoolHandler(10)
 	txnHandler.Start()
-	// ioHandlers := tasks.NewPoolHandler(1)
-	// ioHandlers.Start()
 
 	dispatcher.RegisterHandler(tasks.TxnTask, txnHandler)
 	dispatcher.RegisterHandler(tasks.CompactBlockTask, txnHandler)

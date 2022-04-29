@@ -295,7 +295,7 @@ func TestCompactBlock1(t *testing.T) {
 		}
 		blkMeta := block.GetMeta().(*catalog.BlockEntry)
 		t.Log(blkMeta.String())
-		task, err := jobs.NewCompactBlockTask(&ctx, txn, blkMeta)
+		task, err := jobs.NewCompactBlockTask(&ctx, txn, blkMeta, nil)
 		assert.Nil(t, err)
 		data, err := task.PrepareData()
 		assert.Nil(t, err)
@@ -327,7 +327,7 @@ func TestCompactBlock1(t *testing.T) {
 		block, err := seg.GetBlock(id.BlockID)
 		assert.Nil(t, err)
 		blkMeta := block.GetMeta().(*catalog.BlockEntry)
-		task, err := jobs.NewCompactBlockTask(&ctx, txn, blkMeta)
+		task, err := jobs.NewCompactBlockTask(&ctx, txn, blkMeta, nil)
 		assert.Nil(t, err)
 		data, err := task.PrepareData()
 		assert.Nil(t, err)
@@ -346,7 +346,7 @@ func TestCompactBlock1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Nil(t, txn.Commit())
 		}
-		task, err = jobs.NewCompactBlockTask(&ctx, txn, blkMeta)
+		task, err = jobs.NewCompactBlockTask(&ctx, txn, blkMeta, nil)
 		assert.Nil(t, err)
 		data, err = task.PrepareData()
 		assert.Nil(t, err)
@@ -359,7 +359,7 @@ func TestCompactBlock1(t *testing.T) {
 			seg, _ := rel.GetSegment(id.SegmentID)
 			blk, _ := seg.GetBlock(id.BlockID)
 			blkMeta := blk.GetMeta().(*catalog.BlockEntry)
-			task, err = jobs.NewCompactBlockTask(&ctx, txn, blkMeta)
+			task, err = jobs.NewCompactBlockTask(&ctx, txn, blkMeta, nil)
 			assert.Nil(t, err)
 			data, err := task.PrepareData()
 			assert.Nil(t, err)
@@ -420,7 +420,7 @@ func TestCompactBlock2(t *testing.T) {
 			block = it.GetBlock()
 			break
 		}
-		task, err := jobs.NewCompactBlockTask(ctx, txn, block.GetMeta().(*catalog.BlockEntry))
+		task, err := jobs.NewCompactBlockTask(ctx, txn, block.GetMeta().(*catalog.BlockEntry), nil)
 		assert.Nil(t, err)
 		worker.SendOp(task)
 		err = task.WaitDone()
@@ -450,7 +450,7 @@ func TestCompactBlock2(t *testing.T) {
 		t.Log(rel.SimplePPString(common.PPL1))
 		seg, _ := rel.GetSegment(newBlockFp.SegmentID)
 		blk, _ := seg.GetBlock(newBlockFp.BlockID)
-		task, err := jobs.NewCompactBlockTask(ctx, txn, blk.GetMeta().(*catalog.BlockEntry))
+		task, err := jobs.NewCompactBlockTask(ctx, txn, blk.GetMeta().(*catalog.BlockEntry), nil)
 		assert.Nil(t, err)
 		worker.SendOp(task)
 		err = task.WaitDone()
@@ -483,7 +483,7 @@ func TestCompactBlock2(t *testing.T) {
 		}
 		assert.Equal(t, 1, cnt)
 
-		task, err := jobs.NewCompactBlockTask(ctx, txn, blk.GetMeta().(*catalog.BlockEntry))
+		task, err := jobs.NewCompactBlockTask(ctx, txn, blk.GetMeta().(*catalog.BlockEntry), nil)
 		assert.Nil(t, err)
 		worker.SendOp(task)
 		err = task.WaitDone()
@@ -527,7 +527,7 @@ func TestCompactBlock2(t *testing.T) {
 		err = blk2.RangeDelete(7, 7)
 		assert.Nil(t, err)
 
-		task, err := jobs.NewCompactBlockTask(ctx, txn, blk.GetMeta().(*catalog.BlockEntry))
+		task, err := jobs.NewCompactBlockTask(ctx, txn, blk.GetMeta().(*catalog.BlockEntry), nil)
 		assert.Nil(t, err)
 		worker.SendOp(task)
 		err = task.WaitDone()
