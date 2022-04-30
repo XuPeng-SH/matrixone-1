@@ -63,3 +63,6 @@ func (store *NoopTxnStore) LogBlockID(tid, bid uint64)   {}
 func (store *NoopTxnStore) LogTxnEntry(tableId uint64, entry txnif.TxnEntry, readed []*common.ID) (err error) {
 	return
 }
+
+func (store *NoopTxnStore) IsReadonly() bool      { return false }
+func (store *NoopTxnStore) IncreateWriteCnt() int { return 0 }
