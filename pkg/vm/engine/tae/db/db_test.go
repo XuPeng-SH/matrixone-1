@@ -886,6 +886,7 @@ func TestDelete1(t *testing.T) {
 
 	schema := catalog.MockSchemaAll(3)
 	schema.PrimaryKey = 2
+	schema.BlockMaxRows = 10
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
 
 	{
@@ -922,4 +923,57 @@ func TestDelete1(t *testing.T) {
 		assert.Equal(t, txnbase.ErrNotFound, err)
 		assert.Nil(t, txn.Commit())
 	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		it := rel.MakeBlockIt()
+		blk := it.GetBlock()
+		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
+		factory, err := blkData.BuildCheckpointTaskFactory()
+		assert.Nil(t, err)
+		task, err := tae.TaskScheduler.ScheduleTxnTask(tasks.WaitableCtx, factory)
+		assert.Nil(t, err)
+		err = task.WaitDone()
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		it := rel.MakeBlockIt()
+		blk := it.GetBlock()
+		data, mask, err := blk.GetColumnDataById(int(schema.PrimaryKey), nil, nil)
+		assert.Nil(t, err)
+		assert.Nil(t, mask)
+		assert.Equal(t, gvec.Length(bat.Vecs[0])-1, gvec.Length(data))
+
+		err = blk.RangeDelete(0, 0)
+		assert.Nil(t, err)
+		data, mask, err = blk.GetColumnDataById(int(schema.PrimaryKey), nil, nil)
+		assert.Nil(t, err)
+		assert.True(t, mask.Contains(0))
+		v := compute.GetValue(bat.Vecs[schema.PrimaryKey], 0)
+		filter := handle.NewEQFilter(v)
+		_, _, err = rel.GetByFilter(filter)
+		assert.Equal(t, txnbase.ErrNotFound, err)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		it := rel.MakeBlockIt()
+		blk := it.GetBlock()
+		data, mask, err := blk.GetColumnDataById(int(schema.PrimaryKey), nil, nil)
+		assert.Nil(t, err)
+		assert.True(t, mask.Contains(0))
+		assert.Equal(t, gvec.Length(bat.Vecs[0])-1, gvec.Length(data))
+		v := compute.GetValue(bat.Vecs[schema.PrimaryKey], 0)
+		filter := handle.NewEQFilter(v)
+		_, _, err = rel.GetByFilter(filter)
+		assert.Equal(t, txnbase.ErrNotFound, err)
+	}
+	t.Log(tae.Opts.Catalog.SimplePPString(common.PPL1))
 }

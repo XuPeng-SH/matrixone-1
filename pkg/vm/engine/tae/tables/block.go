@@ -471,30 +471,53 @@ func (blk *dataBlock) getVectorWrapper(colIdx int) (wrapper *vector.VectorWrappe
 	return
 }
 
+func (blk *dataBlock) ablkGetByFilter(ts uint64, filter *handle.Filter) (offset uint32, err error) {
+	readLock := blk.mvcc.GetSharedLock()
+	defer readLock.Unlock()
+	offset, err = blk.indexHolder.(acif.IAppendableBlockIndexHolder).Search(filter.Val)
+	if err != nil {
+		return
+	}
+	if blk.mvcc.IsDeletedLocked(offset, ts) || !blk.mvcc.IsVisibleLocked(offset, ts) {
+		err = txnbase.ErrNotFound
+	}
+	return
+}
+
+func (blk *dataBlock) blkGetByFilter(ts uint64, filter *handle.Filter) (offset uint32, err error) {
+	mayExists := blk.indexHolder.(acif.INonAppendableBlockIndexHolder).MayContainsKey(filter.Val)
+	if !mayExists {
+		err = txnbase.ErrNotFound
+		return
+	}
+	pkColumn, err := blk.getVectorWrapper(int(blk.meta.GetSchema().PrimaryKey))
+	if err != nil {
+		return
+	}
+	defer common.GPool.Free(pkColumn.MNode)
+	data := &pkColumn.Vector
+	offset, exist := compute.CheckRowExists(data, filter.Val, nil)
+	if !exist {
+		err = txnbase.ErrNotFound
+		return
+	}
+
+	readLock := blk.mvcc.GetSharedLock()
+	defer readLock.Unlock()
+	if blk.mvcc.IsDeletedLocked(offset, ts) {
+		err = txnbase.ErrNotFound
+	}
+	return
+}
+
 func (blk *dataBlock) GetByFilter(txn txnif.AsyncTxn, filter *handle.Filter) (offset uint32, err error) {
 	if filter.Op != handle.FilterEq {
 		panic("logic error")
 	}
-	readLock := blk.mvcc.GetSharedLock()
-	defer readLock.Unlock()
 	if blk.meta.IsAppendable() {
-		offset, err = blk.indexHolder.(acif.IAppendableBlockIndexHolder).Search(filter.Val)
-	} else {
-		mayExists := blk.indexHolder.(acif.INonAppendableBlockIndexHolder).MayContainsKey(filter.Val)
-		if mayExists {
-			// TODO: load exact column data from source and get the row offset if exists and visible
-			panic("implement me")
-		}
+		return blk.ablkGetByFilter(txn.GetStartTS(), filter)
 	}
-	if err == nil {
-		ts := txn.GetStartTS()
-		if blk.mvcc.IsDeletedLocked(offset, ts) {
-			err = txnbase.ErrNotFound
-		} else if blk.meta.IsAppendable() && !blk.mvcc.IsVisibleLocked(offset, ts) {
-			err = txnbase.ErrNotFound
-		}
-	}
-	return
+	return blk.blkGetByFilter(txn.GetStartTS(), filter)
 }
 
 func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err error) {
@@ -525,7 +548,7 @@ func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err erro
 		return err
 	}
 	deduplicate := func(v interface{}) error {
-		if compute.CheckRowExists(pkColumnData, v, deletes) {
+		if _, exist := compute.CheckRowExists(pkColumnData, v, deletes); exist {
 			return txnbase.ErrDuplicated
 		}
 		return nil
