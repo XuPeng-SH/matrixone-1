@@ -490,6 +490,11 @@ func (blk *dataBlock) GetByFilter(txn txnif.AsyncTxn, filter *handle.Filter) (of
 		if !blk.controller.IsVisibleLocked(offset, txn.GetStartTS()) {
 			err = txnbase.ErrNotFound
 		}
+		deleteChain := blk.controller.GetDeleteChain()
+		deleted := deleteChain.IsDeleted(offset, txn.GetStartTS())
+		if deleted {
+			err = txnbase.ErrNotFound
+		}
 	}
 	return
 }

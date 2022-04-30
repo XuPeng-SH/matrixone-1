@@ -9,6 +9,7 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/buffer"
 	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 
 	gbat "github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
@@ -877,4 +878,48 @@ func TestUnload2(t *testing.T) {
 
 	t.Log(db.MTBufMgr.String())
 	// t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
+}
+
+func TestDelete1(t *testing.T) {
+	tae := initDB(t, nil)
+	defer tae.Close()
+
+	schema := catalog.MockSchemaAll(3)
+	schema.PrimaryKey = 2
+	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
+
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.CreateDatabase("db")
+		rel, _ := db.CreateRelation(schema)
+		rel.Append(bat)
+		assert.Nil(t, txn.Commit())
+	}
+	var id *common.ID
+	var row uint32
+	var err error
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		pkCol := bat.Vecs[schema.PrimaryKey]
+		pkVal := compute.GetValue(pkCol, 5)
+		filter := handle.NewEQFilter(pkVal)
+		id, row, err = rel.GetByFilter(filter)
+		assert.Nil(t, err)
+		err = rel.RangeDelete(id, row, row)
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		pkCol := bat.Vecs[schema.PrimaryKey]
+		pkVal := compute.GetValue(pkCol, 5)
+		filter := handle.NewEQFilter(pkVal)
+		id, row, err = rel.GetByFilter(filter)
+		assert.Equal(t, txnbase.ErrNotFound, err)
+		assert.Nil(t, txn.Commit())
+	}
 }
