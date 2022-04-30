@@ -298,6 +298,14 @@ func (store *txnStore) CreateSegment(tid uint64) (seg handle.Segment, err error)
 	return table.CreateSegment()
 }
 
+func (store *txnStore) CreateNonAppendableSegment(tid uint64) (seg handle.Segment, err error) {
+	var table Table
+	if table, err = store.getOrSetTable(tid); err != nil {
+		return
+	}
+	return table.CreateNonAppendableSegment()
+}
+
 func (store *txnStore) getOrSetTable(id uint64) (table Table, err error) {
 	table = store.tables[id]
 	if table == nil {
