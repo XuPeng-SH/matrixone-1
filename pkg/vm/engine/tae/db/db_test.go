@@ -217,7 +217,7 @@ func TestNonAppendableBlock(t *testing.T) {
 		assert.Equal(t, expectVal, v)
 		assert.Equal(t, gvec.Length(bat.Vecs[0]), blk.Rows())
 
-		vec, mask, err := dataBlk.GetVectorCopy(txn, schema.ColDefs[2].Name, nil, nil)
+		vec, mask, err := dataBlk.GetColumnDataById(txn, 2, nil, nil)
 		assert.Nil(t, err)
 		assert.Nil(t, mask)
 		t.Log(vec.String())
@@ -230,7 +230,7 @@ func TestNonAppendableBlock(t *testing.T) {
 		_, err = dataBlk.RangeDelete(txn, 1, 2)
 		assert.Nil(t, err)
 
-		vec, mask, err = dataBlk.GetVectorCopy(txn, schema.ColDefs[2].Name, nil, nil)
+		vec, mask, err = dataBlk.GetColumnDataById(txn, 2, nil, nil)
 		assert.Nil(t, err)
 		assert.True(t, mask.Contains(1))
 		assert.True(t, mask.Contains(2))
@@ -240,7 +240,7 @@ func TestNonAppendableBlock(t *testing.T) {
 		assert.Nil(t, err)
 		t.Log(vec.String())
 
-		vec, mask, err = dataBlk.GetVectorCopy(txn, schema.ColDefs[2].Name, nil, nil)
+		vec, mask, err = dataBlk.GetColumnDataById(txn, 2, nil, nil)
 		assert.Nil(t, err)
 		assert.True(t, mask.Contains(1))
 		assert.True(t, mask.Contains(2))
