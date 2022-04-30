@@ -135,10 +135,10 @@ func (blk *txnBlock) Update(row uint32, col uint16, v interface{}) (err error) {
 // TODO: temp use coarse rows
 func (blk *txnBlock) Rows() int { return blk.entry.GetBlockData().Rows(blk.Txn, true) }
 
-func (blk *txnBlock) GetVectorCopyById(colIdx int, compressed, decompressed *bytes.Buffer) (vec *vector.Vector, deletes *roaring.Bitmap, err error) {
+func (blk *txnBlock) GetColumnDataById(colIdx int, compressed, decompressed *bytes.Buffer) (vec *vector.Vector, deletes *roaring.Bitmap, err error) {
 	return blk.entry.GetBlockData().GetColumnDataById(blk.Txn, colIdx, compressed, decompressed)
 }
-func (blk *txnBlock) GetVectorCopy(attr string, compressed, decompressed *bytes.Buffer) (vec *vector.Vector, deletes *roaring.Bitmap, err error) {
+func (blk *txnBlock) GetColumnDataByName(attr string, compressed, decompressed *bytes.Buffer) (vec *vector.Vector, deletes *roaring.Bitmap, err error) {
 	return blk.entry.GetBlockData().GetColumnDataByName(blk.Txn, attr, compressed, decompressed)
 }
 

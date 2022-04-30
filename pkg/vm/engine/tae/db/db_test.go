@@ -466,9 +466,7 @@ func TestCompactBlock2(t *testing.T) {
 		t.Log(rel.SimplePPString(common.PPL1))
 		seg, _ := rel.GetSegment(newBlockFp.SegmentID)
 		blk, _ := seg.GetBlock(newBlockFp.BlockID)
-		// blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
-		// blkData.GetVectorCopyById()
-		vec, mask, err := blk.GetVectorCopyById(3, nil, nil)
+		vec, mask, err := blk.GetColumnDataById(3, nil, nil)
 		assert.Nil(t, err)
 		assert.Nil(t, mask)
 		v := compute.GetValue(vec, 1)
@@ -511,7 +509,7 @@ func TestCompactBlock2(t *testing.T) {
 		t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
 		seg, _ := rel.GetSegment(newBlockFp.SegmentID)
 		blk, _ := seg.GetBlock(newBlockFp.BlockID)
-		vec, mask, err := blk.GetVectorCopyById(3, nil, nil)
+		vec, mask, err := blk.GetColumnDataById(3, nil, nil)
 		assert.Nil(t, err)
 		assert.True(t, mask.Contains(4))
 		assert.True(t, mask.Contains(5))
@@ -682,7 +680,7 @@ func TestMVCC1(t *testing.T) {
 		if bid.BlockID == id.BlockID {
 			var comp bytes.Buffer
 			var decomp bytes.Buffer
-			vec, mask, err := block.GetVectorCopy(schema.ColDefs[schema.PrimaryKey].Name, &comp, &decomp)
+			vec, mask, err := block.GetColumnDataById(int(schema.PrimaryKey), &comp, &decomp)
 			assert.Nil(t, err)
 			assert.Nil(t, mask)
 			assert.NotNil(t, vec)
@@ -753,7 +751,7 @@ func TestMVCC2(t *testing.T) {
 		var decomp bytes.Buffer
 		for it.Valid() {
 			block := it.GetBlock()
-			vec, mask, err := block.GetVectorCopy(schema.ColDefs[schema.PrimaryKey].Name, &comp, &decomp)
+			vec, mask, err := block.GetColumnDataByName(schema.ColDefs[schema.PrimaryKey].Name, &comp, &decomp)
 			assert.Nil(t, err)
 			assert.Nil(t, mask)
 			t.Log(vec.String())
@@ -794,7 +792,7 @@ func TestUnload1(t *testing.T) {
 			it := rel.MakeBlockIt()
 			for it.Valid() {
 				blk := it.GetBlock()
-				vec, _, _ := blk.GetVectorCopy(schema.ColDefs[schema.PrimaryKey].Name, nil, nil)
+				vec, _, _ := blk.GetColumnDataByName(schema.ColDefs[schema.PrimaryKey].Name, nil, nil)
 				assert.Equal(t, int(schema.BlockMaxRows), gvec.Length(vec))
 				it.Next()
 			}
