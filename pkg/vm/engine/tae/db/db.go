@@ -11,6 +11,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 	wb "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/worker/base"
 )
 
@@ -27,7 +28,7 @@ type DB struct {
 	TxnBufMgr   base.INodeManager
 
 	TxnMgr       *txnbase.TxnManager
-	TxnLogDriver txnbase.NodeDriver
+	TxnLogDriver wal.NodeDriver
 
 	CKPDriver checkpoint.Driver
 

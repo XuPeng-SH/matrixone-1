@@ -1,21 +1,10 @@
-package txnbase
+package wal
 
 import (
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
 )
-
-const (
-	GroupC uint32 = iota + 10
-	GroupUC
-)
-
-type NodeDriver interface {
-	AppendEntry(uint32, NodeEntry) (uint64, error)
-	LoadEntry(groupId uint32, lsn uint64) (NodeEntry, error)
-	Close() error
-}
 
 type nodeDriver struct {
 	sync.RWMutex

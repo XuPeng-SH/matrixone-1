@@ -12,6 +12,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnimpl"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 	w "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/worker"
 )
 
@@ -52,7 +53,7 @@ func Open(dirname string, opts *options.Options) (db *DB, err error) {
 	db.IOScheduler = newIOScheduler(db, db.Opts.SchedulerCfg.IOWorkers)
 	db.TaskScheduler = newTaskScheduler(db, db.Opts.SchedulerCfg.TxnTaskWorkers)
 	dataFactory := tables.NewDataFactory(mockio.SegmentFileMockFactory, mutBufMgr, db.IOScheduler)
-	db.TxnLogDriver = txnbase.NewNodeDriver(dirname, WALDir, nil)
+	db.TxnLogDriver = wal.NewNodeDriver(dirname, WALDir, nil)
 	txnStoreFactory := txnimpl.TxnStoreFactory(db.Opts.Catalog, db.TxnLogDriver, txnBufMgr, dataFactory)
 	txnFactory := txnimpl.TxnFactory(db.Opts.Catalog)
 	db.TxnMgr = txnbase.NewTxnManager(txnStoreFactory, txnFactory)
