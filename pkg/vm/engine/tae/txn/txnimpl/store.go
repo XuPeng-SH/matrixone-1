@@ -21,7 +21,7 @@ import (
 type txnStore struct {
 	txnbase.NoopTxnStore
 	tables      map[uint64]Table
-	driver      wal.NodeDriver
+	driver      wal.Driver
 	nodesMgr    base.INodeManager
 	dbIndex     map[string]uint64
 	tableIndex  map[string]uint64
@@ -37,13 +37,13 @@ type txnStore struct {
 	writeOps    uint32
 }
 
-var TxnStoreFactory = func(catalog *catalog.Catalog, driver wal.NodeDriver, txnBufMgr base.INodeManager, dataFactory *tables.DataFactory) txnbase.TxnStoreFactory {
+var TxnStoreFactory = func(catalog *catalog.Catalog, driver wal.Driver, txnBufMgr base.INodeManager, dataFactory *tables.DataFactory) txnbase.TxnStoreFactory {
 	return func() txnif.TxnStore {
 		return newStore(catalog, driver, txnBufMgr, dataFactory)
 	}
 }
 
-func newStore(catalog *catalog.Catalog, driver wal.NodeDriver, txnBufMgr base.INodeManager, dataFactory *tables.DataFactory) *txnStore {
+func newStore(catalog *catalog.Catalog, driver wal.Driver, txnBufMgr base.INodeManager, dataFactory *tables.DataFactory) *txnStore {
 	return &txnStore{
 		tables:      make(map[uint64]Table),
 		catalog:     catalog,

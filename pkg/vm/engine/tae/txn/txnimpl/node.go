@@ -44,7 +44,7 @@ type InsertNode interface {
 	GetSpace() uint32
 	Rows() uint32
 	GetValue(col int, row uint32) (interface{}, error)
-	MakeCommand(uint32, bool) (txnif.TxnCmd, wal.NodeEntry, error)
+	MakeCommand(uint32, bool) (txnif.TxnCmd, wal.LogEntry, error)
 	ToTransient()
 	AddApplyInfo(srcOff, srcLen, destOff, destLen uint32, dest *common.ID) *appendInfo
 	RowsWithoutDeletes() uint32
@@ -66,7 +66,7 @@ func (info *appendInfo) String() string {
 
 type insertNode struct {
 	*buffer.Node
-	driver  wal.NodeDriver
+	driver  wal.Driver
 	data    batch.IBatch
 	lsn     uint64
 	typ     txnbase.NodeState
@@ -76,7 +76,7 @@ type insertNode struct {
 	appends []*appendInfo
 }
 
-func NewInsertNode(tbl Table, mgr base.INodeManager, id common.ID, driver wal.NodeDriver) *insertNode {
+func NewInsertNode(tbl Table, mgr base.INodeManager, id common.ID, driver wal.Driver) *insertNode {
 	impl := new(insertNode)
 	impl.Node = buffer.NewNode(impl, mgr, id, 0)
 	impl.driver = driver
@@ -104,7 +104,7 @@ func (n *insertNode) AddApplyInfo(srcOff, srcLen, destOff, destLen uint32, dest 
 	return info
 }
 
-func (n *insertNode) MakeCommand(id uint32, forceFlush bool) (cmd txnif.TxnCmd, entry wal.NodeEntry, err error) {
+func (n *insertNode) MakeCommand(id uint32, forceFlush bool) (cmd txnif.TxnCmd, entry wal.LogEntry, err error) {
 	if n.data == nil {
 		return
 	}
@@ -130,7 +130,7 @@ func (n *insertNode) MakeCommand(id uint32, forceFlush bool) (cmd txnif.TxnCmd, 
 
 func (n *insertNode) Type() txnbase.NodeType { return NTInsert }
 
-func (n *insertNode) makeLogEntry() wal.NodeEntry {
+func (n *insertNode) makeLogEntry() wal.LogEntry {
 	cmd := txnbase.NewBatchCmd(n.data, n.table.GetSchema().Types())
 	buf, err := cmd.Marshal()
 	e := entry.GetBase()
@@ -193,7 +193,7 @@ func (n *insertNode) OnUnload() {
 	}
 }
 
-func (n *insertNode) execUnload() (entry wal.NodeEntry) {
+func (n *insertNode) execUnload() (entry wal.LogEntry) {
 	if n.IsTransient() {
 		return
 	}

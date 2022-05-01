@@ -11,10 +11,10 @@ import (
 type commandManager struct {
 	cmd    *txnbase.ComposedCmd
 	csn    int
-	driver wal.NodeDriver
+	driver wal.Driver
 }
 
-func newCommandManager(driver wal.NodeDriver) *commandManager {
+func newCommandManager(driver wal.Driver) *commandManager {
 	return &commandManager{
 		cmd:    txnbase.NewComposedCmd(),
 		driver: driver,

@@ -6,40 +6,45 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
 )
 
-type nodeDriver struct {
+type walDriver struct {
 	sync.RWMutex
 	impl store.Store
 	own  bool
 }
 
-func NewNodeDriver(dir, name string, cfg *store.StoreCfg) NodeDriver {
+func NewDriver(dir, name string, cfg *store.StoreCfg) Driver {
 	impl, err := store.NewBaseStore(dir, name, cfg)
 	if err != nil {
 		panic(err)
 	}
-	driver := NewNodeDriverWithStore(impl, true)
+	driver := NewDriverWithStore(impl, true)
 	return driver
 }
 
-func NewNodeDriverWithStore(impl store.Store, own bool) NodeDriver {
-	driver := new(nodeDriver)
+func NewDriverWithStore(impl store.Store, own bool) Driver {
+	driver := new(walDriver)
 	driver.impl = impl
 	driver.own = own
 	return driver
 }
 
-func (nd *nodeDriver) LoadEntry(groupId uint32, lsn uint64) (NodeEntry, error) {
-	return nd.impl.Load(groupId, lsn)
+func (driver *walDriver) Checkpoint(indexes []*Index) (err error) {
+	// TODO
+	return
 }
 
-func (nd *nodeDriver) AppendEntry(group uint32, e NodeEntry) (uint64, error) {
-	id, err := nd.impl.AppendEntry(group, e)
+func (driver *walDriver) LoadEntry(groupId uint32, lsn uint64) (LogEntry, error) {
+	return driver.impl.Load(groupId, lsn)
+}
+
+func (driver *walDriver) AppendEntry(group uint32, e LogEntry) (uint64, error) {
+	id, err := driver.impl.AppendEntry(group, e)
 	return id, err
 }
 
-func (nd *nodeDriver) Close() error {
-	if nd.own {
-		return nd.impl.Close()
+func (driver *walDriver) Close() error {
+	if driver.own {
+		return driver.impl.Close()
 	}
 	return nil
 }

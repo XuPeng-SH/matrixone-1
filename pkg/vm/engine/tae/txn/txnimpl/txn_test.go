@@ -59,7 +59,7 @@ func getNodes() int {
 
 func makeTable(t *testing.T, dir string, colCnt int, bufSize uint64) *txnTable {
 	mgr := buffer.NewNodeManager(bufSize, nil)
-	driver := wal.NewNodeDriver(dir, "store", nil)
+	driver := wal.NewDriver(dir, "store", nil)
 	id := common.NextGlobalSeqNum()
 	schema := catalog.MockSchemaAll(colCnt)
 	rel := mockTestRelation(id, schema)
@@ -561,9 +561,9 @@ func TestTxnManager1(t *testing.T) {
 	assert.Equal(t, expected, seqs)
 }
 
-func initTestContext(t *testing.T, dir string) (*catalog.Catalog, *txnbase.TxnManager, wal.NodeDriver) {
+func initTestContext(t *testing.T, dir string) (*catalog.Catalog, *txnbase.TxnManager, wal.Driver) {
 	c := catalog.MockCatalog(dir, "mock", nil)
-	driver := wal.NewNodeDriver(dir, "store", nil)
+	driver := wal.NewDriver(dir, "store", nil)
 	txnBufMgr := buffer.NewNodeManager(common.G, nil)
 	mutBufMgr := buffer.NewNodeManager(common.G, nil)
 	factory := tables.NewDataFactory(mockio.SegmentFileMockFactory, mutBufMgr, nil)
