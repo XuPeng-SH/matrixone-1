@@ -286,7 +286,7 @@ func (store *txnStore) DropRelationByName(name string) (relation handle.Relation
 		return nil, err
 	}
 	relation = newRelation(store.txn, meta)
-	table.SetDropEntry(meta)
+	err = table.SetDropEntry(meta)
 	return
 }
 

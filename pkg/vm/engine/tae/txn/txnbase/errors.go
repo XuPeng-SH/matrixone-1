@@ -12,4 +12,6 @@ var (
 
 	ErrNotFound   = errors.New("tae: not found")
 	ErrDuplicated = errors.New("tae: duplicated ")
+
+	ErrDropCreatedTable = errors.New("tae: cannot drop created table in a txn")
 )

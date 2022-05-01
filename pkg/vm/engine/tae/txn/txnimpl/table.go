@@ -59,7 +59,7 @@ type Table interface {
 	WaitSynced()
 
 	SetCreateEntry(txnif.TxnEntry)
-	SetDropEntry(txnif.TxnEntry)
+	SetDropEntry(txnif.TxnEntry) error
 	GetMeta() *catalog.TableEntry
 
 	GetValue(id *common.ID, row uint32, col uint16) (interface{}, error)
@@ -306,13 +306,17 @@ func (tbl *txnTable) SetCreateEntry(e txnif.TxnEntry) {
 	tbl.warChecker.ReadDB(tbl.entry.GetDB().GetID())
 }
 
-func (tbl *txnTable) SetDropEntry(e txnif.TxnEntry) {
+func (tbl *txnTable) SetDropEntry(e txnif.TxnEntry) error {
 	if tbl.dropEntry != nil {
 		panic("logic error")
+	}
+	if tbl.createEntry != nil {
+		return txnbase.ErrDropCreatedTable
 	}
 	tbl.dropEntry = e
 	tbl.txnEntries = append(tbl.txnEntries, e)
 	tbl.warChecker.ReadDB(tbl.entry.GetDB().GetID())
+	return nil
 }
 
 func (tbl *txnTable) IsDeleted() bool {
