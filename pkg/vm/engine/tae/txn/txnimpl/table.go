@@ -82,8 +82,8 @@ type txnTable struct {
 	dropEntry   txnif.TxnEntry
 	inodes      []InsertNode
 	appendable  base.INodeHandle
-	updateNodes map[common.ID]*updates.ColumnNode
-	deleteNodes map[common.ID]*updates.DeleteNode
+	updateNodes map[common.ID]txnif.UpdateNode
+	deleteNodes map[common.ID]txnif.DeleteNode
 	appendNodes map[common.ID]txnif.AppendNode
 	appends     []*appendCtx
 	tableHandle data.TableHandle
@@ -117,8 +117,8 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver wal.Driver, 
 		entry:       handle.GetMeta().(*catalog.TableEntry),
 		driver:      driver,
 		index:       NewSimpleTableIndex(),
-		updateNodes: make(map[common.ID]*updates.ColumnNode),
-		deleteNodes: make(map[common.ID]*updates.DeleteNode),
+		updateNodes: make(map[common.ID]txnif.UpdateNode),
+		deleteNodes: make(map[common.ID]txnif.DeleteNode),
 		appendNodes: make(map[common.ID]txnif.AppendNode),
 		appends:     make([]*appendCtx, 0),
 		csegs:       make([]*catalog.SegmentEntry, 0),
@@ -375,7 +375,7 @@ func (tbl *txnTable) registerInsertNode() error {
 	return nil
 }
 
-func (tbl *txnTable) AddDeleteNode(id *common.ID, node *updates.DeleteNode) error {
+func (tbl *txnTable) AddDeleteNode(id *common.ID, node txnif.DeleteNode) error {
 	nid := *id
 	u := tbl.deleteNodes[nid]
 	if u != nil {
@@ -392,7 +392,7 @@ func (tbl *txnTable) AddUpdateNode(node txnif.UpdateNode) error {
 	if u != nil {
 		return ErrDuplicateNode
 	}
-	tbl.updateNodes[id] = node.(*updates.ColumnNode)
+	tbl.updateNodes[id] = node
 	tbl.txnEntries = append(tbl.txnEntries, node)
 	return nil
 }
@@ -547,7 +547,7 @@ func (tbl *txnTable) RangeDelete(inode uint32, segmentId, blockId uint64, start,
 	node2, err := blkData.RangeDelete(tbl.txn, start, end)
 	if err == nil {
 		id := blk.AsCommonID()
-		tbl.AddDeleteNode(id, node2.(*updates.DeleteNode))
+		tbl.AddDeleteNode(id, node2)
 		tbl.warChecker.ReadBlock(id)
 	}
 	return
@@ -592,7 +592,7 @@ func (tbl *txnTable) GetValue(id *common.ID, row uint32, col uint16) (v interfac
 	return block.GetValue(tbl.txn, row, col)
 }
 
-func (tbl *txnTable) updateWithFineLock(node *updates.ColumnNode, txn txnif.AsyncTxn, row uint32, v interface{}) (err error) {
+func (tbl *txnTable) updateWithFineLock(node txnif.UpdateNode, txn txnif.AsyncTxn, row uint32, v interface{}) (err error) {
 	chain := node.GetChain().(*updates.ColumnChain)
 	controller := chain.GetController()
 	sharedLock := controller.GetSharedLock()
