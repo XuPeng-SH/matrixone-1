@@ -792,32 +792,10 @@ func (tbl *txnTable) GetLocalValue(row uint32, col uint16) (interface{}, error) 
 }
 
 func (tbl *txnTable) PrepareRollback() (err error) {
-	if tbl.createEntry != nil {
-		entry := tbl.createEntry.(*catalog.TableEntry)
-		if err = entry.GetDB().RemoveEntry(entry); err != nil {
-			return
+	for _, txnEntry := range tbl.txnEntries {
+		if err = txnEntry.PrepareRollback(); err != nil {
+			break
 		}
-	}
-	if tbl.createEntry != nil || tbl.dropEntry != nil {
-		if err = tbl.entry.PrepareRollback(); err != nil {
-			return
-		}
-	}
-	for _, node := range tbl.updateNodes {
-		chain := node.GetChain()
-		chain.DeleteNode(node.GetDLNode())
-	}
-	for _, node := range tbl.deleteNodes {
-		chain := node.GetChain()
-		chain.Lock()
-		chain.RemoveNodeLocked(node)
-		chain.Unlock()
-	}
-	for _, blk := range tbl.cblks {
-		blk.GetSegment().RemoveEntry(blk)
-	}
-	for _, seg := range tbl.csegs {
-		seg.GetTable().RemoveEntry(seg)
 	}
 	return
 }
