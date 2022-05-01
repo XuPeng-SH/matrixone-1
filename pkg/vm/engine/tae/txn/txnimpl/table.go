@@ -93,10 +93,6 @@ type txnTable struct {
 	nodesMgr    base.INodeManager
 	index       TableIndex
 	rows        uint32
-	csegs       []*catalog.SegmentEntry
-	dsegs       []*catalog.SegmentEntry
-	cblks       []*catalog.BlockEntry
-	dblks       []*catalog.BlockEntry
 	warChecker  *warChecker
 	dataFactory *tables.DataFactory
 	logs        []wal.LogEntry
@@ -121,8 +117,6 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver wal.Driver, 
 		deleteNodes: make(map[common.ID]txnif.DeleteNode),
 		appendNodes: make(map[common.ID]txnif.AppendNode),
 		appends:     make([]*appendCtx, 0),
-		csegs:       make([]*catalog.SegmentEntry, 0),
-		dsegs:       make([]*catalog.SegmentEntry, 0),
 		dataFactory: dataFactory,
 		logs:        make([]wal.LogEntry, 0),
 		txnEntries:  make([]txnif.TxnEntry, 0),
@@ -207,7 +201,6 @@ func (tbl *txnTable) CreateNonAppendableSegment() (seg handle.Segment, err error
 		return
 	}
 	seg = newSegment(tbl.txn, meta)
-	tbl.csegs = append(tbl.csegs, meta)
 	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadTable(meta.GetTable().AsCommonID())
 	return
@@ -223,7 +216,6 @@ func (tbl *txnTable) CreateSegment() (seg handle.Segment, err error) {
 		return
 	}
 	seg = newSegment(tbl.txn, meta)
-	tbl.csegs = append(tbl.csegs, meta)
 	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadTable(meta.GetTable().AsCommonID())
 	return
@@ -238,7 +230,6 @@ func (tbl *txnTable) SoftDeleteBlock(id *common.ID) (err error) {
 	if err != nil {
 		return
 	}
-	tbl.dblks = append(tbl.dblks, meta)
 	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadSegment(seg.AsCommonID())
 	return
@@ -291,7 +282,6 @@ func (tbl *txnTable) createBlock(sid uint64, state catalog.EntryState) (blk hand
 	if err != nil {
 		return
 	}
-	tbl.cblks = append(tbl.cblks, meta)
 	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadSegment(seg.AsCommonID())
 	return newBlock(tbl.txn, meta), err
@@ -355,10 +345,6 @@ func (tbl *txnTable) Close() error {
 	tbl.deleteNodes = nil
 	tbl.appendNodes = nil
 	tbl.tableHandle = nil
-	tbl.csegs = nil
-	tbl.dsegs = nil
-	tbl.cblks = nil
-	tbl.dblks = nil
 	tbl.warChecker = nil
 	tbl.logs = nil
 	return nil
@@ -898,12 +884,11 @@ func (tbl *txnTable) ApplyCommit() (err error) {
 }
 
 func (tbl *txnTable) ApplyRollback() (err error) {
-	if tbl.createEntry != nil || tbl.dropEntry != nil {
-		if err = tbl.entry.ApplyRollback(); err != nil {
-			return
+	for _, node := range tbl.txnEntries {
+		if err = node.ApplyRollback(); err != nil {
+			break
 		}
 	}
-	// TODO: rollback all inserts and updates
 	return
 }
 
