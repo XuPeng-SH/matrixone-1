@@ -104,6 +104,7 @@ type txnTable struct {
 	maxBlkId    uint64
 
 	txnEntries []txnif.TxnEntry
+	csnStart   uint32
 }
 
 func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver wal.Driver, mgr base.INodeManager, checker *warChecker, dataFactory *tables.DataFactory) *txnTable {
@@ -149,22 +150,6 @@ func (tbl *txnTable) WaitSynced() {
 }
 
 func (tbl *txnTable) CollectCmd(cmdMgr *commandManager) error {
-	for _, seg := range tbl.csegs {
-		csn := cmdMgr.GetCSN()
-		cmd, err := seg.MakeCommand(uint32(csn))
-		if err != nil {
-			return err
-		}
-		cmdMgr.AddCmd(cmd)
-	}
-	for _, blk := range tbl.cblks {
-		csn := cmdMgr.GetCSN()
-		cmd, err := blk.MakeCommand(uint32(csn))
-		if err != nil {
-			return err
-		}
-		cmdMgr.AddCmd(cmd)
-	}
 	for i, node := range tbl.inodes {
 		h := tbl.nodesMgr.Pin(node)
 		if h == nil {
@@ -185,25 +170,17 @@ func (tbl *txnTable) CollectCmd(cmdMgr *commandManager) error {
 			cmdMgr.AddCmd(cmd)
 		}
 	}
-	for _, node := range tbl.updateNodes {
+	tbl.csnStart = uint32(cmdMgr.GetCSN())
+	for _, txnEntry := range tbl.txnEntries {
 		csn := cmdMgr.GetCSN()
-		updateCmd, err := node.MakeCommand(uint32(csn))
+		cmd, err := txnEntry.MakeCommand(uint32(csn))
 		if err != nil {
-			panic(err)
+			return err
 		}
-		if updateCmd != nil {
-			cmdMgr.AddCmd(updateCmd)
+		if cmd == nil {
+			panic(txnEntry)
 		}
-	}
-	for _, node := range tbl.deleteNodes {
-		csn := cmdMgr.GetCSN()
-		deleteCmd, err := node.MakeCommand(uint32(csn))
-		if err != nil {
-			panic(err)
-		}
-		if deleteCmd != nil {
-			cmdMgr.AddCmd(deleteCmd)
-		}
+		cmdMgr.AddCmd(cmd)
 	}
 	return nil
 }
@@ -231,6 +208,7 @@ func (tbl *txnTable) CreateNonAppendableSegment() (seg handle.Segment, err error
 	}
 	seg = newSegment(tbl.txn, meta)
 	tbl.csegs = append(tbl.csegs, meta)
+	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadTable(meta.GetTable().AsCommonID())
 	return
 }
@@ -246,6 +224,7 @@ func (tbl *txnTable) CreateSegment() (seg handle.Segment, err error) {
 	}
 	seg = newSegment(tbl.txn, meta)
 	tbl.csegs = append(tbl.csegs, meta)
+	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadTable(meta.GetTable().AsCommonID())
 	return
 }
@@ -259,7 +238,8 @@ func (tbl *txnTable) SoftDeleteBlock(id *common.ID) (err error) {
 	if err != nil {
 		return
 	}
-	tbl.cblks = append(tbl.cblks, meta)
+	tbl.dblks = append(tbl.dblks, meta)
+	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadSegment(seg.AsCommonID())
 	return
 }
@@ -312,6 +292,7 @@ func (tbl *txnTable) createBlock(sid uint64, state catalog.EntryState) (blk hand
 		return
 	}
 	tbl.cblks = append(tbl.cblks, meta)
+	tbl.txnEntries = append(tbl.txnEntries, meta)
 	tbl.warChecker.ReadSegment(seg.AsCommonID())
 	return newBlock(tbl.txn, meta), err
 }
@@ -321,6 +302,7 @@ func (tbl *txnTable) SetCreateEntry(e txnif.TxnEntry) {
 		panic("logic error")
 	}
 	tbl.createEntry = e
+	tbl.txnEntries = append(tbl.txnEntries, e)
 	tbl.warChecker.ReadDB(tbl.entry.GetDB().GetID())
 }
 
@@ -329,6 +311,7 @@ func (tbl *txnTable) SetDropEntry(e txnif.TxnEntry) {
 		panic("logic error")
 	}
 	tbl.dropEntry = e
+	tbl.txnEntries = append(tbl.txnEntries, e)
 	tbl.warChecker.ReadDB(tbl.entry.GetDB().GetID())
 }
 
@@ -399,6 +382,7 @@ func (tbl *txnTable) AddDeleteNode(id *common.ID, node *updates.DeleteNode) erro
 		return ErrDuplicateNode
 	}
 	tbl.deleteNodes[nid] = node
+	tbl.txnEntries = append(tbl.txnEntries, node)
 	return nil
 }
 
@@ -409,6 +393,7 @@ func (tbl *txnTable) AddUpdateNode(node txnif.UpdateNode) error {
 		return ErrDuplicateNode
 	}
 	tbl.updateNodes[id] = node.(*updates.ColumnNode)
+	tbl.txnEntries = append(tbl.txnEntries, node)
 	return nil
 }
 
@@ -847,6 +832,7 @@ func (tbl *txnTable) ApplyAppend() {
 		logutil.Debugf(info.String())
 		appendNode.PrepareCommit()
 		tbl.appendNodes[*id] = appendNode
+		tbl.txnEntries = append(tbl.txnEntries, appendNode)
 	}
 	if tbl.tableHandle != nil {
 		tbl.entry.GetTableData().ApplyHandle(tbl.tableHandle)
@@ -909,99 +895,18 @@ func (tbl *txnTable) PreCommit() (err error) {
 }
 
 func (tbl *txnTable) PrepareCommit() (err error) {
-	// TODO: consider committing delete scenario later. Important!!!
-	tbl.entry.RLock()
-	if tbl.entry.CreateAndDropInSameTxn() {
-		tbl.entry.RUnlock()
-		// TODO: should remove all inodes and updates
-		return
-	}
-	tbl.entry.RUnlock()
-	if tbl.createEntry != nil {
-		if err = tbl.createEntry.PrepareCommit(); err != nil {
-			return
-		}
-	} else if tbl.dropEntry != nil {
-		if err = tbl.dropEntry.PrepareCommit(); err != nil {
-			return
-		}
-	}
 	for _, node := range tbl.txnEntries {
 		if err = node.PrepareCommit(); err != nil {
-			return
-		}
-	}
-
-	for _, seg := range tbl.csegs {
-		logutil.Debugf("PrepareCommit: %s", seg.String())
-		if err = seg.PrepareCommit(); err != nil {
-			return
-		}
-	}
-	for _, blk := range tbl.cblks {
-		logutil.Debugf("PrepareCommit: %s", blk.String())
-		if err = blk.PrepareCommit(); err != nil {
-			return
-		}
-	}
-	for _, update := range tbl.updateNodes {
-		if err = update.PrepareCommit(); err != nil {
-			return
-		}
-	}
-	for _, del := range tbl.deleteNodes {
-		if err = del.PrepareCommit(); err != nil {
-			return
+			break
 		}
 	}
 	return
 }
 
 func (tbl *txnTable) ApplyCommit() (err error) {
-	tbl.entry.RLock()
-	if tbl.entry.CreateAndDropInSameTxn() {
-		tbl.entry.RUnlock()
-		// TODO: should remove all inodes and updates
-		return
-	}
-	tbl.entry.RUnlock()
-	if tbl.createEntry != nil {
-		if err = tbl.createEntry.ApplyCommit(); err != nil {
-			return
-		}
-	} else if tbl.dropEntry != nil {
-		if err = tbl.dropEntry.ApplyCommit(); err != nil {
-			return
-		}
-	}
-	for _, seg := range tbl.csegs {
-		if err = seg.ApplyCommit(); err != nil {
-			break
-		}
-	}
-	for _, blk := range tbl.cblks {
-		if err = blk.ApplyCommit(); err != nil {
-			break
-		}
-	}
-	for _, app := range tbl.appendNodes {
-		if err = app.ApplyCommit(); err != nil {
-			return
-		}
-	}
-	for _, update := range tbl.updateNodes {
-		if err = update.ApplyCommit(); err != nil {
-			return
-		}
-	}
-	for _, del := range tbl.deleteNodes {
-		if err = del.ApplyCommit(); err != nil {
-			return
-		}
-	}
 	for _, node := range tbl.txnEntries {
 		if err = node.ApplyCommit(); err != nil {
-			return
+			break
 		}
 	}
 	return
