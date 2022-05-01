@@ -516,7 +516,10 @@ func (tbl *txnTable) RangeDelete(inode uint32, segmentId, blockId uint64, start,
 	if inode != 0 {
 		return tbl.RangeDeleteLocalRows(start, end)
 	}
-	node := tbl.deleteNodes[common.ID{TableID: tbl.GetID(), SegmentID: segmentId, BlockID: blockId}]
+	id := tbl.entry.AsCommonID()
+	id.SegmentID = segmentId
+	id.BlockID = blockId
+	node := tbl.deleteNodes[*id]
 	if node != nil {
 		chain := node.GetChain().(*updates.DeleteChain)
 		controller := chain.GetController()
