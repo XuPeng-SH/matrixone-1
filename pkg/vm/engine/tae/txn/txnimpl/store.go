@@ -326,7 +326,7 @@ func (store *txnStore) getOrSetTable(id uint64) (table Table, err error) {
 		if store.warChecker == nil {
 			store.warChecker = newWarChecker(store.txn, entry.GetDB())
 		}
-		table = newTxnTable(store.txn, relation, store.driver, store.nodesMgr, store.warChecker, store.dataFactory)
+		table = newTxnTable(store, relation)
 		store.tables[id] = table
 	}
 	return
