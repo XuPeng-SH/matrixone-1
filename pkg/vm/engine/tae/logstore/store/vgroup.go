@@ -63,8 +63,6 @@ type commitGroup struct {
 	Commits    *common.ClosedInterval
 	tidCidMap  map[uint64]uint64
 	partialCkp map[uint64]*partialCkpInfo
-	//tid-{mask, commands-mask}
-	//partial ckp
 }
 type partialCkpInfo struct {
 	size uint32
@@ -77,15 +75,10 @@ func newPartialCkpInfo() *partialCkpInfo {
 	}
 }
 
-// partitial ckp
-// uncommit -> commit -> partitial ckp -> ckp
-// log uncommit group -> commit group tid cid map -> partitial ckp entry -> calculate when compact
-// log tid only | offset/size
 func newcommitGroup(v *vInfo, gid uint32) *commitGroup {
 	return &commitGroup{
 		baseGroup: newbaseGroup(v, gid),
 		ckps:      common.NewClosedIntervals(),
-		// Commits:,
 		tidCidMap:  make(map[uint64]uint64),
 		partialCkp: make(map[uint64]*partialCkpInfo),
 	}
@@ -109,8 +102,8 @@ func (g *commitGroup) Log(info interface{}) error {
 	if g.Commits == nil {
 		g.Commits = &common.ClosedInterval{}
 	}
-	err := g.Commits.Append(commitInfo.CommitId)
-	g.tidCidMap[commitInfo.TxnId] = commitInfo.CommitId
+	err := g.Commits.Append(commitInfo.GroupLSN)
+	g.tidCidMap[commitInfo.TxnId] = commitInfo.GroupLSN
 	return err
 }
 
@@ -191,8 +184,8 @@ func (g *commitGroup) OnCheckpoint(info interface{}) {
 	if ranges.Ranges != nil {
 		g.ckps.TryMerge(*ranges.Ranges)
 	}
-	for _, command := range ranges.Command {
-		commandinfo, ok := g.partialCkp[command.Tid]
+	for lsn, command := range ranges.Command {
+		commandinfo, ok := g.partialCkp[lsn]
 		if !ok {
 			commandinfo = newPartialCkpInfo()
 		}
@@ -200,7 +193,7 @@ func (g *commitGroup) OnCheckpoint(info interface{}) {
 			commandinfo.ckps.Add(cmd)
 		}
 		commandinfo.size = command.Size
-		g.partialCkp[command.Tid] = commandinfo
+		g.partialCkp[lsn] = commandinfo
 	}
 }
 

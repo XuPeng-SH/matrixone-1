@@ -3,6 +3,7 @@ package wal
 import (
 	"sync"
 
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
 )
 
@@ -29,7 +30,40 @@ func NewDriverWithStore(impl store.Store, own bool) Driver {
 }
 
 func (driver *walDriver) Checkpoint(indexes []*Index) (err error) {
-	// TODO
+	commands := make(map[uint64]entry.CommandInfo)
+	for _, idx := range indexes {
+		cmdInfo, ok := commands[idx.LSN]
+		if !ok {
+			cmdInfo = entry.CommandInfo{
+				CommandIds: []uint32{idx.CSN},
+				Size:       1,
+			}
+		} else {
+			existed := false
+			for _, csn := range cmdInfo.CommandIds {
+				if csn == idx.CSN {
+					existed = true
+					break
+				}
+			}
+			if existed {
+				continue
+			}
+			cmdInfo.CommandIds = append(cmdInfo.CommandIds, idx.CSN)
+			cmdInfo.Size++
+		}
+		commands[idx.LSN] = cmdInfo
+	}
+	info := &entry.Info{
+		Group: entry.GTCKp,
+		Checkpoints: []entry.CkpRanges{{
+			Group:   GroupC,
+			Command: commands,
+		}},
+	}
+	e := entry.GetBase()
+	e.SetInfo(info)
+	_, err = driver.impl.AppendEntry(entry.GTCKp, e)
 	return
 }
 
