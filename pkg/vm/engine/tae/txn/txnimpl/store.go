@@ -454,6 +454,21 @@ func (store *txnStore) PrepareCommit() (err error) {
 		}
 	}
 
+	store.CollectCmd()
+
+	logEntry, err := store.cmdMgr.ApplyTxnRecord()
+	if err != nil {
+		panic(err)
+	}
+	if logEntry != nil {
+		store.logs = append(store.logs, logEntry)
+	}
+	logrus.Debugf("Txn-%d PrepareCommit Takes %s", store.txn.GetID(), time.Since(now))
+
+	return
+}
+
+func (store *txnStore) CollectCmd() (err error) {
 	if store.createEntry != nil {
 		csn := store.cmdMgr.GetCSN()
 		cmd, err := store.createEntry.MakeCommand(uint32(csn))
@@ -475,16 +490,6 @@ func (store *txnStore) PrepareCommit() (err error) {
 		}
 		store.cmdMgr.AddCmd(cmd)
 	}
-
-	logEntry, err := store.cmdMgr.ApplyTxnRecord()
-	if err != nil {
-		panic(err)
-	}
-	if logEntry != nil {
-		store.logs = append(store.logs, logEntry)
-	}
-	logrus.Debugf("Txn-%d PrepareCommit Takes %s", store.txn.GetID(), time.Since(now))
-
 	return
 }
 

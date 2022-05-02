@@ -199,6 +199,7 @@ type TxnEntry interface {
 	PrepareCommit() error
 	PrepareRollback() error
 	ApplyCommit() error
+	// ApplyCommit(index *wal.Index) error
 	ApplyRollback() error
 	MakeCommand(uint32) (TxnCmd, error)
 }
