@@ -84,7 +84,6 @@ type txnTable struct {
 	appendable  base.INodeHandle
 	updateNodes map[common.ID]txnif.UpdateNode
 	deleteNodes map[common.ID]txnif.DeleteNode
-	appendNodes map[common.ID]txnif.AppendNode
 	appends     []*appendCtx
 	tableHandle data.TableHandle
 	driver      wal.Driver
@@ -115,7 +114,6 @@ func newTxnTable(txn txnif.AsyncTxn, handle handle.Relation, driver wal.Driver, 
 		index:       NewSimpleTableIndex(),
 		updateNodes: make(map[common.ID]txnif.UpdateNode),
 		deleteNodes: make(map[common.ID]txnif.DeleteNode),
-		appendNodes: make(map[common.ID]txnif.AppendNode),
 		appends:     make([]*appendCtx, 0),
 		dataFactory: dataFactory,
 		logs:        make([]wal.LogEntry, 0),
@@ -301,7 +299,7 @@ func (tbl *txnTable) SetDropEntry(e txnif.TxnEntry) error {
 		panic("logic error")
 	}
 	if tbl.createEntry != nil {
-		return txnbase.ErrDropCreatedTable
+		return txnbase.ErrDDLDropCreated
 	}
 	tbl.dropEntry = e
 	tbl.txnEntries = append(tbl.txnEntries, e)
@@ -343,7 +341,6 @@ func (tbl *txnTable) Close() error {
 	tbl.inodes = nil
 	tbl.updateNodes = nil
 	tbl.deleteNodes = nil
-	tbl.appendNodes = nil
 	tbl.tableHandle = nil
 	tbl.warChecker = nil
 	tbl.logs = nil
@@ -802,7 +799,6 @@ func (tbl *txnTable) ApplyAppend() {
 		info := ctx.node.AddApplyInfo(ctx.start, ctx.count, destOff, ctx.count, id)
 		logutil.Debugf(info.String())
 		appendNode.PrepareCommit()
-		tbl.appendNodes[*id] = appendNode
 		tbl.txnEntries = append(tbl.txnEntries, appendNode)
 	}
 	if tbl.tableHandle != nil {
