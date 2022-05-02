@@ -301,7 +301,9 @@ func (rf *rotateFile) Load(ver int, groupId uint32, lsn uint64) (entry.Entry, er
 }
 
 func (rf *rotateFile) GetEntryByVersion(version int) (VFile, error) {
-	var vf VFile
+	var vf VFile	
+	rf.Lock()
+	defer rf.Unlock()
 	for _, vf := range rf.uncommitted {
 		if vf.version == version {
 			return vf, nil
