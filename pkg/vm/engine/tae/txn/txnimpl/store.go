@@ -489,31 +489,26 @@ func (store *txnStore) PrepareCommit() (err error) {
 }
 
 func (store *txnStore) AddTxnEntry(t txnif.TxnEntryType, entry txnif.TxnEntry) {
-	// switch t {
-	// case TxnEntryCreateDatabase:
-	// 	store.createEntry = entry
-	// case TxnEntryCretaeTable:
-	// 	create := entry.(*catalog.TableEntry)
-
-	// }
+	// TODO
 }
 
 func (store *txnStore) PrepareRollback() error {
 	var err error
 	if store.createEntry != nil {
-		if err := store.catalog.RemoveEntry(store.createEntry.(*catalog.DBEntry)); err != nil {
-			return err
-		}
-	} else if store.dropEntry != nil {
-		if err := store.createEntry.(*catalog.DBEntry).PrepareRollback(); err != nil {
+		if err := store.createEntry.PrepareRollback(); err != nil {
 			return err
 		}
 	}
-
 	for _, table := range store.tables {
 		if err = table.PrepareRollback(); err != nil {
 			break
 		}
 	}
+	if store.dropEntry != nil {
+		if err := store.dropEntry.PrepareRollback(); err != nil {
+			return err
+		}
+	}
+
 	return err
 }
