@@ -1043,3 +1043,44 @@ func TestGCBlock1(t *testing.T) {
 	blkData.Destroy()
 	assert.Equal(t, 0, tae.MTBufMgr.Count())
 }
+
+func TestLogIndex1(t *testing.T) {
+	tae := initDB(t, nil)
+	defer tae.Close()
+	schema := catalog.MockSchemaAll(13)
+	schema.BlockMaxRows = 10
+	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.CreateDatabase("db")
+		rel, _ := db.CreateRelation(schema)
+		err := rel.Append(bat)
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		v := compute.GetValue(bat.Vecs[schema.PrimaryKey], 3)
+		filter := handle.NewEQFilter(v)
+		id, offset, err := rel.GetByFilter(filter)
+		assert.Nil(t, err)
+		err = rel.RangeDelete(id, offset, offset)
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		it := rel.MakeBlockIt()
+		blk := it.GetBlock()
+		meta := blk.GetMeta().(*catalog.BlockEntry)
+		task, err := jobs.NewCompactBlockTask(nil, txn, meta, nil)
+		assert.Nil(t, err)
+		err = task.OnExec()
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+}
