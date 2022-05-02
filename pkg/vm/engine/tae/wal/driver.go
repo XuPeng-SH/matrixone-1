@@ -62,6 +62,7 @@ func (driver *walDriver) Checkpoint(indexes []*Index) (err error) {
 		}},
 	}
 	e := entry.GetBase()
+	e.SetType(entry.ETCheckpoint)
 	e.SetInfo(info)
 	_, err = driver.impl.AppendEntry(entry.GTCKp, e)
 	return
