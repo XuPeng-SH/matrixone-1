@@ -203,7 +203,7 @@ func (info *Info) ToString() string {
 	case GTCKp:
 		s := "checkpoint entry"
 		for _, ranges := range info.Checkpoints {
-			s = fmt.Sprintf("%s G%d-%v", s, ranges.Group, ranges.Ranges)
+			s = fmt.Sprintf("%s%s", s, ranges)
 		}
 		s = fmt.Sprintf("%s\n", s)
 		return s
@@ -230,6 +230,14 @@ type CkpRanges struct {
 	Group   uint32
 	Ranges  *common.ClosedIntervals
 	Command map[uint64]CommandInfo
+}
+
+func (r CkpRanges) String() string {
+	s := fmt.Sprintf("G%d-%v", r.Group, r.Ranges)
+	for lsn, cmd := range r.Command {
+		s = fmt.Sprintf("%s[%d-%v/%d]", s, lsn, cmd.CommandIds, cmd.Size)
+	}
+	return s
 }
 
 type CommandInfo struct {

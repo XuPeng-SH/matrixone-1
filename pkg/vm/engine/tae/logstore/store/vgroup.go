@@ -77,15 +77,15 @@ func newPartialCkpInfo() *partialCkpInfo {
 
 func newcommitGroup(v *vInfo, gid uint32) *commitGroup {
 	return &commitGroup{
-		baseGroup: newbaseGroup(v, gid),
-		ckps:      common.NewClosedIntervals(),
+		baseGroup:  newbaseGroup(v, gid),
+		ckps:       common.NewClosedIntervals(),
 		tidCidMap:  make(map[uint64]uint64),
 		partialCkp: make(map[uint64]*partialCkpInfo),
 	}
 }
 
 func (g *commitGroup) String() string {
-	s := fmt.Sprintf("Commit[ckp-%s,commits-%s,tc-{", g.ckps, g.Commits)
+	s := fmt.Sprintf("G%dCommit[ckp-%s,commits-%s,tc-{", g.groupId, g.ckps, g.Commits)
 	for tid, cid := range g.tidCidMap {
 		s = fmt.Sprintf("%s%d-%d,", s, tid, cid)
 	}
@@ -139,21 +139,23 @@ func (g *commitGroup) MergeCheckpointInfo(c *compactor) {
 		partialMap = make(map[uint64]*partialCkpInfo)
 	}
 	gMap := c.tidCidMap[g.groupId]
-	for tid, commandsInfo := range g.partialCkp {
-		partial, ok := partialMap[tid]
+	for lsn, commandsInfo := range g.partialCkp {
+		partial, ok := partialMap[lsn]
 		if !ok {
 			partial = newPartialCkpInfo()
+			partial.size = commandsInfo.size
 		}
-		partial.size = commandsInfo.size
+		if partial.size != commandsInfo.size{
+			panic("logic error")
+		}
 		partial.ckps.Or(commandsInfo.ckps)
 		if partial.ckps.GetCardinality() == uint64(partial.size) {
 			if gMap != nil {
-				cid := gMap[tid]
-				g.ckps.TryMerge(*common.NewClosedIntervalsByInt(cid))
-				delete(partialMap, tid)
+				g.ckps.TryMerge(*common.NewClosedIntervalsByInt(lsn))
+				delete(partialMap, lsn)
 			}
 		}
-		partialMap[tid] = partial
+		partialMap[lsn] = partial
 	}
 	c.partialCKP[g.groupId] = partialMap
 	//merge ckps
