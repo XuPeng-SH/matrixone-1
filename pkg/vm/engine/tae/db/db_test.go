@@ -19,6 +19,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/data"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/jobs"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/txnentries"
@@ -1050,21 +1051,39 @@ func TestLogIndex1(t *testing.T) {
 	schema := catalog.MockSchemaAll(13)
 	schema.BlockMaxRows = 10
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows), int(schema.PrimaryKey), nil)
+	bats := compute.SplitBatch(bat, int(schema.BlockMaxRows))
 	{
 		txn := tae.StartTxn(nil)
 		db, _ := txn.CreateDatabase("db")
-		rel, _ := db.CreateRelation(schema)
-		err := rel.Append(bat)
-		assert.Nil(t, err)
+		db.CreateRelation(schema)
+		// err := rel.Append(bat)
+		// assert.Nil(t, err)
 		assert.Nil(t, txn.Commit())
 	}
+	txns := make([]txnif.AsyncTxn, 0)
+	doAppend := func(data *gbat.Batch) func() {
+		return func() {
+			txn := tae.StartTxn(nil)
+			db, _ := txn.GetDatabase("db")
+			rel, _ := db.GetRelationByName(schema.Name)
+			rel.Append(data)
+			assert.Nil(t, txn.Commit())
+			txns = append(txns, txn)
+		}
+	}
+	for _, data := range bats {
+		doAppend(data)()
+	}
+	var id *common.ID
+	var offset uint32
+	var err error
 	{
 		txn := tae.StartTxn(nil)
 		db, _ := txn.GetDatabase("db")
 		rel, _ := db.GetRelationByName(schema.Name)
 		v := compute.GetValue(bat.Vecs[schema.PrimaryKey], 3)
 		filter := handle.NewEQFilter(v)
-		id, offset, err := rel.GetByFilter(filter)
+		id, offset, err = rel.GetByFilter(filter)
 		assert.Nil(t, err)
 		err = rel.RangeDelete(id, offset, offset)
 		assert.Nil(t, err)
@@ -1077,6 +1096,31 @@ func TestLogIndex1(t *testing.T) {
 		it := rel.MakeBlockIt()
 		blk := it.GetBlock()
 		meta := blk.GetMeta().(*catalog.BlockEntry)
+		indexes := meta.GetBlockData().CollectAppendLogIndexes(txns[0].GetStartTS(), txns[len(txns)-1].GetCommitTS())
+		assert.Equal(t, len(txns), len(indexes))
+		indexes = meta.GetBlockData().CollectAppendLogIndexes(txns[1].GetStartTS(), txns[len(txns)-1].GetCommitTS())
+		assert.Equal(t, len(txns)-1, len(indexes))
+		indexes = meta.GetBlockData().CollectAppendLogIndexes(txns[1].GetCommitTS(), txns[len(txns)-1].GetCommitTS())
+		assert.Equal(t, len(txns)-2, len(indexes))
+		indexes = meta.GetBlockData().CollectAppendLogIndexes(txns[1].GetCommitTS(), txns[len(txns)-1].GetStartTS())
+		assert.Equal(t, len(txns)-3, len(indexes))
+	}
+	{
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		it := rel.MakeBlockIt()
+		blk := it.GetBlock()
+		meta := blk.GetMeta().(*catalog.BlockEntry)
+		indexes := meta.GetBlockData().CollectAppendLogIndexes(0, txn.GetStartTS())
+		for i, index := range indexes {
+			t.Logf("%d: %s", i, index.String())
+		}
+
+		vec, mask, err := blk.GetColumnDataById(int(schema.PrimaryKey), nil, nil)
+		assert.Nil(t, err)
+		assert.True(t, mask.Contains(offset))
+		t.Log(vec.String())
 		task, err := jobs.NewCompactBlockTask(nil, txn, meta, nil)
 		assert.Nil(t, err)
 		err = task.OnExec()

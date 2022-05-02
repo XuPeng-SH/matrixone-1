@@ -8,6 +8,7 @@ import (
 
 	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common/errors"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -567,6 +568,12 @@ func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err erro
 		return err
 	}
 	return
+}
+
+func (blk *dataBlock) CollectAppendLogIndexes(startTs, endTs uint64) (indexes []*wal.Index) {
+	readLock := blk.mvcc.GetSharedLock()
+	defer readLock.Unlock()
+	return blk.mvcc.CollectAppendLogIndexesLocked(startTs, endTs)
 }
 
 func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (v interface{}) {
