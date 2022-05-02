@@ -237,7 +237,7 @@ func (blk *dataBlock) MakeBlockView() (view *updates.BlockView, err error) {
 		blk.makeColumnView(uint16(i), view)
 	}
 	deleteChain := mvcc.GetDeleteChain()
-	dnode := deleteChain.CollectDeletesLocked(ts).(*updates.DeleteNode)
+	dnode := deleteChain.CollectDeletesLocked(ts, true).(*updates.DeleteNode)
 	if dnode != nil {
 		view.DeleteMask = dnode.GetDeleteMaskLocked()
 	}
@@ -287,7 +287,7 @@ func (blk *dataBlock) GetColumnDataById(txn txnif.AsyncTxn, colIdx int, compress
 	sharedLock := blk.mvcc.GetSharedLock()
 	err = blk.makeColumnView(uint16(colIdx), view)
 	deleteChain := blk.mvcc.GetDeleteChain()
-	dnode := deleteChain.CollectDeletesLocked(txn.GetStartTS()).(*updates.DeleteNode)
+	dnode := deleteChain.CollectDeletesLocked(txn.GetStartTS(), false).(*updates.DeleteNode)
 	sharedLock.Unlock()
 	if dnode != nil {
 		view.DeleteMask = dnode.GetDeleteMaskLocked()
@@ -342,7 +342,7 @@ func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompres
 	err = blk.makeColumnView(uint16(colIdx), view)
 	deleteChain := blk.mvcc.GetDeleteChain()
 	deleteChain.RLock()
-	dnode := deleteChain.CollectDeletesLocked(ts).(*updates.DeleteNode)
+	dnode := deleteChain.CollectDeletesLocked(ts, false).(*updates.DeleteNode)
 	deleteChain.RUnlock()
 	sharedLock.Unlock()
 	if dnode != nil {
@@ -576,15 +576,16 @@ func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (v interface{
 	for i := range blk.meta.GetSchema().ColDefs {
 		chain := blk.mvcc.GetColumnChain(uint16(i))
 		chain.RLock()
-		updateMask, updateVals := chain.CollectCommittedInRangeLocked(startTs, endTs)
+		updateMask, updateVals, indexes := chain.CollectCommittedInRangeLocked(startTs, endTs)
 		chain.RUnlock()
 		if updateMask != nil {
 			view.UpdateMasks[uint16(i)] = updateMask
 			view.UpdateVals[uint16(i)] = updateVals
 		}
+		view.ColLogIndexes[uint16(i)] = indexes
 	}
 	deleteChain := blk.mvcc.GetDeleteChain()
-	view.DeleteMask = deleteChain.CollectDeletesInRange(startTs, endTs)
+	view.DeleteMask, view.DeleteLogIndexes = deleteChain.CollectDeletesInRange(startTs, endTs)
 	readLock.Unlock()
 	v = view
 	return

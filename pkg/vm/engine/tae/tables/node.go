@@ -107,7 +107,7 @@ func (node *appendableNode) OnUnload() {
 		}
 	}
 	deleteChain := mvcc.GetDeleteChain()
-	dnode := deleteChain.CollectDeletesLocked(ts).(*updates.DeleteNode)
+	dnode := deleteChain.CollectDeletesLocked(ts, true).(*updates.DeleteNode)
 	readLock.Unlock()
 	var deletes *roaring.Bitmap
 	if dnode != nil {
