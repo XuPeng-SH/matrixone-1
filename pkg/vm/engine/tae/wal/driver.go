@@ -29,14 +29,14 @@ func NewDriverWithStore(impl store.Store, own bool) Driver {
 	return driver
 }
 
-func (driver *walDriver) Checkpoint(indexes []*Index) (err error) {
+func (driver *walDriver) Checkpoint(indexes []*Index) (e LogEntry,err error) {
 	commands := make(map[uint64]entry.CommandInfo)
 	for _, idx := range indexes {
 		cmdInfo, ok := commands[idx.LSN]
 		if !ok {
 			cmdInfo = entry.CommandInfo{
 				CommandIds: []uint32{idx.CSN},
-				Size:       1,
+				Size:       idx.Size,
 			}
 		} else {
 			existed := false
@@ -50,7 +50,9 @@ func (driver *walDriver) Checkpoint(indexes []*Index) (err error) {
 				continue
 			}
 			cmdInfo.CommandIds = append(cmdInfo.CommandIds, idx.CSN)
-			cmdInfo.Size++
+			if cmdInfo.Size != idx.Size {
+				panic("logic error")
+			}
 		}
 		commands[idx.LSN] = cmdInfo
 	}
@@ -61,11 +63,15 @@ func (driver *walDriver) Checkpoint(indexes []*Index) (err error) {
 			Command: commands,
 		}},
 	}
-	e := entry.GetBase()
+	e = entry.GetBase()
 	e.SetType(entry.ETCheckpoint)
 	e.SetInfo(info)
 	_, err = driver.impl.AppendEntry(entry.GTCKp, e)
 	return
+}
+
+func (driver *walDriver) Compact() error{
+	return driver.impl.TryCompact()
 }
 
 func (driver *walDriver) LoadEntry(groupId uint32, lsn uint64) (LogEntry, error) {
