@@ -143,8 +143,8 @@ func (node *appendableNode) OnUnload() {
 		Waitable: true,
 	}
 	task := jobs.NewFlushABlkTask(&ctx, node.file, node.block.meta.AsCommonID(), node.data, ts, masks, vals, deletes)
-	if node.block.ioScheduler != nil {
-		node.block.ioScheduler.Schedule(task)
+	if node.block.scheduler != nil {
+		node.block.scheduler.Schedule(task)
 		if err := task.WaitDone(); err != nil {
 			panic(err)
 		}
@@ -158,7 +158,16 @@ func (node *appendableNode) OnUnload() {
 	node.data = nil
 	node.SetBlockMaxFlushTS(ts)
 	ckpTask := jobs.NewCheckpointABlkTask(tasks.WaitableCtx, nil, node.block.meta.AsCommonID(), node.block, ts)
-	ckpTask.OnExec()
+	if node.block.scheduler != nil {
+		node.block.scheduler.Schedule(ckpTask)
+		if err := ckpTask.WaitDone(); err != nil {
+			panic(err)
+		}
+	} else {
+		if err := ckpTask.OnExec(); err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (node *appendableNode) PrepareAppend(rows uint32) (n uint32, err error) {
