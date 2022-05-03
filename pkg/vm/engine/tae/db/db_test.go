@@ -981,7 +981,7 @@ func TestDelete1(t *testing.T) {
 		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
 		factory, err := blkData.BuildCheckpointTaskFactory()
 		assert.Nil(t, err)
-		task, err := tae.TaskScheduler.ScheduleTxnTask(tasks.WaitableCtx, factory)
+		task, err := tae.Scheduler.ScheduleTxnTask(tasks.WaitableCtx, factory)
 		assert.Nil(t, err)
 		err = task.WaitDone()
 		assert.Nil(t, err)

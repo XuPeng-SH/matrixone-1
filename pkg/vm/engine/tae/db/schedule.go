@@ -6,39 +6,17 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
-type ioScheduler struct {
-	*tasks.BaseScheduler
-	db *DB
-}
-
-func newIOScheduler(db *DB, workers int) *ioScheduler {
-	if workers < 0 || workers > 100 {
-		panic(fmt.Sprintf("bad param: %d workers", workers))
-	}
-	s := &ioScheduler{
-		BaseScheduler: tasks.NewBaseScheduler("ioScheduler"),
-		db:            db,
-	}
-	dispatcher := tasks.NewBaseScopedDispatcher(tasks.DefaultScopeSharder)
-	for i := 0; i < workers; i++ {
-		handler := tasks.NewSingleWorkerHandler(fmt.Sprintf("[ioworker-%d]", i))
-		dispatcher.AddHandle(handler)
-		handler.Start()
-	}
-
-	s.RegisterDispatcher(tasks.IOTask, dispatcher)
-	s.Start()
-	return s
-}
-
 type taskScheduler struct {
 	*tasks.BaseScheduler
 	db *DB
 }
 
-func newTaskScheduler(db *DB, txnWorkers int) *taskScheduler {
+func newTaskScheduler(db *DB, txnWorkers int, ioWorkers int) *taskScheduler {
 	if txnWorkers < 0 || txnWorkers > 100 {
 		panic(fmt.Sprintf("bad param: %d txn workers", txnWorkers))
+	}
+	if ioWorkers < 0 || ioWorkers > 100 {
+		panic(fmt.Sprintf("bad param: %d io workers", ioWorkers))
 	}
 	s := &taskScheduler{
 		BaseScheduler: tasks.NewBaseScheduler("taskScheduler"),
@@ -58,8 +36,16 @@ func newTaskScheduler(db *DB, txnWorkers int) *taskScheduler {
 		handler.Start()
 	}
 
+	ioDispatcher := tasks.NewBaseScopedDispatcher(tasks.DefaultScopeSharder)
+	for i := 0; i < ioWorkers; i++ {
+		handler := tasks.NewSingleWorkerHandler(fmt.Sprintf("[ioworker-%d]", i))
+		ioDispatcher.AddHandle(handler)
+		handler.Start()
+	}
+
 	s.RegisterDispatcher(tasks.TxnTask, dispatcher)
 	s.RegisterDispatcher(tasks.CompactBlockTask, dispatcher)
+	s.RegisterDispatcher(tasks.IOTask, ioDispatcher)
 	s.RegisterDispatcher(tasks.ConsumeLogIndexesTask, dispatcher2)
 	s.Start()
 	return s
