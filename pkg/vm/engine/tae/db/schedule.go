@@ -51,8 +51,16 @@ func newTaskScheduler(db *DB, txnWorkers int) *taskScheduler {
 	dispatcher.RegisterHandler(tasks.TxnTask, txnHandler)
 	dispatcher.RegisterHandler(tasks.CompactBlockTask, txnHandler)
 
+	dispatcher2 := tasks.NewBaseScopedDispatcher(tasks.DefaultScopeSharder)
+	for i := 0; i < 4; i++ {
+		handler := tasks.NewSingleWorkerHandler(fmt.Sprintf("[ckpworker-%d]", i))
+		dispatcher2.AddHandle(handler)
+		handler.Start()
+	}
+
 	s.RegisterDispatcher(tasks.TxnTask, dispatcher)
 	s.RegisterDispatcher(tasks.CompactBlockTask, dispatcher)
+	s.RegisterDispatcher(tasks.ConsumeLogIndexesTask, dispatcher2)
 	s.Start()
 	return s
 }

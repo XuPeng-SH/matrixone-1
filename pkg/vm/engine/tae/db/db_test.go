@@ -808,14 +808,32 @@ func TestUnload1(t *testing.T) {
 	schema.PrimaryKey = 2
 
 	bat := compute.MockBatch(schema.Types(), uint64(schema.BlockMaxRows*2), int(schema.PrimaryKey), nil)
+	bats := compute.SplitBatch(bat, int(schema.BlockMaxRows))
 
 	{
 		txn := db.StartTxn(nil)
 		database, _ := txn.CreateDatabase("db")
-		rel, _ := database.CreateRelation(schema)
-		rel.Append(bat)
+		database.CreateRelation(schema)
+		// rel.Append(bat)
 		assert.Nil(t, txn.Commit())
 	}
+	var wg sync.WaitGroup
+	doAppend := func(data *gbat.Batch) func() {
+		return func() {
+			defer wg.Done()
+			txn := db.StartTxn(nil)
+			database, _ := txn.GetDatabase("db")
+			rel, _ := database.GetRelationByName(schema.Name)
+			rel.Append(data)
+			assert.Nil(t, txn.Commit())
+		}
+	}
+	pool, _ := ants.NewPool(1)
+	for _, data := range bats {
+		wg.Add(1)
+		pool.Submit(doAppend(data))
+	}
+	wg.Wait()
 	{
 		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
@@ -836,7 +854,7 @@ func TestUnload1(t *testing.T) {
 func TestUnload2(t *testing.T) {
 	opts := new(options.Options)
 	opts.CacheCfg = new(options.CacheCfg)
-	opts.CacheCfg.InsertCapacity = common.K * 2
+	opts.CacheCfg.InsertCapacity = common.K * 3
 	opts.CacheCfg.TxnCapacity = common.M
 	db := initDB(t, opts)
 	defer db.Close()

@@ -40,8 +40,8 @@ type dataBlock struct {
 	ioScheduler tasks.Scheduler
 	indexHolder acif.IBlockIndexHolder
 	mvcc        *updates.MVCCHandle
-	maxCkp      uint64
 	nice        uint32
+	ckpTs       uint64
 }
 
 func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeManager, ioScheduler tasks.Scheduler) *dataBlock {
@@ -69,6 +69,14 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 		// Non-appendable index holder would be initialized during compaction
 	}
 	return block
+}
+
+func (blk *dataBlock) SetMaxCheckpointTS(ts uint64) {
+	atomic.StoreUint64(&blk.ckpTs, ts)
+}
+
+func (blk *dataBlock) GetMaxCheckpointTS() uint64 {
+	return atomic.LoadUint64(&blk.ckpTs)
 }
 
 func (blk *dataBlock) Destroy() (err error) {

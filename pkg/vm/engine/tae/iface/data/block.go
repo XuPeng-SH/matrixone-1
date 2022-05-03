@@ -56,4 +56,7 @@ type Block interface {
 	GetTotalChanges() int
 	RefreshIndex() error
 	Destroy() error
+
+	SetMaxCheckpointTS(ts uint64)
+	GetMaxCheckpointTS() uint64
 }

@@ -57,6 +57,19 @@ func NewMVCCHandle(meta *catalog.BlockEntry) *MVCCHandle {
 	return node
 }
 
+func (n *MVCCHandle) HasActiveAppendNode() bool {
+	n.RLock()
+	defer n.RUnlock()
+	if len(n.appends) == 0 {
+		return false
+	}
+	node := n.appends[len(n.appends)-1]
+	node.RLock()
+	txn := node.txn
+	node.RUnlock()
+	return txn != nil
+}
+
 func (n *MVCCHandle) IncChangeNodeCnt() {
 	atomic.AddUint32(&n.changes, uint32(1))
 }
