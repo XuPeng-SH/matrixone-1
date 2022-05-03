@@ -350,9 +350,9 @@ func TestCommand(t *testing.T) {
 	cmd, err := txnbase.BuildCommandFrom(r)
 	assert.Nil(t, err)
 	t.Log(cmd.GetType())
-	eCmd := cmd.(*entryCmd)
-	assert.Equal(t, db.CreateAt, eCmd.db.CreateAt)
-	assert.Equal(t, db.name, eCmd.db.name)
+	eCmd := cmd.(*EntryCommand)
+	assert.Equal(t, db.CreateAt, eCmd.DB.CreateAt)
+	assert.Equal(t, db.name, eCmd.DB.name)
 	assert.Equal(t, db.ID, eCmd.entry.ID)
 
 	db.CurrOp = OpSoftDelete
@@ -371,7 +371,7 @@ func TestCommand(t *testing.T) {
 	cmd, err = txnbase.BuildCommandFrom(r)
 	assert.Nil(t, err)
 
-	eCmd = cmd.(*entryCmd)
+	eCmd = cmd.(*EntryCommand)
 	assert.Equal(t, db.DeleteAt, eCmd.entry.DeleteAt)
 	assert.Equal(t, db.ID, eCmd.entry.ID)
 
@@ -392,11 +392,11 @@ func TestCommand(t *testing.T) {
 
 	cmd, err = txnbase.BuildCommandFrom(r)
 	assert.Nil(t, err)
-	eCmd = cmd.(*entryCmd)
-	assert.Equal(t, tb.ID, eCmd.table.ID)
-	assert.Equal(t, tb.CreateAt, eCmd.table.CreateAt)
-	assert.Equal(t, tb.GetSchema().Name, eCmd.table.GetSchema().Name)
-	assert.Equal(t, tb.db.ID, eCmd.db.ID)
+	eCmd = cmd.(*EntryCommand)
+	assert.Equal(t, tb.ID, eCmd.Table.ID)
+	assert.Equal(t, tb.CreateAt, eCmd.Table.CreateAt)
+	assert.Equal(t, tb.GetSchema().Name, eCmd.Table.GetSchema().Name)
+	assert.Equal(t, tb.db.ID, eCmd.DBID)
 
 	tb.DeleteAt = common.NextGlobalSeqNum()
 	tb.CurrOp = OpSoftDelete
@@ -413,10 +413,10 @@ func TestCommand(t *testing.T) {
 
 	cmd, err = txnbase.BuildCommandFrom(r)
 	assert.Nil(t, err)
-	eCmd = cmd.(*entryCmd)
+	eCmd = cmd.(*EntryCommand)
 	assert.Equal(t, tb.ID, eCmd.entry.ID)
 	assert.Equal(t, tb.DeleteAt, eCmd.entry.DeleteAt)
-	assert.Equal(t, tb.db.ID, eCmd.db.ID)
+	assert.Equal(t, tb.db.ID, eCmd.DBID)
 }
 
 // UT Steps

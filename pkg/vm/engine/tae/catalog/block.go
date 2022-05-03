@@ -1,7 +1,9 @@
 package catalog
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -100,4 +102,25 @@ func (entry *BlockEntry) PrepareRollback() (err error) {
 		err = entry.GetSegment().RemoveEntry(entry)
 	}
 	return
+}
+
+func (entry *BlockEntry) WriteTo(w io.Writer) (err error) {
+	if err = entry.BaseEntry.WriteTo(w); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, entry.state); err != nil {
+		return
+	}
+	return
+}
+
+func (entry *BlockEntry) ReadFrom(r io.Reader) (err error) {
+	if err = entry.BaseEntry.ReadFrom(r); err != nil {
+		return
+	}
+	return binary.Read(r, binary.BigEndian, &entry.state)
+}
+
+func (entry *BlockEntry) MakeLogEntry() (cmd txnif.TxnCmd, err error) {
+	return newBlockCmd(0, CmdLogBlock, entry), nil
 }
