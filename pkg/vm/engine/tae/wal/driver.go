@@ -70,6 +70,10 @@ func (driver *walDriver) Checkpoint(indexes []*Index) (e LogEntry,err error) {
 	return
 }
 
+func (driver *walDriver) GetCheckpointed() uint64{
+	return driver.impl.GetCheckpointed(GroupC)
+}
+
 func (driver *walDriver) Compact() error{
 	return driver.impl.TryCompact()
 }

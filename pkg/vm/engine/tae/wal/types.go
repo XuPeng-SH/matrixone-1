@@ -23,6 +23,7 @@ type Driver interface {
 	Checkpoint(indexes []*Index) (LogEntry, error)
 	AppendEntry(uint32, LogEntry) (uint64, error)
 	LoadEntry(groupId uint32, lsn uint64) (LogEntry, error)
+	GetCheckpointed() uint64
 	Compact() error
 	Close() error
 }
