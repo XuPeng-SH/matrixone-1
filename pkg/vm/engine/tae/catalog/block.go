@@ -124,3 +124,21 @@ func (entry *BlockEntry) ReadFrom(r io.Reader) (err error) {
 func (entry *BlockEntry) MakeLogEntry() (cmd txnif.TxnCmd, err error) {
 	return newBlockCmd(0, CmdLogBlock, entry), nil
 }
+
+func (entry *BlockEntry) Clone() *BlockEntry {
+	cloned := &BlockEntry{
+		BaseEntry: entry.BaseEntry.Clone(),
+		state:     entry.state,
+		segment:   entry.segment,
+	}
+	return cloned
+}
+
+func (entry *BlockEntry) CloneCreate() *BlockEntry {
+	cloned := &BlockEntry{
+		BaseEntry: entry.BaseEntry.CloneCreate(),
+		state:     entry.state,
+		segment:   entry.segment,
+	}
+	return cloned
+}

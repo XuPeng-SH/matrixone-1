@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
@@ -102,7 +103,7 @@ func TestCheckpointCatalog(t *testing.T) {
 	db.CreateRelation(schema)
 	txn.Commit()
 
-	pool, _ := ants.NewPool(10)
+	pool, _ := ants.NewPool(1)
 	var wg sync.WaitGroup
 	mockRes := func() {
 		defer wg.Done()
@@ -141,9 +142,23 @@ func TestCheckpointCatalog(t *testing.T) {
 	endTs := tae.TxnMgr.StatSafeTS() - 2
 	t.Logf("endTs=%d", endTs)
 
-	indexes := tae.Catalog.PrepareCheckpoint(startTs, endTs)
+	entry := tae.Catalog.PrepareCheckpoint(startTs, endTs)
 
-	for i, index := range indexes {
+	for _, entry := range entry.BlockEntries {
+		logutil.Info(entry.StringLocked())
+	}
+	for i, index := range entry.LogIndexes {
 		t.Logf("%d: %s", i, index.String())
 	}
+	assert.Equal(t, len(entry.LogIndexes)-1, len(entry.BlockEntries))
+	blockEntry := entry.BlockEntries[6]
+	seg := blockEntry.GetSegment()
+	blk, err := seg.GetBlockEntryByID(blockEntry.ID)
+	t.Log(blk.String())
+	assert.Nil(t, err)
+	assert.True(t, blk.HasDropped())
+	assert.True(t, blk.DeleteAt > endTs)
+	assert.True(t, blk.CreateAt > startTs)
+	assert.Equal(t, blk.CreateAt, blockEntry.CreateAt)
+	assert.Equal(t, uint64(0), blockEntry.DeleteAt)
 }

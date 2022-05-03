@@ -7,7 +7,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -246,8 +245,8 @@ func (catalog *Catalog) RecurLoop(processor Processor) (err error) {
 	return err
 }
 
-func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) []*wal.Index {
-	indexes := make([]*wal.Index, 0, 16)
+func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntry {
+	ckpEntry := NewCheckpointEntry(startTs, endTs)
 	processor := new(LoopProcessor)
 	processor.BlockFn = func(entry *BlockEntry) (err error) {
 		entry.RLock()
@@ -269,32 +268,37 @@ func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) []*wal.Index {
 				return
 			}
 			// 3.2 entry was deleted
-			indexes = append(indexes, entry.LogIndex)
-			// entry.ClonePrevCommit()
+			ckpEntry.AddIndex(entry.LogIndex)
+			cloned := entry.CloneCreate()
 			entry.RUnlock()
+			ckpEntry.AddBlock(cloned)
 			return
 		}
 		// 4. entry was created at|after startTs
 		// 4.1 entry was deleted at|before endTs
 		if entry.DeleteAt <= endTs && entry.DeleteAt != 0 {
-			indexes = append(indexes, entry.LogIndex)
-			indexes = append(indexes, entry.PrevCommit.LogIndex)
+			ckpEntry.AddIndex(entry.LogIndex)
+			ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
+			cloned := entry.Clone()
 			entry.RUnlock()
+			ckpEntry.AddBlock(cloned)
 			return
 		}
 		// 4.2 entry was not deleted
 		if entry.DeleteAt == 0 {
-			indexes = append(indexes, entry.LogIndex)
-			// entry.Clone
+			ckpEntry.AddIndex(entry.LogIndex)
+			cloned := entry.Clone()
 			entry.RUnlock()
+			ckpEntry.AddBlock(cloned)
 			return
 		}
 		// 4.3 entry was deleted after endTs
-		indexes = append(indexes, entry.PrevCommit.LogIndex)
-		// entry.ClonePrevCommit
+		ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
+		cloned := entry.CloneCreate()
 		entry.RUnlock()
+		ckpEntry.AddBlock(cloned)
 		return nil
 	}
 	catalog.RecurLoop(processor)
-	return indexes
+	return ckpEntry
 }

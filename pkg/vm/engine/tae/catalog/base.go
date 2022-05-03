@@ -66,6 +66,27 @@ type BaseEntry struct {
 	CreateAt, DeleteAt uint64
 }
 
+func (be *BaseEntry) CloneCreate() *BaseEntry {
+	info := be.PrevCommit.Clone()
+	cloned := &BaseEntry{
+		CommitInfo: *info,
+		ID:         be.ID,
+		CreateAt:   be.CreateAt,
+	}
+	return cloned
+}
+
+func (be *BaseEntry) Clone() *BaseEntry {
+	info := be.CommitInfo.Clone()
+	cloned := &BaseEntry{
+		CommitInfo: *info,
+		ID:         be.ID,
+		CreateAt:   be.CreateAt,
+		DeleteAt:   be.DeleteAt,
+	}
+	return cloned
+}
+
 func (be *BaseEntry) WriteTo(w io.Writer) (err error) {
 	if err = binary.Write(w, binary.BigEndian, be.ID); err != nil {
 		return
