@@ -3,6 +3,7 @@ package catalog
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
@@ -14,6 +15,18 @@ type LogEntry = entry.Entry
 const (
 	ETCatalogCheckpoint = entry.ETCustomizedStart + 100 + iota
 )
+
+type Checkpoint struct {
+	MaxTS uint64
+	LSN   uint64
+}
+
+func (ckp *Checkpoint) String() string {
+	if ckp == nil {
+		return "LSN=0,MaxTS=0"
+	}
+	return fmt.Sprintf("LSN=%d,MaxTS=%d", ckp.LSN, ckp.MaxTS)
+}
 
 type CheckpointEntry struct {
 	MinTS, MaxTS uint64

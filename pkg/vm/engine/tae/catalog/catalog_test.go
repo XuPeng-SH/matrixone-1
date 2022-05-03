@@ -20,7 +20,7 @@ const (
 
 func TestCreateDB1(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 
 	txnMgr := txnbase.NewTxnManager(MockTxnStoreFactory(catalog), MockTxnFactory(catalog))
@@ -104,7 +104,7 @@ func TestCreateDB1(t *testing.T) {
 //  [TXN1]: CREATE DB1 [OK] | GET DB [OK]
 func TestTableEntry1(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 
 	txnMgr := txnbase.NewTxnManager(MockTxnStoreFactory(catalog), MockTxnFactory(catalog))
@@ -179,7 +179,7 @@ func TestTableEntry1(t *testing.T) {
 
 func TestTableEntry2(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 
 	txnMgr := txnbase.NewTxnManager(MockTxnStoreFactory(catalog), MockTxnFactory(catalog))
@@ -245,7 +245,7 @@ func TestTableEntry2(t *testing.T) {
 
 func TestDB1(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 
 	txnMgr := txnbase.NewTxnManager(MockTxnStoreFactory(catalog), MockTxnFactory(catalog))
@@ -281,7 +281,7 @@ func TestDB1(t *testing.T) {
 
 func TestTable1(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 
 	txnMgr := txnbase.NewTxnManager(MockTxnStoreFactory(catalog), MockTxnFactory(catalog))
@@ -328,7 +328,7 @@ func TestTable1(t *testing.T) {
 
 func TestCommand(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 	name := "db"
 
@@ -428,7 +428,7 @@ func TestCommand(t *testing.T) {
 // 5. Start Txn4, scan "tb" and both "seg1" and "seg2" found
 func TestSegment1(t *testing.T) {
 	dir := testutils.InitTestEnv(ModuleName, t)
-	catalog := MockCatalog(dir, "mock", nil)
+	catalog := MockCatalog(dir, "mock", nil, nil)
 	defer catalog.Close()
 	txnMgr := txnbase.NewTxnManager(MockTxnStoreFactory(catalog), MockTxnFactory(catalog))
 	txnMgr.Start()

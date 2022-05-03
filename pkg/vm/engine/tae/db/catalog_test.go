@@ -8,7 +8,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 	"github.com/panjf2000/ants/v2"
 	"github.com/stretchr/testify/assert"
 )
@@ -180,10 +179,16 @@ func TestCheckpointCatalog(t *testing.T) {
 		assert.Equal(t, blk1.CurrOp, blk2.CurrOp)
 	}
 
-	logEntry, err := entry.MakeLogEntry()
+	err = tae.Catalog.Checkpoint(endTs)
 	assert.Nil(t, err)
-	lsn, err := tae.Wal.AppendEntry(wal.GroupCatalog, logEntry)
-	logEntry.WaitDone()
-	logEntry.Free()
-	t.Log(lsn)
+
+	assert.Equal(t, endTs, tae.Catalog.GetCheckpointed())
+	t.Log(tae.Catalog.SimplePPString(common.PPL1))
+
+	// logEntry, err := entry.MakeLogEntry()
+	// assert.Nil(t, err)
+	// lsn, err := tae.Wal.AppendEntry(wal.GroupCatalog, logEntry)
+	// logEntry.WaitDone()
+	// logEntry.Free()
+	// t.Log(lsn)
 }
