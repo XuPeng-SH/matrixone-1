@@ -1,44 +1,101 @@
 package catalog
 
-import "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
+import (
+	"bytes"
+	"encoding/binary"
+
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
+)
+
+type LogEntry = entry.Entry
+
+const (
+	ETCatalogCheckpoint = entry.ETCustomizedStart + 100 + iota
+)
 
 type CheckpointEntry struct {
-	MinTS, MaxTS   uint64
-	LogIndexes     []*wal.Index
-	BlockEntries   []*BlockEntry
-	SegmentEntries []*SegmentEntry
-	TableEntries   []*TableEntry
-	DBEntries      []*DBEntry
+	MinTS, MaxTS uint64
+	LogIndexes   []*wal.Index
+	Entries      []*EntryCommand
+}
+
+func NewEmptyCheckpointEntry() *CheckpointEntry {
+	return &CheckpointEntry{
+		Entries: make([]*EntryCommand, 0, 16),
+	}
 }
 
 func NewCheckpointEntry(minTs, maxTs uint64) *CheckpointEntry {
 	return &CheckpointEntry{
-		MinTS:          minTs,
-		MaxTS:          maxTs,
-		LogIndexes:     make([]*wal.Index, 0, 16),
-		BlockEntries:   make([]*BlockEntry, 0, 16),
-		SegmentEntries: make([]*SegmentEntry, 0, 4),
-		TableEntries:   make([]*TableEntry, 0, 4),
-		DBEntries:      make([]*DBEntry, 0, 4),
+		MinTS:      minTs,
+		MaxTS:      maxTs,
+		LogIndexes: make([]*wal.Index, 0, 16),
+		Entries:    make([]*EntryCommand, 0, 16),
 	}
 }
 
-func (entry *CheckpointEntry) AddBlock(block *BlockEntry) {
-	entry.BlockEntries = append(entry.BlockEntries, block)
+func (e *CheckpointEntry) AddCommand(cmd *EntryCommand) {
+	e.Entries = append(e.Entries, cmd)
 }
 
-func (entry *CheckpointEntry) AddSegment(segment *SegmentEntry) {
-	entry.SegmentEntries = append(entry.SegmentEntries, segment)
+func (e *CheckpointEntry) AddIndex(index *wal.Index) {
+	e.LogIndexes = append(e.LogIndexes, index)
 }
 
-func (entry *CheckpointEntry) AddTable(table *TableEntry) {
-	entry.TableEntries = append(entry.TableEntries, table)
+func (e *CheckpointEntry) Unmarshal(buf []byte) (err error) {
+	r := bytes.NewBuffer(buf)
+	if err = binary.Read(r, binary.BigEndian, &e.MinTS); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &e.MaxTS); err != nil {
+		return
+	}
+	var cmdCnt uint32
+	if err = binary.Read(r, binary.BigEndian, &cmdCnt); err != nil {
+		return
+	}
+	for i := 0; i < int(cmdCnt); i++ {
+		cmd, err := txnbase.BuildCommandFrom(r)
+		if err != nil {
+			return err
+		}
+		e.Entries = append(e.Entries, cmd.(*EntryCommand))
+	}
+
+	return
 }
 
-func (entry *CheckpointEntry) AddDB(db *DBEntry) {
-	entry.DBEntries = append(entry.DBEntries, db)
+func (e *CheckpointEntry) Marshal() (buf []byte, err error) {
+	var w bytes.Buffer
+	if err = binary.Write(&w, binary.BigEndian, e.MinTS); err != nil {
+		return
+	}
+	if err = binary.Write(&w, binary.BigEndian, e.MaxTS); err != nil {
+		return
+	}
+
+	if err = binary.Write(&w, binary.BigEndian, uint32(len(e.Entries))); err != nil {
+		return
+	}
+	for _, cmd := range e.Entries {
+		if err = cmd.WriteTo(&w); err != nil {
+			return
+		}
+	}
+
+	buf = w.Bytes()
+	return
 }
 
-func (entry *CheckpointEntry) AddIndex(index *wal.Index) {
-	entry.LogIndexes = append(entry.LogIndexes, index)
+func (e *CheckpointEntry) MakeLogEntry() (logEntry LogEntry, err error) {
+	var buf []byte
+	if buf, err = e.Marshal(); err != nil {
+		return
+	}
+	logEntry = entry.GetBase()
+	logEntry.SetType(ETCatalogCheckpoint)
+	logEntry.Unmarshal(buf)
+	return
 }

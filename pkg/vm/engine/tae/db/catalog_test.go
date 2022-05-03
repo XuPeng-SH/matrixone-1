@@ -5,10 +5,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 	"github.com/panjf2000/ants/v2"
 	"github.com/stretchr/testify/assert"
 )
@@ -73,8 +73,7 @@ func TestLogBlock(t *testing.T) {
 	meta := blk.GetMeta().(*catalog.BlockEntry)
 	err := txn.Commit()
 	assert.Nil(t, err)
-	cmd, err := meta.MakeLogEntry()
-	assert.Nil(t, err)
+	cmd := meta.MakeLogEntry()
 	assert.NotNil(t, cmd)
 
 	var w bytes.Buffer
@@ -144,14 +143,14 @@ func TestCheckpointCatalog(t *testing.T) {
 
 	entry := tae.Catalog.PrepareCheckpoint(startTs, endTs)
 
-	for _, entry := range entry.BlockEntries {
-		logutil.Info(entry.StringLocked())
-	}
-	for i, index := range entry.LogIndexes {
-		t.Logf("%d: %s", i, index.String())
-	}
-	assert.Equal(t, len(entry.LogIndexes)-1, len(entry.BlockEntries))
-	blockEntry := entry.BlockEntries[6]
+	// for _, entry := range entry.BlockEntries {
+	// 	logutil.Info(entry.StringLocked())
+	// }
+	// for i, index := range entry.LogIndexes {
+	// 	t.Logf("%d: %s", i, index.String())
+	// }
+	assert.Equal(t, len(entry.LogIndexes)-1, len(entry.Entries))
+	blockEntry := entry.Entries[6].Block
 	seg := blockEntry.GetSegment()
 	blk, err := seg.GetBlockEntryByID(blockEntry.ID)
 	t.Log(blk.String())
@@ -161,4 +160,30 @@ func TestCheckpointCatalog(t *testing.T) {
 	assert.True(t, blk.CreateAt > startTs)
 	assert.Equal(t, blk.CreateAt, blockEntry.CreateAt)
 	assert.Equal(t, uint64(0), blockEntry.DeleteAt)
+
+	buf, err := entry.Marshal()
+	assert.Nil(t, err)
+	t.Log(len(buf))
+
+	entry2 := catalog.NewEmptyCheckpointEntry()
+	err = entry2.Unmarshal(buf)
+	assert.Nil(t, err)
+	assert.Equal(t, entry.MinTS, entry2.MinTS)
+	assert.Equal(t, entry.MaxTS, entry2.MaxTS)
+	assert.Equal(t, len(entry.Entries), len(entry2.Entries))
+	for i := 0; i < len(entry.Entries); i++ {
+		blk1 := entry.Entries[i].Block
+		blk2 := entry2.Entries[i].Block
+		assert.Equal(t, blk1.ID, blk2.ID)
+		assert.Equal(t, blk1.CreateAt, blk2.CreateAt)
+		assert.Equal(t, blk1.DeleteAt, blk2.DeleteAt)
+		assert.Equal(t, blk1.CurrOp, blk2.CurrOp)
+	}
+
+	logEntry, err := entry.MakeLogEntry()
+	assert.Nil(t, err)
+	lsn, err := tae.Wal.AppendEntry(wal.GroupCatalog, logEntry)
+	logEntry.WaitDone()
+	logEntry.Free()
+	t.Log(lsn)
 }

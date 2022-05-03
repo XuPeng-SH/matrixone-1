@@ -193,29 +193,6 @@ func (catalog *Catalog) DropDBEntry(name string, txnCtx txnif.AsyncTxn) (deleted
 func (catalog *Catalog) CreateDBEntry(name string, txnCtx txnif.AsyncTxn) (*DBEntry, error) {
 	var err error
 	catalog.Lock()
-	// node := catalog.txnGetNodeByNameLocked(name, txnCtx)
-	// if node != nil {
-	// 	record := node.payload.(*DBEntry)
-	// 	record.RLock()
-	// 	defer record.RUnlock()
-	// 	if record.Txn != nil {
-	// 		if record.Txn.GetID() == txnCtx.GetID() {
-	// 			if !record.IsDroppedUncommitted() {
-	// 				err = ErrDuplicate
-	// 			}
-	// 		} else {
-	// 			err = txnif.TxnWWConflictErr
-	// 		}
-	// 	} else {
-	// 		if !record.HasDropped() {
-	// 			err = ErrDuplicate
-	// 		}
-	// 	}
-	// 	if err != nil {
-	// 		catalog.Unlock()
-	// 		return nil, err
-	// 	}
-	// }
 	entry := NewDBEntry(catalog, name, txnCtx)
 	err = catalog.addEntryLocked(entry)
 	catalog.Unlock()
@@ -271,7 +248,7 @@ func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntr
 			ckpEntry.AddIndex(entry.LogIndex)
 			cloned := entry.CloneCreate()
 			entry.RUnlock()
-			ckpEntry.AddBlock(cloned)
+			ckpEntry.AddCommand(cloned.MakeLogEntry())
 			return
 		}
 		// 4. entry was created at|after startTs
@@ -281,7 +258,7 @@ func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntr
 			ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
 			cloned := entry.Clone()
 			entry.RUnlock()
-			ckpEntry.AddBlock(cloned)
+			ckpEntry.AddCommand(cloned.MakeLogEntry())
 			return
 		}
 		// 4.2 entry was not deleted
@@ -289,14 +266,14 @@ func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntr
 			ckpEntry.AddIndex(entry.LogIndex)
 			cloned := entry.Clone()
 			entry.RUnlock()
-			ckpEntry.AddBlock(cloned)
+			ckpEntry.AddCommand(cloned.MakeLogEntry())
 			return
 		}
 		// 4.3 entry was deleted after endTs
 		ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
 		cloned := entry.CloneCreate()
 		entry.RUnlock()
-		ckpEntry.AddBlock(cloned)
+		ckpEntry.AddCommand(cloned.MakeLogEntry())
 		return nil
 	}
 	catalog.RecurLoop(processor)

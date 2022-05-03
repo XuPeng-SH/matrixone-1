@@ -20,6 +20,12 @@ type BlockEntry struct {
 	blkData data.Block
 }
 
+func NewEmptyBlockEntry() *BlockEntry {
+	return &BlockEntry{
+		BaseEntry: new(BaseEntry),
+	}
+}
+
 func NewBlockEntry(segment *SegmentEntry, txn txnif.AsyncTxn, state EntryState, dataFactory BlockDataFactory) *BlockEntry {
 	id := segment.GetTable().GetDB().catalog.NextBlock()
 	e := &BlockEntry{
@@ -121,8 +127,8 @@ func (entry *BlockEntry) ReadFrom(r io.Reader) (err error) {
 	return binary.Read(r, binary.BigEndian, &entry.state)
 }
 
-func (entry *BlockEntry) MakeLogEntry() (cmd txnif.TxnCmd, err error) {
-	return newBlockCmd(0, CmdLogBlock, entry), nil
+func (entry *BlockEntry) MakeLogEntry() *EntryCommand {
+	return newBlockCmd(0, CmdLogBlock, entry)
 }
 
 func (entry *BlockEntry) Clone() *BlockEntry {
