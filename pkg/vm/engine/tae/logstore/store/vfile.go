@@ -132,7 +132,6 @@ func (vf *vFile) Commit() {
 	vf.wg.Wait()
 	// vf.WriteMeta()
 	vf.Sync()
-	fmt.Printf("sync-%s\n", vf.String())
 	vf.Lock()
 	vf.buf = nil
 	vf.Unlock()
@@ -141,6 +140,7 @@ func (vf *vFile) Commit() {
 	vf.commitCond.Broadcast()
 	vf.commitCond.L.Unlock()
 	vf.vInfo.close()
+	fmt.Printf("sync-%s\n", vf.String())
 	// vf.FreeMeta()
 }
 
