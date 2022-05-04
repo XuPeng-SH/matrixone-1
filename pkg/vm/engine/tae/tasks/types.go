@@ -73,3 +73,18 @@ func NewFnTask(ctx *Context, taskType TaskType, fn func() error) *FnTask {
 func (task *FnTask) Execute() error {
 	return task.Fn()
 }
+
+type ScopedFnTask struct {
+	*FnTask
+	scope *common.ID
+}
+
+func NewScopedFnTask(ctx *Context, taskType TaskType, scope *common.ID, fn func() error) *ScopedFnTask {
+	task := &ScopedFnTask{
+		FnTask: NewFnTask(ctx, taskType, fn),
+		scope:  scope,
+	}
+	return task
+}
+
+func (task *ScopedFnTask) Scope() *common.ID { return task.scope }
