@@ -26,6 +26,7 @@ type TaskScheduler interface {
 	Scheduler
 	ScheduleTxnTask(ctx *Context, factory TxnTaskFactory) (Task, error)
 	Checkpoint(indexes []*wal.Index) error
+	GetCheckpointed() uint64
 }
 
 type BaseScheduler struct {

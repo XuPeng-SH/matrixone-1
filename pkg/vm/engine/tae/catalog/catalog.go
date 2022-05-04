@@ -307,6 +307,9 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 		panic(err)
 	}
 	logutil.Infof("SaveCheckpointed: %s", time.Since(now))
+	// for i, index := range entry.LogIndexes {
+	// 	logutil.Infof("%d: %s", i, index.String())
+	// }
 	now = time.Now()
 	err = catalog.scheduler.Checkpoint(entry.LogIndexes)
 	if err != nil {
@@ -316,6 +319,6 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 	catalog.ckpmu.Lock()
 	catalog.checkpoints = append(catalog.checkpoints, checkpoint)
 	catalog.ckpmu.Unlock()
-	time.Sleep(time.Second)
+	logutil.Infof("Max LogIndex: %s", entry.MaxIndex.String())
 	return
 }

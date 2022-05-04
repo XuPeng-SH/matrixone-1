@@ -67,3 +67,7 @@ func (s *taskScheduler) Checkpoint(indexes []*wal.Index) (err error) {
 	err = s.Schedule(task)
 	return
 }
+
+func (s *taskScheduler) GetCheckpointed() uint64 {
+	return s.db.Wal.GetCheckpointed()
+}
