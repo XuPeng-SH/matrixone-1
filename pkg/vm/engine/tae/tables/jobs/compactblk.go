@@ -16,7 +16,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
-var CompactBlockTaskFactory = func(meta *catalog.BlockEntry, scheduler tasks.Scheduler) tasks.TxnTaskFactory {
+var CompactBlockTaskFactory = func(meta *catalog.BlockEntry, scheduler tasks.TaskScheduler) tasks.TxnTaskFactory {
 	return func(ctx *tasks.Context, txn txnif.AsyncTxn) (tasks.Task, error) {
 		return NewCompactBlockTask(ctx, txn, meta, scheduler)
 	}
@@ -28,10 +28,10 @@ type compactBlockTask struct {
 	compacted handle.Block
 	created   handle.Block
 	meta      *catalog.BlockEntry
-	scheduler tasks.Scheduler
+	scheduler tasks.TaskScheduler
 }
 
-func NewCompactBlockTask(ctx *tasks.Context, txn txnif.AsyncTxn, meta *catalog.BlockEntry, scheduler tasks.Scheduler) (task *compactBlockTask, err error) {
+func NewCompactBlockTask(ctx *tasks.Context, txn txnif.AsyncTxn, meta *catalog.BlockEntry, scheduler tasks.TaskScheduler) (task *compactBlockTask, err error) {
 	task = &compactBlockTask{
 		txn:       txn,
 		meta:      meta,
@@ -117,7 +117,7 @@ func (task *compactBlockTask) Execute() (err error) {
 		return err
 	}
 	task.created = newBlk
-	txnEntry := txnentries.NewCompactBlockEntry(task.txn, task.compacted, task.created)
+	txnEntry := txnentries.NewCompactBlockEntry(task.txn, task.compacted, task.created, task.scheduler)
 	if err = task.txn.LogTxnEntry(task.meta.GetSegment().GetTable().GetID(), txnEntry, []*common.ID{task.compacted.Fingerprint()}); err != nil {
 		return
 	}
