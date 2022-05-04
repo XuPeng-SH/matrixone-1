@@ -245,27 +245,27 @@ func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntr
 			return
 		}
 		// 2. entry was deleted before startTs. Skip it
-		if entry.DeleteAt < startTs && entry.DeleteAt != 0 {
+		if entry.DeleteAt < startTs && entry.HasDropped() {
 			entry.RUnlock()
 			return
 		}
 		// 3. entry was created before startTs
 		if entry.CreateAt < startTs {
 			// 3.1 entry was not deleted. skip it
-			if entry.DeleteAt == txnif.UncommitTS {
+			if !entry.HasDropped() {
 				entry.RUnlock()
 				return
 			}
 			// 3.2 entry was deleted
 			ckpEntry.AddIndex(entry.LogIndex)
-			cloned := entry.CloneCreate()
+			cloned := entry.Clone()
 			entry.RUnlock()
 			ckpEntry.AddCommand(cloned.MakeLogEntry())
 			return
 		}
 		// 4. entry was created at|after startTs
 		// 4.1 entry was deleted at|before endTs
-		if entry.DeleteAt <= endTs && entry.DeleteAt != 0 {
+		if entry.DeleteAt <= endTs && entry.HasDropped() {
 			ckpEntry.AddIndex(entry.LogIndex)
 			ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
 			cloned := entry.Clone()
@@ -274,7 +274,7 @@ func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntr
 			return
 		}
 		// 4.2 entry was not deleted
-		if entry.DeleteAt == 0 {
+		if !entry.HasDropped() {
 			ckpEntry.AddIndex(entry.LogIndex)
 			cloned := entry.Clone()
 			entry.RUnlock()

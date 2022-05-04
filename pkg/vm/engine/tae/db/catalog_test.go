@@ -237,15 +237,28 @@ func TestCheckpointCatalog(t *testing.T) {
 	t.Logf("endTs=%d", endTs)
 
 	entry := tae.Catalog.PrepareCheckpoint(startTs, endTs)
+	blkCnt := 0
+	blocks := make([]*catalog.BlockEntry, 0)
+	for _, cmd := range entry.Entries {
+		if cmd.Block != nil {
+			blkCnt++
+			t.Logf("%s", cmd.Block.StringLocked())
+			blocks = append(blocks, cmd.Block)
+		}
+	}
+	assert.Equal(t, 8, blkCnt)
+	entry2 := tae.Catalog.PrepareCheckpoint(endTs+1, tae.TxnMgr.StatSafeTS())
 
-	// for _, entry := range entry.BlockEntries {
-	// 	logutil.Info(entry.StringLocked())
-	// }
-	// for i, index := range entry.LogIndexes {
-	// 	t.Logf("%d: %s", i, index.String())
-	// }
-	assert.Equal(t, len(entry.LogIndexes)-1, len(entry.Entries))
-	blockEntry := entry.Entries[6].Block
+	blkCnt = 0
+	for _, cmd := range entry2.Entries {
+		if cmd.Block != nil {
+			blkCnt++
+			t.Logf("%s", cmd.Block.StringLocked())
+		}
+	}
+	assert.Equal(t, 1, blkCnt)
+
+	blockEntry := blocks[6]
 	seg := blockEntry.GetSegment()
 	blk, err := seg.GetBlockEntryByID(blockEntry.ID)
 	t.Log(blk.String())
@@ -260,19 +273,21 @@ func TestCheckpointCatalog(t *testing.T) {
 	assert.Nil(t, err)
 	t.Log(len(buf))
 
-	entry2 := catalog.NewEmptyCheckpointEntry()
-	err = entry2.Unmarshal(buf)
+	replayEntry := catalog.NewEmptyCheckpointEntry()
+	err = replayEntry.Unmarshal(buf)
 	assert.Nil(t, err)
-	assert.Equal(t, entry.MinTS, entry2.MinTS)
-	assert.Equal(t, entry.MaxTS, entry2.MaxTS)
-	assert.Equal(t, len(entry.Entries), len(entry2.Entries))
+	assert.Equal(t, entry.MinTS, replayEntry.MinTS)
+	assert.Equal(t, entry.MaxTS, replayEntry.MaxTS)
+	assert.Equal(t, len(entry.Entries), len(replayEntry.Entries))
 	for i := 0; i < len(entry.Entries); i++ {
-		blk1 := entry.Entries[i].Block
-		blk2 := entry2.Entries[i].Block
-		assert.Equal(t, blk1.ID, blk2.ID)
-		assert.Equal(t, blk1.CreateAt, blk2.CreateAt)
-		assert.Equal(t, blk1.DeleteAt, blk2.DeleteAt)
-		assert.Equal(t, blk1.CurrOp, blk2.CurrOp)
+		if entry.Entries[i].Block != nil {
+			blk1 := entry.Entries[i].Block
+			blk2 := replayEntry.Entries[i].Block
+			assert.Equal(t, blk1.ID, blk2.ID)
+			assert.Equal(t, blk1.CreateAt, blk2.CreateAt)
+			assert.Equal(t, blk1.DeleteAt, blk2.DeleteAt)
+			assert.Equal(t, blk1.CurrOp, blk2.CurrOp)
+		}
 	}
 
 	err = tae.Catalog.Checkpoint(endTs)
