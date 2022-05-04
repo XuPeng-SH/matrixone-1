@@ -92,6 +92,102 @@ func TestLogBlock(t *testing.T) {
 	assert.Equal(t, meta.DeleteAt, entryCmd.Block.DeleteAt)
 }
 
+func TestLogSegment(t *testing.T) {
+	tae := initDB(t, nil)
+	defer tae.Close()
+	schema := catalog.MockSchemaAll(2)
+	txn := tae.StartTxn(nil)
+	db, _ := txn.CreateDatabase("db")
+	rel, _ := db.CreateRelation(schema)
+	seg, _ := rel.CreateSegment()
+	meta := seg.GetMeta().(*catalog.SegmentEntry)
+	err := txn.Commit()
+	assert.Nil(t, err)
+	cmd := meta.MakeLogEntry()
+	assert.NotNil(t, cmd)
+
+	var w bytes.Buffer
+	err = cmd.WriteTo(&w)
+	assert.Nil(t, nil)
+
+	buf := w.Bytes()
+	r := bytes.NewBuffer(buf)
+	cmd2, err := txnbase.BuildCommandFrom(r)
+	assert.Nil(t, err)
+	entryCmd := cmd2.(*catalog.EntryCommand)
+	t.Log(meta.StringLocked())
+	t.Log(entryCmd.Segment.StringLocked())
+	assert.Equal(t, meta.ID, entryCmd.Segment.ID)
+	assert.Equal(t, meta.CurrOp, entryCmd.Segment.CurrOp)
+	assert.Equal(t, meta.CreateAt, entryCmd.Segment.CreateAt)
+	assert.Equal(t, meta.DeleteAt, entryCmd.Segment.DeleteAt)
+}
+
+func TestLogTable(t *testing.T) {
+	tae := initDB(t, nil)
+	defer tae.Close()
+	schema := catalog.MockSchemaAll(13)
+	schema.PrimaryKey = 3
+	txn := tae.StartTxn(nil)
+	db, _ := txn.CreateDatabase("db")
+	rel, _ := db.CreateRelation(schema)
+	meta := rel.GetMeta().(*catalog.TableEntry)
+	err := txn.Commit()
+	assert.Nil(t, err)
+	cmd := meta.MakeLogEntry()
+	assert.NotNil(t, cmd)
+
+	var w bytes.Buffer
+	err = cmd.WriteTo(&w)
+	assert.Nil(t, nil)
+
+	buf := w.Bytes()
+	r := bytes.NewBuffer(buf)
+	cmd2, err := txnbase.BuildCommandFrom(r)
+	assert.Nil(t, err)
+	entryCmd := cmd2.(*catalog.EntryCommand)
+	t.Log(meta.StringLocked())
+	t.Log(entryCmd.Table.StringLocked())
+	assert.Equal(t, meta.ID, entryCmd.Table.ID)
+	assert.Equal(t, meta.CurrOp, entryCmd.Table.CurrOp)
+	assert.Equal(t, meta.CreateAt, entryCmd.Table.CreateAt)
+	assert.Equal(t, meta.DeleteAt, entryCmd.Table.DeleteAt)
+	assert.Equal(t, meta.GetSchema().Name, entryCmd.Table.GetSchema().Name)
+	assert.Equal(t, meta.GetSchema().BlockMaxRows, entryCmd.Table.GetSchema().BlockMaxRows)
+	assert.Equal(t, meta.GetSchema().SegmentMaxBlocks, entryCmd.Table.GetSchema().SegmentMaxBlocks)
+	assert.Equal(t, meta.GetSchema().PrimaryKey, entryCmd.Table.GetSchema().PrimaryKey)
+	assert.Equal(t, meta.GetSchema().Types(), entryCmd.Table.GetSchema().Types())
+}
+
+func TestLogDatabase(t *testing.T) {
+	tae := initDB(t, nil)
+	defer tae.Close()
+	txn := tae.StartTxn(nil)
+	db, _ := txn.CreateDatabase("db")
+	meta := db.GetMeta().(*catalog.DBEntry)
+	err := txn.Commit()
+	assert.Nil(t, err)
+	cmd := meta.MakeLogEntry()
+	assert.NotNil(t, cmd)
+
+	var w bytes.Buffer
+	err = cmd.WriteTo(&w)
+	assert.Nil(t, nil)
+
+	buf := w.Bytes()
+	r := bytes.NewBuffer(buf)
+	cmd2, err := txnbase.BuildCommandFrom(r)
+	assert.Nil(t, err)
+	entryCmd := cmd2.(*catalog.EntryCommand)
+	t.Log(meta.StringLocked())
+	t.Log(entryCmd.DB.StringLocked())
+	assert.Equal(t, meta.ID, entryCmd.DB.ID)
+	assert.Equal(t, meta.CurrOp, entryCmd.DB.CurrOp)
+	assert.Equal(t, meta.CreateAt, entryCmd.DB.CreateAt)
+	assert.Equal(t, meta.DeleteAt, entryCmd.DB.DeleteAt)
+	assert.Equal(t, meta.GetName(), entryCmd.DB.GetName())
+}
+
 func TestCheckpointCatalog(t *testing.T) {
 	tae := initDB(t, nil)
 	defer tae.Close()

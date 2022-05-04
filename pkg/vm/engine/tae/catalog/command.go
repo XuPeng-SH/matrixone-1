@@ -53,6 +53,15 @@ func init() {
 	txnif.RegisterCmdFactory(CmdLogBlock, func(cmdType int16) txnif.TxnCmd {
 		return newEmptyEntryCmd(cmdType)
 	})
+	txnif.RegisterCmdFactory(CmdLogSegment, func(cmdType int16) txnif.TxnCmd {
+		return newEmptyEntryCmd(cmdType)
+	})
+	txnif.RegisterCmdFactory(CmdLogTable, func(cmdType int16) txnif.TxnCmd {
+		return newEmptyEntryCmd(cmdType)
+	})
+	txnif.RegisterCmdFactory(CmdLogDatabase, func(cmdType int16) txnif.TxnCmd {
+		return newEmptyEntryCmd(cmdType)
+	})
 }
 
 type EntryCommand struct {
@@ -144,10 +153,22 @@ func (cmd *EntryCommand) WriteTo(w io.Writer) (err error) {
 		if err = binary.Write(w, binary.BigEndian, cmd.Segment.ID); err != nil {
 			return
 		}
-		if err = cmd.Block.WriteTo(w); err != nil {
+		return cmd.Block.WriteTo(w)
+	case CmdLogSegment:
+		if err = binary.Write(w, binary.BigEndian, cmd.DB.ID); err != nil {
 			return
 		}
-		return
+		if err = binary.Write(w, binary.BigEndian, cmd.Table.ID); err != nil {
+			return
+		}
+		return cmd.Segment.WriteTo(w)
+	case CmdLogTable:
+		if err = binary.Write(w, binary.BigEndian, cmd.DB.ID); err != nil {
+			return
+		}
+		return cmd.Table.WriteTo(w)
+	case CmdLogDatabase:
+		return cmd.DB.WriteTo(w)
 	}
 
 	if err = binary.Write(w, binary.BigEndian, cmd.entry.GetID()); err != nil {
@@ -245,6 +266,30 @@ func (cmd *EntryCommand) ReadFrom(r io.Reader) (err error) {
 			return
 		}
 		return cmd.Block.ReadFrom(r)
+	case CmdLogSegment:
+		cmd.Segment = &SegmentEntry{
+			BaseEntry: new(BaseEntry),
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.TableID); err != nil {
+			return
+		}
+		return cmd.Segment.ReadFrom(r)
+	case CmdLogTable:
+		cmd.Table = &TableEntry{
+			BaseEntry: new(BaseEntry),
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
+			return
+		}
+		return cmd.Table.ReadFrom(r)
+	case CmdLogDatabase:
+		cmd.DB = &DBEntry{
+			BaseEntry: new(BaseEntry),
+		}
+		return cmd.DB.ReadFrom(r)
 	}
 
 	cmd.entry = &BaseEntry{}
