@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"time"
+
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/aoe/mergesort"
@@ -78,6 +80,7 @@ func (task *compactBlockTask) PrepareData() (bat *batch.Batch, err error) {
 func (task *compactBlockTask) GetNewBlock() handle.Block { return task.created }
 
 func (task *compactBlockTask) Execute() (err error) {
+	now := time.Now()
 	data, err := task.PrepareData()
 	if err != nil {
 		return
@@ -118,6 +121,7 @@ func (task *compactBlockTask) Execute() (err error) {
 	if err = task.txn.LogTxnEntry(task.meta.GetSegment().GetTable().GetID(), txnEntry, []*common.ID{task.compacted.Fingerprint()}); err != nil {
 		return
 	}
+	logutil.Infof("(%s) [Compacted] | (%s) [Created] | %s", task.compacted.Fingerprint().BlockString(), task.created.Fingerprint().BlockString(), time.Since(now))
 	logutil.Debug(idxCommon.MockIndexBufferManager.String())
 	return
 }
