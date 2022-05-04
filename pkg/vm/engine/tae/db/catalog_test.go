@@ -188,6 +188,52 @@ func TestLogDatabase(t *testing.T) {
 	assert.Equal(t, meta.GetName(), entryCmd.DB.GetName())
 }
 
+func TestCheckpointCatalog2(t *testing.T) {
+	tae := initDB(t, nil)
+	defer tae.Close()
+	txn := tae.StartTxn(nil)
+	schema := catalog.MockSchemaAll(13)
+	db, _ := txn.CreateDatabase("db")
+	db.CreateRelation(schema)
+	txn.Commit()
+
+	pool, _ := ants.NewPool(100)
+	var wg sync.WaitGroup
+	mockRes := func() {
+		defer wg.Done()
+		txn := tae.StartTxn(nil)
+		db, _ := txn.GetDatabase("db")
+		rel, _ := db.GetRelationByName(schema.Name)
+		seg, err := rel.CreateSegment()
+		assert.Nil(t, err)
+		var id *common.ID
+		for i := 0; i < 30; i++ {
+			blk, err := seg.CreateBlock()
+			if i == 2 {
+				id = blk.Fingerprint()
+			}
+			assert.Nil(t, err)
+		}
+		err = txn.Commit()
+		assert.Nil(t, err)
+
+		txn = tae.StartTxn(nil)
+		db, _ = txn.GetDatabase("db")
+		rel, _ = db.GetRelationByName(schema.Name)
+		seg, _ = rel.GetSegment(id.SegmentID)
+		err = seg.SoftDeleteBlock(id.BlockID)
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		pool.Submit(mockRes)
+	}
+	wg.Wait()
+	// t.Log(tae.Catalog.SimplePPString(common.PPL1))
+	tae.Catalog.Checkpoint(tae.TxnMgr.StatSafeTS())
+}
+
 func TestCheckpointCatalog(t *testing.T) {
 	tae := initDB(t, nil)
 	defer tae.Close()

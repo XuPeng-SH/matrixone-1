@@ -3,7 +3,9 @@ package catalog
 import (
 	"fmt"
 	"sync"
+	"time"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
@@ -284,11 +286,16 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 		minTs = lastMax + 1
 	}
 	catalog.ckpmu.RUnlock()
+	now := time.Now()
 	entry := catalog.PrepareCheckpoint(minTs, maxTs)
+	logutil.Infof("PrepareCheckpoint: %s", time.Since(now))
+	now = time.Now()
 	logEntry, err := entry.MakeLogEntry()
 	if err != nil {
 		return
 	}
+	logutil.Infof("MakeLogEntry: %s", time.Since(now))
+	now = time.Now()
 	defer logEntry.Free()
 	checkpoint := new(Checkpoint)
 	checkpoint.MaxTS = maxTs
@@ -299,6 +306,8 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 	if err = logEntry.WaitDone(); err != nil {
 		panic(err)
 	}
+	logutil.Infof("SaveCheckpointed: %s", time.Since(now))
+	now = time.Now()
 	ckpEntry, err := catalog.wal.Checkpoint(entry.LogIndexes)
 	if err != nil {
 		panic(err)
@@ -307,6 +316,7 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 	if err = ckpEntry.WaitDone(); err != nil {
 		panic(err)
 	}
+	logutil.Infof("CheckpointWal: %s", time.Since(now))
 	catalog.ckpmu.Lock()
 	catalog.checkpoints = append(catalog.checkpoints, checkpoint)
 	catalog.ckpmu.Unlock()
