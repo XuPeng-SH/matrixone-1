@@ -16,26 +16,26 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
-var CompactBlockTaskFactory = func(meta *catalog.BlockEntry, ioScheduler tasks.Scheduler) tasks.TxnTaskFactory {
+var CompactBlockTaskFactory = func(meta *catalog.BlockEntry, scheduler tasks.Scheduler) tasks.TxnTaskFactory {
 	return func(ctx *tasks.Context, txn txnif.AsyncTxn) (tasks.Task, error) {
-		return NewCompactBlockTask(ctx, txn, meta, ioScheduler)
+		return NewCompactBlockTask(ctx, txn, meta, scheduler)
 	}
 }
 
 type compactBlockTask struct {
 	*tasks.BaseTask
-	txn         txnif.AsyncTxn
-	compacted   handle.Block
-	created     handle.Block
-	meta        *catalog.BlockEntry
-	ioScheduler tasks.Scheduler
+	txn       txnif.AsyncTxn
+	compacted handle.Block
+	created   handle.Block
+	meta      *catalog.BlockEntry
+	scheduler tasks.Scheduler
 }
 
-func NewCompactBlockTask(ctx *tasks.Context, txn txnif.AsyncTxn, meta *catalog.BlockEntry, ioScheduler tasks.Scheduler) (task *compactBlockTask, err error) {
+func NewCompactBlockTask(ctx *tasks.Context, txn txnif.AsyncTxn, meta *catalog.BlockEntry, scheduler tasks.Scheduler) (task *compactBlockTask, err error) {
 	task = &compactBlockTask{
-		txn:         txn,
-		meta:        meta,
-		ioScheduler: ioScheduler,
+		txn:       txn,
+		meta:      meta,
+		scheduler: scheduler,
 	}
 	dbName := meta.GetSegment().GetTable().GetDB().GetName()
 	database, err := txn.GetDatabase(dbName)
@@ -100,8 +100,8 @@ func (task *compactBlockTask) Execute() (err error) {
 
 	ctx := tasks.Context{Waitable: true}
 	ioTask := NewFlushBlkTask(&ctx, blockFile, task.txn.GetStartTS(), newMeta, data)
-	if task.ioScheduler != nil {
-		if err = task.ioScheduler.Schedule(ioTask); err != nil {
+	if task.scheduler != nil {
+		if err = task.scheduler.Schedule(ioTask); err != nil {
 			return
 		}
 		if err = ioTask.WaitDone(); err != nil {

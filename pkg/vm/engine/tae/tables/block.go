@@ -37,14 +37,14 @@ type dataBlock struct {
 	node        *appendableNode
 	file        file.Block
 	bufMgr      base.INodeManager
-	scheduler   tasks.Scheduler
+	scheduler   tasks.TaskScheduler
 	indexHolder acif.IBlockIndexHolder
 	mvcc        *updates.MVCCHandle
 	nice        uint32
 	ckpTs       uint64
 }
 
-func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeManager, scheduler tasks.Scheduler) *dataBlock {
+func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeManager, scheduler tasks.TaskScheduler) *dataBlock {
 	colCnt := len(meta.GetSchema().ColDefs)
 	indexCnt := make(map[int]int)
 	indexCnt[int(meta.GetSchema().PrimaryKey)] = 2
