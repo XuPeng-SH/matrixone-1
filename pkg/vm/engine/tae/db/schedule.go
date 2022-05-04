@@ -52,6 +52,7 @@ func newTaskScheduler(db *DB, txnWorkers int, ioWorkers int) *taskScheduler {
 	s.RegisterDispatcher(tasks.CompactBlockTask, dispatcher)
 	s.RegisterDispatcher(tasks.CheckpointWalTask, dispatcher)
 	s.RegisterDispatcher(tasks.IOTask, ioDispatcher)
+	s.RegisterDispatcher(tasks.CheckpointDataTask, dispatcher2)
 	s.RegisterDispatcher(tasks.CheckpointCatalogTask, dispatcher2)
 	s.Start()
 	return s

@@ -6,6 +6,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/ops/base"
 )
 
+type FuncT = func() error
+
 type TaskType uint16
 
 var taskIdAlloctor *common.IdAlloctor
@@ -19,7 +21,7 @@ const (
 
 	CompactBlockTask
 	MergeBlocksTask
-	ConsumeLogIndexesTask
+	CheckpointDataTask
 	CheckpointCatalogTask
 	CheckpointWalTask
 )
@@ -59,10 +61,10 @@ func IsSameScope(left, right *common.ID) bool {
 
 type FnTask struct {
 	*BaseTask
-	Fn func() error
+	Fn FuncT
 }
 
-func NewFnTask(ctx *Context, taskType TaskType, fn func() error) *FnTask {
+func NewFnTask(ctx *Context, taskType TaskType, fn FuncT) *FnTask {
 	task := &FnTask{
 		Fn: fn,
 	}
@@ -79,7 +81,7 @@ type ScopedFnTask struct {
 	scope *common.ID
 }
 
-func NewScopedFnTask(ctx *Context, taskType TaskType, scope *common.ID, fn func() error) *ScopedFnTask {
+func NewScopedFnTask(ctx *Context, taskType TaskType, scope *common.ID, fn FuncT) *ScopedFnTask {
 	task := &ScopedFnTask{
 		FnTask: NewFnTask(ctx, taskType, fn),
 		scope:  scope,
