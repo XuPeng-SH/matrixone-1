@@ -20,6 +20,7 @@ const (
 	CompactBlockTask
 	MergeBlocksTask
 	ConsumeLogIndexesTask
+	CheckpointCatalogTask
 	CheckpointWalTask
 )
 
@@ -54,4 +55,21 @@ var DefaultScopeSharder = func(scope *common.ID) int {
 
 func IsSameScope(left, right *common.ID) bool {
 	return left.TableID == right.TableID && left.SegmentID == right.SegmentID
+}
+
+type FnTask struct {
+	*BaseTask
+	Fn func() error
+}
+
+func NewFnTask(ctx *Context, taskType TaskType, fn func() error) *FnTask {
+	task := &FnTask{
+		Fn: fn,
+	}
+	task.BaseTask = NewBaseTask(task, taskType, ctx)
+	return task
+}
+
+func (task *FnTask) Execute() error {
+	return task.Fn()
 }

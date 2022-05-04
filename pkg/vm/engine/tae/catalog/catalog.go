@@ -289,6 +289,9 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 	now := time.Now()
 	entry := catalog.PrepareCheckpoint(minTs, maxTs)
 	logutil.Infof("PrepareCheckpoint: %s", time.Since(now))
+	if len(entry.LogIndexes) == 0 {
+		return
+	}
 	now = time.Now()
 	logEntry, err := entry.MakeLogEntry()
 	if err != nil {
