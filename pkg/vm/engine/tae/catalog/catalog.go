@@ -10,7 +10,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
-	"github.com/sirupsen/logrus"
 )
 
 // +--------+---------+----------+----------+------------+
@@ -102,7 +101,7 @@ func (catalog *Catalog) addEntryLocked(database *DBEntry) error {
 			}
 		} else if !record.HasDropped() {
 			record.RUnlock()
-			logrus.Info(record.String())
+			logutil.Info(record.String())
 			return ErrDuplicate
 		}
 
@@ -155,7 +154,6 @@ func (catalog *Catalog) PPString(level common.PPLevel, depth int, prefix string)
 }
 
 func (catalog *Catalog) RemoveEntry(database *DBEntry) error {
-	// logrus.Infof("Removing: %s", database.String())
 	catalog.Lock()
 	defer catalog.Unlock()
 	if n, ok := catalog.entries[database.GetID()]; !ok {
