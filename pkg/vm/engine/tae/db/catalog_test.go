@@ -242,10 +242,10 @@ func TestCheckpointCatalog(t *testing.T) {
 	for _, cmd := range entry.Entries {
 		if cmd.Block != nil {
 			blkCnt++
-			t.Logf("%s", cmd.Block.StringLocked())
 			blocks = append(blocks, cmd.Block)
 		}
 	}
+	entry.PrintItems()
 	assert.Equal(t, 8, blkCnt)
 	entry2 := tae.Catalog.PrepareCheckpoint(endTs+1, tae.TxnMgr.StatSafeTS())
 
@@ -257,6 +257,8 @@ func TestCheckpointCatalog(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, blkCnt)
+	entry3 := tae.Catalog.PrepareCheckpoint(0, endTs-1)
+	entry3.PrintItems()
 
 	blockEntry := blocks[6]
 	seg := blockEntry.GetSegment()
@@ -289,6 +291,7 @@ func TestCheckpointCatalog(t *testing.T) {
 			assert.Equal(t, blk1.CurrOp, blk2.CurrOp)
 		}
 	}
+	replayEntry.PrintItems()
 
 	err = tae.Catalog.Checkpoint(endTs)
 	assert.Nil(t, err)

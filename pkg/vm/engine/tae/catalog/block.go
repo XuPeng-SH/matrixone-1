@@ -131,7 +131,7 @@ func (entry *BlockEntry) MakeLogEntry() *EntryCommand {
 	return newBlockCmd(0, CmdLogBlock, entry)
 }
 
-func (entry *BlockEntry) Clone() *BlockEntry {
+func (entry *BlockEntry) Clone() CheckpointItem {
 	cloned := &BlockEntry{
 		BaseEntry: entry.BaseEntry.Clone(),
 		state:     entry.state,
@@ -140,7 +140,7 @@ func (entry *BlockEntry) Clone() *BlockEntry {
 	return cloned
 }
 
-func (entry *BlockEntry) CloneCreate() *BlockEntry {
+func (entry *BlockEntry) CloneCreate() CheckpointItem {
 	cloned := &BlockEntry{
 		BaseEntry: entry.BaseEntry.CloneCreate(),
 		state:     entry.state,

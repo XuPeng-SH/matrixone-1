@@ -243,7 +243,7 @@ func (entry *TableEntry) MakeLogEntry() *EntryCommand {
 	return newTableCmd(0, CmdLogTable, entry)
 }
 
-func (entry *TableEntry) Clone() *TableEntry {
+func (entry *TableEntry) Clone() CheckpointItem {
 	cloned := &TableEntry{
 		BaseEntry: entry.BaseEntry.Clone(),
 		schema:    entry.schema,
@@ -252,7 +252,7 @@ func (entry *TableEntry) Clone() *TableEntry {
 	return cloned
 }
 
-func (entry *TableEntry) CloneCreate() *TableEntry {
+func (entry *TableEntry) CloneCreate() CheckpointItem {
 	cloned := &TableEntry{
 		BaseEntry: entry.BaseEntry.CloneCreate(),
 		schema:    entry.schema,

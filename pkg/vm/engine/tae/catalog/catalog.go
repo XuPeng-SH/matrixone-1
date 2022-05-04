@@ -237,56 +237,25 @@ func (catalog *Catalog) RecurLoop(processor Processor) (err error) {
 func (catalog *Catalog) PrepareCheckpoint(startTs, endTs uint64) *CheckpointEntry {
 	ckpEntry := NewCheckpointEntry(startTs, endTs)
 	processor := new(LoopProcessor)
-	processor.BlockFn = func(entry *BlockEntry) (err error) {
-		entry.RLock()
-		// 1. entry was created after endTs. Skip it
-		if entry.CreateAt > endTs {
-			entry.RUnlock()
-			return
-		}
-		// 2. entry was deleted before startTs. Skip it
-		if entry.DeleteAt < startTs && entry.HasDropped() {
-			entry.RUnlock()
-			return
-		}
-		// 3. entry was created before startTs
-		if entry.CreateAt < startTs {
-			// 3.1 entry was not deleted. skip it
-			if !entry.HasDropped() {
-				entry.RUnlock()
-				return
-			}
-			// 3.2 entry was deleted
-			ckpEntry.AddIndex(entry.LogIndex)
-			cloned := entry.Clone()
-			entry.RUnlock()
-			ckpEntry.AddCommand(cloned.MakeLogEntry())
-			return
-		}
-		// 4. entry was created at|after startTs
-		// 4.1 entry was deleted at|before endTs
-		if entry.DeleteAt <= endTs && entry.HasDropped() {
-			ckpEntry.AddIndex(entry.LogIndex)
-			ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
-			cloned := entry.Clone()
-			entry.RUnlock()
-			ckpEntry.AddCommand(cloned.MakeLogEntry())
-			return
-		}
-		// 4.2 entry was not deleted
-		if !entry.HasDropped() {
-			ckpEntry.AddIndex(entry.LogIndex)
-			cloned := entry.Clone()
-			entry.RUnlock()
-			ckpEntry.AddCommand(cloned.MakeLogEntry())
-			return
-		}
-		// 4.3 entry was deleted after endTs
-		ckpEntry.AddIndex(entry.PrevCommit.LogIndex)
-		cloned := entry.CloneCreate()
-		entry.RUnlock()
-		ckpEntry.AddCommand(cloned.MakeLogEntry())
-		return nil
+	processor.BlockFn = func(block *BlockEntry) (err error) {
+		entry := block.BaseEntry
+		CheckpointOp(ckpEntry, entry, block, startTs, endTs)
+		return
+	}
+	processor.SegmentFn = func(segment *SegmentEntry) (err error) {
+		entry := segment.BaseEntry
+		CheckpointOp(ckpEntry, entry, segment, startTs, endTs)
+		return
+	}
+	processor.TableFn = func(table *TableEntry) (err error) {
+		entry := table.BaseEntry
+		CheckpointOp(ckpEntry, entry, table, startTs, endTs)
+		return
+	}
+	processor.DatabaseFn = func(database *DBEntry) (err error) {
+		entry := database.BaseEntry
+		CheckpointOp(ckpEntry, entry, database, startTs, endTs)
+		return
 	}
 	catalog.RecurLoop(processor)
 	return ckpEntry

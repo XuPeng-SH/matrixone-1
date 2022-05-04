@@ -235,7 +235,7 @@ func (entry *SegmentEntry) MakeLogEntry() *EntryCommand {
 	return newSegmentCmd(0, CmdLogSegment, entry)
 }
 
-func (entry *SegmentEntry) Clone() *SegmentEntry {
+func (entry *SegmentEntry) Clone() CheckpointItem {
 	cloned := &SegmentEntry{
 		BaseEntry: entry.BaseEntry.Clone(),
 		state:     entry.state,
@@ -244,7 +244,7 @@ func (entry *SegmentEntry) Clone() *SegmentEntry {
 	return cloned
 }
 
-func (entry *SegmentEntry) CloneCreate() *SegmentEntry {
+func (entry *SegmentEntry) CloneCreate() CheckpointItem {
 	cloned := &SegmentEntry{
 		BaseEntry: entry.BaseEntry.CloneCreate(),
 		state:     entry.state,

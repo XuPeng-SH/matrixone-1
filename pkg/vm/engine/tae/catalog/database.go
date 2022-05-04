@@ -275,7 +275,7 @@ func (entry *DBEntry) MakeLogEntry() *EntryCommand {
 	return newDBCmd(0, CmdLogDatabase, entry)
 }
 
-func (entry *DBEntry) Clone() *DBEntry {
+func (entry *DBEntry) Clone() CheckpointItem {
 	cloned := &DBEntry{
 		BaseEntry: entry.BaseEntry.Clone(),
 		name:      entry.name,
@@ -283,7 +283,7 @@ func (entry *DBEntry) Clone() *DBEntry {
 	return cloned
 }
 
-func (entry *DBEntry) CloneCreate() *DBEntry {
+func (entry *DBEntry) CloneCreate() CheckpointItem {
 	cloned := &DBEntry{
 		BaseEntry: entry.BaseEntry.CloneCreate(),
 		name:      entry.name,
