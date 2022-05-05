@@ -235,11 +235,11 @@ func (e *DBEntry) PrepareRollback() (err error) {
 	e.RLock()
 	currOp := e.CurrOp
 	e.RUnlock()
-	if err = e.BaseEntry.PrepareRollback(); err != nil {
-		return
-	}
 	if currOp == OpCreate {
 		err = e.catalog.RemoveEntry(e)
+	}
+	if err = e.BaseEntry.PrepareRollback(); err != nil {
+		return
 	}
 	return
 }
