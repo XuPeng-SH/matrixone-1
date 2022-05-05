@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
@@ -56,6 +57,11 @@ func newTaskScheduler(db *DB, txnWorkers int, ioWorkers int) *taskScheduler {
 	s.RegisterDispatcher(tasks.CheckpointCatalogTask, dispatcher2)
 	s.Start()
 	return s
+}
+
+func (s *taskScheduler) Stop() {
+	s.BaseScheduler.Stop()
+	logutil.Info("TaskScheduler Stopped")
 }
 
 func (s *taskScheduler) ScheduleTxnTask(ctx *tasks.Context, factory tasks.TxnTaskFactory) (task tasks.Task, err error) {
