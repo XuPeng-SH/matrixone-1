@@ -35,9 +35,10 @@ func (blk *dataBlock) ABlkCheckpointWAL(endTs uint64) (err error) {
 	}
 	indexes := blk.CollectAppendLogIndexes(ckpTs+1, endTs)
 	blk.scheduler.Checkpoint(indexes)
-	for i, index := range indexes {
-		logutil.Infof("Checkpoint %d: %s", i, index.String())
-	}
+	logutil.Infof("ABLK | [%d,%d] | CNT=[%d] | Checkpointed ", ckpTs+1, endTs, len(indexes))
+	// for i, index := range indexes {
+	// 	logutil.Infof("Checkpoint %d: %s", i, index.String())
+	// }
 	blk.SetMaxCheckpointTS(endTs)
 	return
 }

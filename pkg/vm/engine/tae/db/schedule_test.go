@@ -124,6 +124,10 @@ func TestCheckpoint2(t *testing.T) {
 	opts.CacheCfg.IndexCapacity = 1000000
 	opts.CacheCfg.TxnCapacity = 1000000
 	opts.CacheCfg.InsertCapacity = 200
+	// opts.CheckpointCfg = new(options.CheckpointCfg)
+	// opts.CheckpointCfg.ScannerInterval = 10
+	// opts.CheckpointCfg.ExecutionLevels = 2
+	// opts.CheckpointCfg.ExecutionInterval = 1
 	tae := initDB(t, opts)
 	defer tae.Close()
 	schema1 := catalog.MockSchema(4)

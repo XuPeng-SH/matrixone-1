@@ -285,6 +285,7 @@ func (catalog *Catalog) Checkpoint(maxTs uint64) (err error) {
 			err = ErrCheckpoint
 		}
 		if maxTs == lastMax {
+			catalog.ckpmu.RUnlock()
 			return
 		}
 		minTs = lastMax + 1

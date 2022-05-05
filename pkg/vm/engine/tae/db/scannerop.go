@@ -1,8 +1,13 @@
 package db
 
 import (
+	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
 type ScannerOp interface {
@@ -65,15 +70,27 @@ func (processor *calibrationOp) onBlock(blockEntry *catalog.BlockEntry) (err err
 
 type catalogStatsMonitor struct {
 	*catalog.LoopProcessor
-	db                         *DB
-	unCheckpointedCnt          int
-	checkpointedTS             uint64
-	lastCheckpointScheduleTime uint64
+	db                *DB
+	unCheckpointedCnt int64
+	minTs             uint64
+	maxTs             uint64
+	lastScheduleTime  time.Time
+	cntLimit          int64
+	intervalLimit     time.Duration
 }
 
-func newCatalogStatsMonitor(db *DB) *catalogStatsMonitor {
+func newCatalogStatsMonitor(db *DB, cntLimit int64, intervalLimit time.Duration) *catalogStatsMonitor {
+	if cntLimit <= 0 {
+		logutil.Warnf("Catalog uncheckpoint cnt limit %d is too small and is changed to %d", cntLimit, options.DefaultCatalogUnCkpLimit)
+		cntLimit = options.DefaultCatalogUnCkpLimit
+	}
+	if intervalLimit <= time.Duration(0) || intervalLimit >= time.Second*180 {
+		logutil.Warnf("Catalog checkpoint schedule interval limit %s is too small|big and is changed to %s", intervalLimit, options.DefaultCatalogCkpInterval)
+		intervalLimit = time.Duration(options.DefaultCatalogCkpInterval)
+	}
 	monitor := &catalogStatsMonitor{
-		db: db,
+		LoopProcessor: new(catalog.LoopProcessor),
+		db:            db,
 	}
 	monitor.BlockFn = monitor.onBlock
 	monitor.SegmentFn = monitor.onSegment
@@ -84,26 +101,44 @@ func newCatalogStatsMonitor(db *DB) *catalogStatsMonitor {
 
 func (monitor *catalogStatsMonitor) PreExecute() error {
 	monitor.unCheckpointedCnt = 0
-	monitor.checkpointedTS = monitor.db.Catalog.GetCheckpointed()
+	monitor.minTs = monitor.db.Catalog.GetCheckpointed() + 1
+	monitor.maxTs = monitor.db.TxnMgr.StatSafeTS()
 	return nil
 }
 
 func (monitor *catalogStatsMonitor) PostExecute() error {
+	logutil.Infof("[Monotor] Catalog Total Uncheckpointed Cnt [%d, %d]: %d", monitor.minTs, monitor.maxTs, monitor.unCheckpointedCnt)
+	if monitor.unCheckpointedCnt >= monitor.cntLimit || time.Since(monitor.lastScheduleTime) >= monitor.intervalLimit {
+		monitor.db.Scheduler.ScheduleScopedFn(nil, tasks.CheckpointCatalogTask, nil, monitor.db.Catalog.CheckpointClosure(monitor.maxTs))
+		monitor.lastScheduleTime = time.Now()
+	}
 	return nil
 }
 
 func (monitor *catalogStatsMonitor) onBlock(entry *catalog.BlockEntry) (err error) {
+	if monitor.minTs <= monitor.maxTs && catalog.CheckpointSelectOp(entry.BaseEntry, monitor.minTs, monitor.maxTs) {
+		monitor.unCheckpointedCnt++
+	}
 	return
 }
 
 func (monitor *catalogStatsMonitor) onSegment(entry *catalog.SegmentEntry) (err error) {
+	if monitor.minTs <= monitor.maxTs && catalog.CheckpointSelectOp(entry.BaseEntry, monitor.minTs, monitor.maxTs) {
+		monitor.unCheckpointedCnt++
+	}
 	return
 }
 
 func (monitor *catalogStatsMonitor) onTable(entry *catalog.TableEntry) (err error) {
+	if monitor.minTs <= monitor.maxTs && catalog.CheckpointSelectOp(entry.BaseEntry, monitor.minTs, monitor.maxTs) {
+		monitor.unCheckpointedCnt++
+	}
 	return
 }
 
 func (monitor *catalogStatsMonitor) onDatabase(entry *catalog.DBEntry) (err error) {
+	if catalog.CheckpointSelectOp(entry.BaseEntry, monitor.minTs, monitor.maxTs) {
+		monitor.unCheckpointedCnt++
+	}
 	return
 }
