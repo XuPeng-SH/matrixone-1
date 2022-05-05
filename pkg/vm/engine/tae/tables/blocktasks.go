@@ -4,6 +4,7 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/data"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
@@ -16,13 +17,13 @@ func (blk *dataBlock) CheckpointWALClosure(endTs uint64) tasks.FuncT {
 	return closure(endTs)
 }
 
-func (blk *dataBlock) ABlkFlushDataClosure(ts uint64, data batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) tasks.FuncT {
-	closure := func(ts uint64, data batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) tasks.FuncT {
+func (blk *dataBlock) ABlkFlushDataClosure(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) tasks.FuncT {
+	closure := func(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) tasks.FuncT {
 		return func() error {
-			return blk.ABlkFlushData(ts, data, masks, vals, deletes)
+			return blk.ABlkFlushData(ts, bat, masks, vals, deletes)
 		}
 	}
-	return closure(ts, data, masks, vals, deletes)
+	return closure(ts, bat, masks, vals, deletes)
 }
 
 func (blk *dataBlock) CheckpointWAL(endTs uint64) (err error) {
@@ -47,9 +48,24 @@ func (blk *dataBlock) ABlkCheckpointWAL(endTs uint64) (err error) {
 	return
 }
 
-func (blk *dataBlock) ABlkFlushData(ts uint64, data batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) (err error) {
-	if err := blk.file.WriteIBatch(data, ts, masks, vals, deletes); err != nil {
+func (blk *dataBlock) ABlkFlushData(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) (err error) {
+	flushTs := blk.node.GetBlockMaxFlushTS()
+	if ts <= flushTs {
+		logutil.Infof("FLUSH ABLK | [%s] | CANCELLED | (Stale Request: Already Flushed)")
+		return data.ErrStaleRequest
+	}
+	ckpTs := blk.GetMaxCheckpointTS()
+	if ts <= ckpTs {
+		logutil.Infof("FLUSH ABLK | [%s] | CANCELLED | (State Request: Already Compacted)")
+		return data.ErrStaleRequest
+	}
+
+	if err := blk.file.WriteIBatch(bat, ts, masks, vals, deletes); err != nil {
 		return err
 	}
-	return blk.file.Sync()
+	if err = blk.file.Sync(); err != nil {
+		return
+	}
+	blk.node.SetBlockMaxFlushTS(ts)
+	return
 }
