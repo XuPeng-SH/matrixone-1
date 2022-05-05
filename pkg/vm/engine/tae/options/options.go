@@ -22,9 +22,9 @@ func (o *Options) FillDefaults(dirname string) *Options {
 
 	if o.CheckpointCfg == nil {
 		o.CheckpointCfg = &CheckpointCfg{
-			CalibrationInterval: DefaultCalibrationInterval,
-			ExecutionInterval:   DefaultExecutionInterval,
-			ExecutionLevels:     DefaultExecutionLevels,
+			ScannerInterval:   DefaultScannerInterval,
+			ExecutionInterval: DefaultExecutionInterval,
+			ExecutionLevels:   DefaultExecutionLevels,
 		}
 	}
 
