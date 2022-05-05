@@ -197,7 +197,10 @@ func TestCheckpoint2(t *testing.T) {
 	// })
 	t.Log(tae.Wal.GetPenddingCnt())
 	meta.GetBlockData().Destroy()
-	tae.Catalog.Checkpoint(tae.TxnMgr.StatSafeTS())
+	task, err := tae.Scheduler.ScheduleScopedFn(tasks.WaitableCtx, tasks.CheckpointCatalogTask, nil, tae.Catalog.CheckpointClosure(tae.TxnMgr.StatSafeTS()))
+	assert.Nil(t, err)
+	err = task.WaitDone()
+	assert.Nil(t, err)
 	testutils.WaitExpect(1000, func() bool {
 		return tae.Wal.GetPenddingCnt() == 0
 	})

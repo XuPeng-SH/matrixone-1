@@ -9,21 +9,15 @@ import (
 )
 
 func (blk *dataBlock) CheckpointWALClosure(endTs uint64) tasks.FuncT {
-	closure := func(ts uint64) func() error {
-		return func() error {
-			return blk.CheckpointWAL(ts)
-		}
+	return func() error {
+		return blk.CheckpointWAL(endTs)
 	}
-	return closure(endTs)
 }
 
 func (blk *dataBlock) ABlkFlushDataClosure(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) tasks.FuncT {
-	closure := func(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) tasks.FuncT {
-		return func() error {
-			return blk.ABlkFlushData(ts, bat, masks, vals, deletes)
-		}
+	return func() error {
+		return blk.ABlkFlushData(ts, bat, masks, vals, deletes)
 	}
-	return closure(ts, bat, masks, vals, deletes)
 }
 
 func (blk *dataBlock) CheckpointWAL(endTs uint64) (err error) {
