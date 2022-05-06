@@ -135,10 +135,10 @@ func TestAppend2(t *testing.T) {
 	testutils.WaitExpect(3000, func() bool {
 		cnt = 0
 		db.Opts.Catalog.RecurLoop(processor)
-		return cnt == 40
+		return cnt == 60
 	})
 	t.Log(time.Since(now))
-	assert.Equal(t, 40, cnt)
+	assert.Equal(t, 60, cnt)
 }
 
 func TestTableHandle(t *testing.T) {

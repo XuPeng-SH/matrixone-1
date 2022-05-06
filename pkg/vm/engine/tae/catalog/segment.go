@@ -96,7 +96,7 @@ func (entry *SegmentEntry) PPString(level common.PPLevel, depth int, prefix stri
 }
 
 func (entry *SegmentEntry) StringLocked() string {
-	return fmt.Sprintf("SEGMENT%s", entry.BaseEntry.String())
+	return fmt.Sprintf("[%s]SEGMENT%s", entry.state.Repr(), entry.BaseEntry.String())
 }
 
 func (entry *SegmentEntry) String() string {
