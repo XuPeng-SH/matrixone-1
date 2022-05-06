@@ -136,7 +136,7 @@ func (be *BaseEntry) IsTerminated(waitIfcommitting bool) bool {
 }
 
 func (be *BaseEntry) IsCommitted() bool {
-	return be.Txn == nil
+	return be.Txn == nil && be.CreateAt > 0
 	// if be.Txn == nil {
 	// 	return true
 	// }

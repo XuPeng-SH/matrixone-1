@@ -24,7 +24,7 @@ type Scheduler interface {
 type TaskScheduler interface {
 	Scheduler
 	ScheduleTxnTask(ctx *Context, taskType TaskType, factory TxnTaskFactory) (Task, error)
-	// ScheduleListScopedTxnTask(ctx *Context, taskType TaskType, scopes []*common.ID, factory TxnTaskFactory) (Task, error)
+	ScheduleMultiScopedTxnTask(ctx *Context, taskType TaskType, scopes []common.ID, factory TxnTaskFactory) (Task, error)
 	ScheduleFn(ctx *Context, taskType TaskType, fn func() error) (Task, error)
 	ScheduleScopedFn(ctx *Context, taskType TaskType, scope *common.ID, fn func() error) (Task, error)
 	Checkpoint(indexes []*wal.Index) error

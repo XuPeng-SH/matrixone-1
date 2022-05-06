@@ -104,7 +104,7 @@ func newTaskScheduler(db *DB, asyncWorkers int, ioWorkers int) *taskScheduler {
 		BaseScheduler: tasks.NewBaseScheduler("taskScheduler"),
 		db:            db,
 	}
-	jobDispatcher := tasks.NewBaseDispatcher()
+	jobDispatcher := newAsyncJobDispatcher()
 	jobHandler := tasks.NewPoolHandler(asyncWorkers)
 	jobHandler.Start()
 	jobDispatcher.RegisterHandler(tasks.DataCompactionTask, jobHandler)
@@ -136,7 +136,13 @@ func (s *taskScheduler) Stop() {
 }
 
 func (s *taskScheduler) ScheduleTxnTask(ctx *tasks.Context, taskType tasks.TaskType, factory tasks.TxnTaskFactory) (task tasks.Task, err error) {
-	task = NewScheduledTxnTask(ctx, s.db, taskType, factory)
+	task = NewScheduledTxnTask(ctx, s.db, taskType, nil, factory)
+	err = s.Schedule(task)
+	return
+}
+
+func (s *taskScheduler) ScheduleMultiScopedTxnTask(ctx *tasks.Context, taskType tasks.TaskType, scopes []common.ID, factory tasks.TxnTaskFactory) (task tasks.Task, err error) {
+	task = NewScheduledTxnTask(ctx, s.db, taskType, scopes, factory)
 	err = s.Schedule(task)
 	return
 }
@@ -170,12 +176,11 @@ func (s *taskScheduler) ScheduleScopedFn(ctx *tasks.Context, taskType tasks.Task
 	return
 }
 
-// func (s *taskScheduler) ScheduleExpensitiveJobs(ctx *tasks.Context, taskType tasks.)
-
-// func (s *taskScheduler) Schedule(task tasks.Task) (err error) {
-// 	taskType := task.Type()
-// 	if taskType == tasks.DataCompactionTask || taskType == tasks.DataCompactionTask {
-// 		dispatcher := s.Dispatchers[task.Type()].(*asyncJobDispatcher)
-// 	}
-// 	return s.BaseScheduler.Schedule(task)
-// }
+func (s *taskScheduler) Schedule(task tasks.Task) (err error) {
+	taskType := task.Type()
+	if taskType == tasks.DataCompactionTask {
+		dispatcher := s.Dispatchers[task.Type()].(*asyncJobDispatcher)
+		return dispatcher.TryDispatch(task)
+	}
+	return s.BaseScheduler.Schedule(task)
+}

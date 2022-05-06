@@ -1,9 +1,15 @@
 package tasks
 
 import (
+	"errors"
+
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/ops/base"
+)
+
+var (
+	ErrScheduleScopeConflict = errors.New("tae scheduler: scope conflict")
 )
 
 type FuncT = func() error
@@ -42,6 +48,11 @@ type Task interface {
 type ScopedTask interface {
 	Task
 	Scope() *common.ID
+}
+
+type MScopedTask interface {
+	Task
+	Scopes() []common.ID
 }
 
 var DefaultScopeSharder = func(scope *common.ID) int {
@@ -86,3 +97,18 @@ func NewScopedFnTask(ctx *Context, taskType TaskType, scope *common.ID, fn FuncT
 }
 
 func (task *ScopedFnTask) Scope() *common.ID { return task.scope }
+
+type MultiScopedFnTask struct {
+	*FnTask
+	scopes []common.ID
+}
+
+func NewMultiScopedFnTask(ctx *Context, taskType TaskType, scopes []common.ID, fn FuncT) *MultiScopedFnTask {
+	task := &MultiScopedFnTask{
+		FnTask: NewFnTask(ctx, taskType, fn),
+		scopes: scopes,
+	}
+	return task
+}
+
+func (task *MultiScopedFnTask) Scopes() []common.ID { return task.scopes }

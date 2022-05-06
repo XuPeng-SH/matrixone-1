@@ -19,7 +19,7 @@ type CheckpointUnit interface {
 	MutationInfo() string
 	RunCalibration()
 	EstimateScore() int
-	BuildCompactionTaskFactory() (tasks.TxnTaskFactory, tasks.TaskType, error)
+	BuildCompactionTaskFactory() (tasks.TxnTaskFactory, tasks.TaskType, []common.ID, error)
 }
 
 type BlockAppender interface {

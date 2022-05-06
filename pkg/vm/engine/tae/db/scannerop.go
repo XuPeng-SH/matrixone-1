@@ -5,7 +5,6 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
@@ -18,7 +17,8 @@ type ScannerOp interface {
 
 type calibrationOp struct {
 	*catalog.LoopProcessor
-	db *DB
+	db              *DB
+	blkCntOfSegment int
 }
 
 func newCalibrationOp(db *DB) *calibrationOp {
@@ -27,6 +27,8 @@ func newCalibrationOp(db *DB) *calibrationOp {
 		LoopProcessor: new(catalog.LoopProcessor),
 	}
 	processor.BlockFn = processor.onBlock
+	processor.SegmentFn = processor.onSegment
+	processor.PostSegmentFn = processor.onPostSegment
 	return processor
 }
 
@@ -34,12 +36,22 @@ func (processor *calibrationOp) PreExecute() error  { return nil }
 func (processor *calibrationOp) PostExecute() error { return nil }
 
 func (processor *calibrationOp) onSegment(segmentEntry *catalog.SegmentEntry) (err error) {
-	segmentEntry.RLock()
-	maxTs := segmentEntry.MaxCommittedTS()
-	segmentEntry.RUnlock()
-	if maxTs == txnif.UncommitTS {
-		panic(maxTs)
+	processor.blkCntOfSegment = 0
+	return
+}
+
+func (processor *calibrationOp) onPostSegment(segmentEntry *catalog.SegmentEntry) (err error) {
+	if processor.blkCntOfSegment >= int(segmentEntry.GetTable().GetSchema().SegmentMaxBlocks) {
+		// processor.db.CKPDriver.EnqueueCheckpointUnit(segmentEntry.GetSegmentData())
+		segmentData := segmentEntry.GetSegmentData()
+		taskFactory, taskType, scopes, err := segmentData.BuildCompactionTaskFactory()
+		if err != nil || taskFactory == nil {
+			logutil.Warnf("%s: %v", segmentData.MutationInfo(), err)
+		}
+		processor.db.Scheduler.ScheduleMultiScopedTxnTask(nil, taskType, scopes, taskFactory)
+		logutil.Infof("Mergeblocks %s was scheduled", segmentEntry.String())
 	}
+	processor.blkCntOfSegment = 0
 	return
 }
 
@@ -54,6 +66,9 @@ func (processor *calibrationOp) onBlock(blockEntry *catalog.BlockEntry) (err err
 	if blockEntry.IsDroppedCommitted() {
 		blockEntry.RUnlock()
 		return nil
+	}
+	if blockEntry.GetSegment().IsAppendable() && catalog.ActiveWithNoTxnFilter(blockEntry.BaseEntry) && catalog.NonAppendableBlkFilter(blockEntry) {
+		processor.blkCntOfSegment++
 	}
 	blockEntry.RUnlock()
 
