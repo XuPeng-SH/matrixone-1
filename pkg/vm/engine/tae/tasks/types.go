@@ -14,16 +14,12 @@ var taskIdAlloctor *common.IdAlloctor
 
 const (
 	NoopTask TaskType = iota
-	TxnTask
-	IOTask
 	MockTask
 	CustomizedTask
 
-	CompactBlockTask
-	MergeBlocksTask
-	CheckpointDataTask
-	CheckpointCatalogTask
-	CheckpointWalTask
+	DataCompactionTask
+	CheckpointTask
+	IOTask
 )
 
 func init() {

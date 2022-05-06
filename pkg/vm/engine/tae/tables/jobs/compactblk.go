@@ -54,7 +54,7 @@ func NewCompactBlockTask(ctx *tasks.Context, txn txnif.AsyncTxn, meta *catalog.B
 	if err != nil {
 		return
 	}
-	task.BaseTask = tasks.NewBaseTask(task, tasks.CompactBlockTask, ctx)
+	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx)
 	return
 }
 

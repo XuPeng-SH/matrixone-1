@@ -109,7 +109,7 @@ func (monitor *catalogStatsMonitor) PreExecute() error {
 func (monitor *catalogStatsMonitor) PostExecute() error {
 	logutil.Infof("[Monotor] Catalog Total Uncheckpointed Cnt [%d, %d]: %d", monitor.minTs, monitor.maxTs, monitor.unCheckpointedCnt)
 	if monitor.unCheckpointedCnt >= monitor.cntLimit || time.Since(monitor.lastScheduleTime) >= monitor.intervalLimit {
-		monitor.db.Scheduler.ScheduleScopedFn(nil, tasks.CheckpointCatalogTask, nil, monitor.db.Catalog.CheckpointClosure(monitor.maxTs))
+		monitor.db.Scheduler.ScheduleScopedFn(nil, tasks.CheckpointTask, nil, monitor.db.Catalog.CheckpointClosure(monitor.maxTs))
 		monitor.lastScheduleTime = time.Now()
 	}
 	return nil

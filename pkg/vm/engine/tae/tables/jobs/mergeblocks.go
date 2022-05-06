@@ -64,7 +64,7 @@ func NewMergeBlocksTask(ctx *tasks.Context, txn txnif.AsyncTxn, metas []*catalog
 		}
 		task.compacted = append(task.compacted, blk)
 	}
-	task.BaseTask = tasks.NewBaseTask(task, tasks.MergeBlocksTask, ctx)
+	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx)
 	return
 }
 
