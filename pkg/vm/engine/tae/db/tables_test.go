@@ -15,9 +15,11 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/dataio/mockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/data"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/jobs"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils"
 	"github.com/panjf2000/ants/v2"
 	"github.com/stretchr/testify/assert"
 )
@@ -519,7 +521,14 @@ func TestTxn6(t *testing.T) {
 }
 
 func TestMergeBlocks1(t *testing.T) {
-	db := initDB(t, nil)
+	opts := new(options.Options)
+	opts.CheckpointCfg = new(options.CheckpointCfg)
+	opts.CheckpointCfg.ScannerInterval = 5
+	opts.CheckpointCfg.ExecutionLevels = 2
+	opts.CheckpointCfg.ExecutionInterval = 1
+	opts.CheckpointCfg.CatalogCkpInterval = 5
+	opts.CheckpointCfg.CatalogUnCkpLimit = 1
+	db := initDB(t, opts)
 	defer db.Close()
 	schema := catalog.MockSchemaAll(13)
 	schema.BlockMaxRows = 10
@@ -534,6 +543,7 @@ func TestMergeBlocks1(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Nil(t, txn.Commit())
 	}
+
 	{
 		txn := db.StartTxn(nil)
 		database, _ := txn.GetDatabase("db")
@@ -555,11 +565,9 @@ func TestMergeBlocks1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Nil(t, txn.Commit())
 		}
-		factory := jobs.MergeBlocksTaskFactory(blks)
-		ctx := &tasks.Context{Waitable: false}
-		task, err := factory(ctx, txn)
+		task, err := db.Scheduler.ScheduleTxnTask(tasks.WaitableCtx, jobs.MergeBlocksTaskFactory(blks, blks[0].GetSegment(), db.Scheduler))
 		assert.Nil(t, err)
-		err = task.OnExec()
+		err = task.WaitDone()
 		assert.Nil(t, err)
 		assert.Nil(t, txn.Commit())
 		t.Log(db.Opts.Catalog.SimplePPString(common.PPL1))
@@ -571,10 +579,16 @@ func TestMergeBlocks1(t *testing.T) {
 		it := rel.MakeBlockIt()
 		for it.Valid() {
 			blk := it.GetBlock()
-			t.Log(blk.String())
-			vec, _, _ := blk.GetColumnDataById(int(schema.PrimaryKey), nil, nil)
+			// t.Log(blk.String())
+			vec, _, _ := blk.GetColumnDataById(3, nil, nil)
+			// vec, _, _ := blk.GetColumnDataById(int(schema.PrimaryKey), nil, nil)
 			t.Log(vec.String())
 			it.Next()
 		}
 	}
+	testutils.WaitExpect(1000, func() bool {
+		return db.Wal.GetPenddingCnt() == 0
+	})
+	assert.Equal(t, uint64(0), db.Wal.GetPenddingCnt())
+	t.Logf("Checkpointed: %d", db.Wal.GetCheckpointed())
 }

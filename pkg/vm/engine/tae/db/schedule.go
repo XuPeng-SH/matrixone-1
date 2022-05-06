@@ -33,6 +33,7 @@ func newTaskScheduler(db *DB, txnWorkers int, ioWorkers int) *taskScheduler {
 
 	dispatcher.RegisterHandler(tasks.TxnTask, txnHandler)
 	dispatcher.RegisterHandler(tasks.CompactBlockTask, txnHandler)
+	dispatcher.RegisterHandler(tasks.MergeBlocksTask, txnHandler)
 	dispatcher.RegisterHandler(tasks.CheckpointWalTask, genericHandler)
 
 	dispatcher2 := tasks.NewBaseScopedDispatcher(tasks.DefaultScopeSharder)
@@ -51,6 +52,7 @@ func newTaskScheduler(db *DB, txnWorkers int, ioWorkers int) *taskScheduler {
 
 	s.RegisterDispatcher(tasks.TxnTask, dispatcher)
 	s.RegisterDispatcher(tasks.CompactBlockTask, dispatcher)
+	s.RegisterDispatcher(tasks.MergeBlocksTask, dispatcher)
 	s.RegisterDispatcher(tasks.CheckpointWalTask, dispatcher)
 	s.RegisterDispatcher(tasks.IOTask, ioDispatcher)
 	s.RegisterDispatcher(tasks.CheckpointDataTask, dispatcher2)
