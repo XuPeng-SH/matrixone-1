@@ -1,13 +1,11 @@
 package jobs
 
 import (
-	"bytes"
 	"unsafe"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	gvec "github.com/matrixorigin/matrixone/pkg/container/vector"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
@@ -80,11 +78,6 @@ func (task *mergeBlocksTask) mergeColumn(vecs []*vector.Vector, sortedIdx *[]uin
 }
 
 func (task *mergeBlocksTask) Execute() (err error) {
-	// 1. Get total rows of all blocks to be compacted: 10000
-	// 2. Decide created blocks layout: []int{3000,3000,3000,1000}
-	// 3. Merge sort blocks and split it into created blocks
-	// 4. Record all mappings: []int
-	// 5. PrepareMergeBlock(mappings)
 	var targetSeg handle.Segment
 	if task.segMeta == nil {
 		if targetSeg, err = task.rel.CreateNonAppendableSegment(); err != nil {
@@ -99,8 +92,6 @@ func (task *mergeBlocksTask) Execute() (err error) {
 
 	schema := task.metas[0].GetSchema()
 	var deletes *roaring.Bitmap
-	var compressed bytes.Buffer
-	var decompressed bytes.Buffer
 	var vec *vector.Vector
 	vecs := make([]*vector.Vector, 0)
 	rows := make([]uint32, len(task.compacted))
@@ -109,7 +100,7 @@ func (task *mergeBlocksTask) Execute() (err error) {
 	var toAddr []uint32
 	ids := make([]*common.ID, 0, len(task.compacted))
 	for i, block := range task.compacted {
-		if vec, deletes, err = block.GetColumnDataById(int(schema.PrimaryKey), &compressed, &decompressed); err != nil {
+		if vec, deletes, err = block.GetColumnDataById(int(schema.PrimaryKey), nil, nil); err != nil {
 			return
 		}
 		vec = compute.ApplyDeleteToVector(vec, deletes)
@@ -137,7 +128,8 @@ func (task *mergeBlocksTask) Execute() (err error) {
 	defer common.GPool.Free(node)
 	sortedIdx := *(*[]uint32)(unsafe.Pointer(&buf))
 	vecs, mapping := task.mergeColumn(vecs, &sortedIdx, true, rows, to)
-	logutil.Infof("mapping is %v", mapping)
+	// logutil.Infof("mapping is %v", mapping)
+	// logutil.Infof("sortedIdx is %v", sortedIdx)
 	length = 0
 	var blk handle.Block
 	for _, vec := range vecs {
@@ -159,10 +151,8 @@ func (task *mergeBlocksTask) Execute() (err error) {
 			continue
 		}
 		vecs = vecs[:0]
-		compressed.Reset()
-		decompressed.Reset()
 		for _, block := range task.compacted {
-			if vec, deletes, err = block.GetColumnDataById(i, &compressed, &decompressed); err != nil {
+			if vec, deletes, err = block.GetColumnDataById(i, nil, nil); err != nil {
 				return
 			}
 			vec = compute.ApplyDeleteToVector(vec, deletes)
@@ -189,7 +179,7 @@ func (task *mergeBlocksTask) Execute() (err error) {
 		}
 	}
 
-	txnEntry := txnentries.NewMergeBlocksEntry(task.txn, task.compacted, task.created, sortedIdx, fromAddr, toAddr, task.scheduler)
+	txnEntry := txnentries.NewMergeBlocksEntry(task.txn, task.compacted, task.created, mapping, fromAddr, toAddr, task.scheduler)
 	if err = task.txn.LogTxnEntry(task.segMeta.GetTable().GetID(), txnEntry, ids); err != nil {
 		return
 	}

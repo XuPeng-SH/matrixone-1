@@ -72,10 +72,17 @@ func (entry *mergeBlocksEntry) resolveAddr(fromPos int, fromOffset uint32) (toPo
 			break
 		}
 	}
-	if toPos == 0 && entry.toAddr[toPos] < totalToOffset {
-		toPos = toPos + 1
+
+	// if toPos == 0 && entry.toAddr[toPos] < totalToOffset {
+	if entry.toAddr[toPos] > totalToOffset {
+		toPos = toPos - 1
 	}
-	toOffset = entry.toAddr[toPos]
+	toOffset = totalToOffset - entry.toAddr[toPos]
+	// logutil.Infof("mapping=%v", entry.mapping)
+	// logutil.Infof("fromPos=%d, fromOff=%d", fromPos, fromOffset)
+	// logutil.Infof("fromAddr=%v", entry.fromAddr)
+	// logutil.Infof("toAddr=%v", entry.toAddr)
+	// logutil.Infof("toPos=%d, toOffset=%d", toPos, toOffset)
 	return
 }
 
