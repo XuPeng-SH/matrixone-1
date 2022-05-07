@@ -21,6 +21,9 @@ func newMergeBlocksCmd(from, to []*common.ID) *mergeBlocksCmd {
 }
 func (cmd *mergeBlocksCmd) GetType() int16 { return CmdMergeBlocks }
 func (cmd *mergeBlocksCmd) WriteTo(w io.Writer) (err error) {
+	if err = binary.Write(w, binary.BigEndian, CmdMergeBlocks); err != nil {
+		return
+	}
 	fromLength := uint32(len(cmd.from))
 	if err = binary.Write(w, binary.BigEndian, fromLength); err != nil {
 		return
@@ -78,7 +81,7 @@ func (cmd *mergeBlocksCmd) ReadFrom(r io.Reader) (err error) {
 		return
 	}
 	cmd.to = make([]*common.ID, toLength)
-	for i := 0; i < int(fromLength); i++ {
+	for i := 0; i < int(toLength); i++ {
 		id := &common.ID{}
 		if err = binary.Read(r, binary.BigEndian, &id.TableID); err != nil {
 			return

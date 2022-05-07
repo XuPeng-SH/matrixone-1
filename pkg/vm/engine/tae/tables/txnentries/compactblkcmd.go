@@ -21,6 +21,9 @@ func newCompactBlockCmd(from, to *common.ID) *compactBlockCmd {
 }
 func (cmd *compactBlockCmd) GetType() int16 { return CmdCompactBlock }
 func (cmd *compactBlockCmd) WriteTo(w io.Writer) (err error) {
+	if err = binary.Write(w, binary.BigEndian, CmdCompactBlock); err != nil {
+		return
+	}
 	if err = binary.Write(w, binary.BigEndian, cmd.from.TableID); err != nil {
 		return
 	}
@@ -43,6 +46,7 @@ func (cmd *compactBlockCmd) WriteTo(w io.Writer) (err error) {
 	return
 }
 func (cmd *compactBlockCmd) ReadFrom(r io.Reader) (err error) {
+	cmd.from = &common.ID{}
 	if err = binary.Read(r, binary.BigEndian, &cmd.from.TableID); err != nil {
 		return
 	}
@@ -52,6 +56,7 @@ func (cmd *compactBlockCmd) ReadFrom(r io.Reader) (err error) {
 	if err = binary.Read(r, binary.BigEndian, &cmd.from.BlockID); err != nil {
 		return
 	}
+	cmd.to = &common.ID{}
 	if err = binary.Read(r, binary.BigEndian, &cmd.to.TableID); err != nil {
 		return
 	}

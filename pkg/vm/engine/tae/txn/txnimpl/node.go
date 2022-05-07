@@ -51,8 +51,7 @@ type InsertNode interface {
 	AddApplyInfo(srcOff, srcLen, destOff, destLen uint32, dest *common.ID) *appendInfo
 	RowsWithoutDeletes() uint32
 	LengthWithDeletes(appended, toAppend uint32) uint32
-	WriteAppendInfos(w io.Writer) (err error)
-	ReadAppendInfos(r io.Reader) (err error)
+	GetAppends() []*appendInfo
 }
 
 type appendInfo struct {
@@ -62,6 +61,20 @@ type appendInfo struct {
 	destOff, destLen uint32
 }
 
+func mockAppendInfo() *appendInfo {
+	return &appendInfo{
+		seq:    1,
+		srcOff: 678,
+		srcLen: 2134,
+		dest: &common.ID{
+			TableID:   1234,
+			SegmentID: 45,
+			BlockID:   9,
+		},
+		destOff: 6790,
+		destLen: 9876,
+	}
+}
 func (info *appendInfo) String() string {
 	s := fmt.Sprintf("[%d]: Append from [%d:%d] to blk %s[%d:%d]",
 		info.seq, info.srcOff, info.srcLen+info.srcOff, info.dest.ToBlockFileName(), info.destOff, info.destLen+info.destOff)
@@ -148,29 +161,18 @@ func NewInsertNode(tbl Table, mgr base.INodeManager, id common.ID, driver wal.Dr
 	mgr.RegisterNode(impl)
 	return impl
 }
-func (n *insertNode) WriteAppendInfos(w io.Writer) (err error) {
-	if err = binary.Write(w, binary.BigEndian, uint32(len(n.appends))); err != nil {
-		return
-	}
-	for _, info := range n.appends {
-		if err = info.WriteTo(w); err != nil {
-			return
-		}
-	}
-	return
+
+func mockInsertNodeWithAppendInfo(infos []*appendInfo) *insertNode {
+	node := new(insertNode)
+	node.appends = infos
+	attrs := []int{0, 1}
+	vecs := make([]vector.IVector, 2)
+	node.data, _ = batch.NewBatch(attrs, vecs)
+	node.lsn = 1
+	return node
 }
-func (n *insertNode) ReadAppendInfos(r io.Reader) (err error) {
-	length := uint32(0)
-	if err = binary.Read(r, binary.BigEndian, &length); err != nil {
-		return
-	}
-	n.appends = make([]*appendInfo, length)
-	for i := 0; i < int(length); i++ {
-		if err = n.appends[i].ReadFrom(r); err != nil {
-			return
-		}
-	}
-	return
+func (n *insertNode) GetAppends() []*appendInfo {
+	return n.appends
 }
 func (n *insertNode) AddApplyInfo(srcOff, srcLen, destOff, destLen uint32, dest *common.ID) *appendInfo {
 	seq := len(n.appends)
