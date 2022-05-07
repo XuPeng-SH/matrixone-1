@@ -55,12 +55,22 @@ func (c *AppendCmd) WriteTo(w io.Writer) (err error) {
 	if err = binary.Write(w, binary.BigEndian, c.ID); err != nil {
 		return
 	}
+	if err = c.Node.WriteAppendInfos(w); err != nil {
+		return
+	}
 	err = c.ComposedCmd.WriteTo(w)
 	return err
 }
 
 func (c *AppendCmd) ReadFrom(r io.Reader) (err error) {
+	typ := int16(0)
+	if err = binary.Read(r, binary.BigEndian, &typ); err != nil {
+		return
+	}
 	if err = binary.Read(r, binary.BigEndian, &c.ID); err != nil {
+		return
+	}
+	if err = c.Node.ReadAppendInfos(r); err != nil {
 		return
 	}
 	err = c.ComposedCmd.ReadFrom(r)

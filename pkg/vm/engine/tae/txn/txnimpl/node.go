@@ -2,7 +2,9 @@ package txnimpl
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/RoaringBitmap/roaring"
@@ -49,6 +51,8 @@ type InsertNode interface {
 	AddApplyInfo(srcOff, srcLen, destOff, destLen uint32, dest *common.ID) *appendInfo
 	RowsWithoutDeletes() uint32
 	LengthWithDeletes(appended, toAppend uint32) uint32
+	WriteAppendInfos(w io.Writer) (err error)
+	ReadAppendInfos(r io.Reader) (err error)
 }
 
 type appendInfo struct {
@@ -62,6 +66,61 @@ func (info *appendInfo) String() string {
 	s := fmt.Sprintf("[%d]: Append from [%d:%d] to blk %s[%d:%d]",
 		info.seq, info.srcOff, info.srcLen+info.srcOff, info.dest.ToBlockFileName(), info.destOff, info.destLen+info.destOff)
 	return s
+}
+func (info *appendInfo) WriteTo(w io.Writer) (err error) {
+	if err = binary.Write(w, binary.BigEndian, info.seq); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.srcOff); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.srcLen); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.dest.TableID); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.dest.SegmentID); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.dest.BlockID); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.destOff); err != nil {
+		return
+	}
+	if err = binary.Write(w, binary.BigEndian, info.destLen); err != nil {
+		return
+	}
+	return
+}
+func (info *appendInfo) ReadFrom(r io.Reader) (err error) {
+	if err = binary.Read(r, binary.BigEndian, &info.seq); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &info.srcOff); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &info.srcLen); err != nil {
+		return
+	}
+	info.dest = &common.ID{}
+	if err = binary.Read(r, binary.BigEndian, &info.dest.TableID); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &info.dest.SegmentID); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &info.dest.BlockID); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &info.destOff); err != nil {
+		return
+	}
+	if err = binary.Read(r, binary.BigEndian, &info.destLen); err != nil {
+		return
+	}
+	return
 }
 
 type insertNode struct {
@@ -89,7 +148,30 @@ func NewInsertNode(tbl Table, mgr base.INodeManager, id common.ID, driver wal.Dr
 	mgr.RegisterNode(impl)
 	return impl
 }
-
+func (n *insertNode) WriteAppendInfos(w io.Writer) (err error) {
+	if err = binary.Write(w, binary.BigEndian, uint32(len(n.appends))); err != nil {
+		return
+	}
+	for _, info := range n.appends {
+		if err = info.WriteTo(w); err != nil {
+			return
+		}
+	}
+	return
+}
+func (n *insertNode) ReadAppendInfos(r io.Reader) (err error) {
+	length := uint32(0)
+	if err = binary.Read(r, binary.BigEndian, &length); err != nil {
+		return
+	}
+	n.appends = make([]*appendInfo, length)
+	for i := 0; i < int(length); i++ {
+		if err = n.appends[i].ReadFrom(r); err != nil {
+			return
+		}
+	}
+	return
+}
 func (n *insertNode) AddApplyInfo(srcOff, srcLen, destOff, destLen uint32, dest *common.ID) *appendInfo {
 	seq := len(n.appends)
 	info := &appendInfo{

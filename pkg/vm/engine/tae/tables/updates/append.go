@@ -1,6 +1,8 @@
 package updates
 
 import (
+	"encoding/binary"
+	"io"
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
@@ -55,6 +57,20 @@ func (n *AppendNode) ApplyCommit(index *wal.Index) error {
 		n.controller.SetMaxVisible(n.commitTs)
 	}
 	return nil
+}
+
+func (node *AppendNode) WriteTo(w io.Writer) (err error) {
+	if err = binary.Write(w, binary.BigEndian, node.maxRow); err != nil {
+		return
+	}
+	return
+}
+
+func (node *AppendNode) ReadFrom(r io.Reader) (err error) {
+	if err = binary.Read(r, binary.BigEndian, &node.maxRow); err != nil {
+		return
+	}
+	return
 }
 
 func (n *AppendNode) PrepareRollback() (err error) { return }
