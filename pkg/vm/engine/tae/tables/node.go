@@ -157,6 +157,15 @@ func (node *appendableNode) OnUnload() {
 	node.block.scheduler.ScheduleScopedFn(nil, tasks.CheckpointTask, scope, node.block.CheckpointWALClosure(ts))
 }
 
+func (node *appendableNode) Close() error {
+	node.Node.Close()
+	if node.data != nil {
+		node.data.Close()
+		node.data = nil
+	}
+	return nil
+}
+
 func (node *appendableNode) PrepareAppend(rows uint32) (n uint32, err error) {
 	left := node.block.meta.GetSchema().BlockMaxRows - node.rows
 	if left == 0 {
