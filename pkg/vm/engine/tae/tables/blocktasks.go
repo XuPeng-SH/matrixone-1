@@ -81,6 +81,42 @@ func (blk *dataBlock) SyncBlockData(ts uint64, rows uint32) (err error) {
 	return blk.file.Sync()
 }
 
+func (blk *dataBlock) ForceCompact() (err error) {
+	if !blk.meta.IsAppendable() {
+		panic("todo")
+	}
+	ts := blk.mvcc.LoadMaxVisible()
+	if blk.node.GetBlockMaxFlushTS() >= ts {
+		return
+	}
+	h := blk.bufMgr.Pin(blk.node)
+	defer h.Close()
+	// Why check again? May be a flush was executed in between
+	if blk.node.GetBlockMaxFlushTS() >= ts {
+		return
+	}
+	blk.mvcc.RLock()
+	maxRow, _ := blk.mvcc.GetMaxVisibleRowLocked(ts)
+	blk.mvcc.RUnlock()
+	view, err := blk.node.GetColumnsView(maxRow)
+	if err != nil {
+		return
+	}
+	needCkp := true
+	if err = blk.node.flushData(ts, view); err != nil {
+		if err == data.ErrStaleRequest {
+			err = nil
+			needCkp = false
+		} else {
+			return
+		}
+	}
+	if needCkp {
+		blk.scheduler.ScheduleScopedFn(nil, tasks.CheckpointTask, blk.meta.AsCommonID(), blk.CheckpointWALClosure(ts))
+	}
+	return
+}
+
 func (blk *dataBlock) ABlkFlushData(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) (err error) {
 	flushTs := blk.node.GetBlockMaxFlushTS()
 	if ts <= flushTs {
@@ -100,5 +136,6 @@ func (blk *dataBlock) ABlkFlushData(ts uint64, bat batch.IBatch, masks map[uint1
 		return
 	}
 	blk.node.SetBlockMaxFlushTS(ts)
+	blk.resetNice()
 	return
 }

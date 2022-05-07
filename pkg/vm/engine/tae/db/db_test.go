@@ -582,6 +582,52 @@ func TestCompactBlock2(t *testing.T) {
 	}
 }
 
+func TestCompactABlk(t *testing.T) {
+	// opts := new(options.Options)
+	// opts.CheckpointCfg = new(options.CheckpointCfg)
+	// opts.CheckpointCfg.ScannerInterval = 10
+	// opts.CheckpointCfg.ExecutionLevels = 2
+	// opts.CheckpointCfg.ExecutionInterval = 1
+	tae := initDB(t, nil)
+	defer tae.Close()
+	schema := catalog.MockSchemaAll(13)
+	schema.BlockMaxRows = 1000
+	schema.SegmentMaxBlocks = 10
+	schema.PrimaryKey = 3
+
+	totalRows := uint64(schema.BlockMaxRows) / 5
+	bat := compute.MockBatch(schema.Types(), totalRows, int(schema.PrimaryKey), nil)
+	{
+		txn := tae.StartTxn(nil)
+		database, _ := txn.CreateDatabase("db")
+		rel, _ := database.CreateRelation(schema)
+		rel.Append(bat)
+		assert.Nil(t, txn.Commit())
+	}
+	{
+		txn := tae.StartTxn(nil)
+		database, _ := txn.GetDatabase("db")
+		rel, _ := database.GetRelationByName(schema.Name)
+		it := rel.MakeBlockIt()
+		blk := it.GetBlock()
+		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
+		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
+		assert.Nil(t, err)
+		task, err := tae.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+		assert.Nil(t, err)
+		err = task.WaitDone()
+		assert.Nil(t, err)
+		assert.Nil(t, txn.Commit())
+	}
+	err := tae.Catalog.Checkpoint(tae.TxnMgr.StatSafeTS())
+	assert.Nil(t, err)
+	testutils.WaitExpect(1000, func() bool {
+		return tae.Scheduler.GetPenddingCnt() == 0
+	})
+	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingCnt())
+	t.Log(tae.Catalog.SimplePPString(common.PPL1))
+}
+
 func TestRollback1(t *testing.T) {
 	db := initDB(t, nil)
 	defer db.Close()
