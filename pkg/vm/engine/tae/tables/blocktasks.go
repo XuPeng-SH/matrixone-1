@@ -54,8 +54,8 @@ func (blk *dataBlock) ABlkCheckpointWAL(endTs uint64) (err error) {
 	}
 	blk.scheduler.Checkpoint(indexes)
 	logutil.Infof("ABLK | [%d,%d] | CNT=[%d] | Checkpointed ", ckpTs+1, endTs, len(indexes))
-	// for i, index := range indexes {
-	// 	logutil.Infof("Checkpoint %d: %s", i, index.String())
+	// for _, index := range indexes {
+	// 	logutil.Infof("Ckp1Index  %s", index.String())
 	// }
 	blk.SetMaxCheckpointTS(endTs)
 	return
@@ -120,12 +120,12 @@ func (blk *dataBlock) ForceCompact() (err error) {
 func (blk *dataBlock) ABlkFlushData(ts uint64, bat batch.IBatch, masks map[uint16]*roaring.Bitmap, vals map[uint16]map[uint32]interface{}, deletes *roaring.Bitmap) (err error) {
 	flushTs := blk.node.GetBlockMaxFlushTS()
 	if ts <= flushTs {
-		logutil.Infof("FLUSH ABLK | [%s] | CANCELLED | (Stale Request: Already Flushed)")
+		logutil.Infof("FLUSH ABLK | [%s] | CANCELLED | (Stale Request: Already Flushed)", blk.meta.String())
 		return data.ErrStaleRequest
 	}
 	ckpTs := blk.GetMaxCheckpointTS()
 	if ts <= ckpTs {
-		logutil.Infof("FLUSH ABLK | [%s] | CANCELLED | (State Request: Already Compacted)")
+		logutil.Infof("FLUSH ABLK | [%s] | CANCELLED | (State Request: Already Compacted)", blk.meta.String())
 		return data.ErrStaleRequest
 	}
 
@@ -137,5 +137,6 @@ func (blk *dataBlock) ABlkFlushData(ts uint64, bat batch.IBatch, masks map[uint1
 	}
 	blk.node.SetBlockMaxFlushTS(ts)
 	blk.resetNice()
+	logutil.Infof("FLUSH ABLK | [%s] | Done | MaxRow=%d | MaxTs=%d", blk.meta.String(), bat.Length(), ts)
 	return
 }
