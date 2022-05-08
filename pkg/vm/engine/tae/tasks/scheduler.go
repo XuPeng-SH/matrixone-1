@@ -5,9 +5,9 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
-	iops "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/ops/base"
+	iops "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks/ops/base"
+	ops "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks/worker"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
-	ops "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/worker"
 )
 
 var (
