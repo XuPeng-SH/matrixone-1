@@ -33,36 +33,35 @@ type BlockAppender interface {
 
 type Block interface {
 	CheckpointUnit
+
 	GetID() *common.ID
-	MutationInfo() string
-	MakeAppender() (BlockAppender, error)
 	IsAppendable() bool
 	Rows(txn txnif.AsyncTxn, coarse bool) int
 	GetColumnDataByName(txn txnif.AsyncTxn, attr string, compressed, decompressed *bytes.Buffer) (*model.ColumnView, error)
 	GetColumnDataById(txn txnif.AsyncTxn, colIdx int, compressed, decompressed *bytes.Buffer) (*model.ColumnView, error)
+
+	MakeAppender() (BlockAppender, error)
 	RangeDelete(txn txnif.AsyncTxn, start, end uint32) (txnif.DeleteNode, error)
 	Update(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (txnif.UpdateNode, error)
 
+	GetTotalChanges() int
 	CollectChangesInRange(startTs, endTs uint64) *model.BlockView
 	CollectAppendLogIndexes(startTs, endTs uint64) []*wal.Index
 
-	// GetUpdateChain() txnif.UpdateChain
 	BatchDedup(txn txnif.AsyncTxn, pks *vector.Vector) error
 	GetByFilter(txn txnif.AsyncTxn, filter *handle.Filter) (uint32, error)
 	GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (interface{}, error)
 	PPString(level common.PPLevel, depth int, prefix string) string
 	GetBlockFile() file.Block
-	GetTotalChanges() int
 	RefreshIndex() error
-	Destroy() error
 
 	SetMaxCheckpointTS(ts uint64)
 	GetMaxCheckpointTS() uint64
 	GetMaxVisibleTS() uint64
 
-	ForceCompact() error
-
 	CheckpointWALClosure(endTs uint64) tasks.FuncT
 	SyncBlockDataClosure(ts uint64, rows uint32) tasks.FuncT
 	FlushColumnDataClosure(ts uint64, colIdx int, colData *vector.Vector, sync bool) tasks.FuncT
+	ForceCompact() error
+	Destroy() error
 }

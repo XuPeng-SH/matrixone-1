@@ -250,9 +250,9 @@ func (blk *dataBlock) Rows(txn txnif.AsyncTxn, coarse bool) int {
 func (blk *dataBlock) PPString(level common.PPLevel, depth int, prefix string) string {
 	s := fmt.Sprintf("%s | [Rows=%d]", blk.meta.PPString(level, depth, prefix), blk.Rows(nil, true))
 	if level >= common.PPL1 {
-		readLock := blk.mvcc.GetSharedLock()
+		blk.mvcc.RLock()
 		s2 := blk.mvcc.StringLocked()
-		readLock.Unlock()
+		blk.mvcc.RUnlock()
 		if s2 != "" {
 			s = fmt.Sprintf("%s\n%s", s, s2)
 		}
@@ -282,7 +282,7 @@ func (blk *dataBlock) FillBlockView(colIdx uint16, view *model.BlockView) (err e
 
 func (blk *dataBlock) MakeBlockView() (view *model.BlockView, err error) {
 	mvcc := blk.mvcc
-	readLock := mvcc.GetSharedLock()
+	mvcc.RLock()
 	ts := mvcc.LoadMaxVisible()
 	view = model.NewBlockView(ts)
 	for i := range blk.meta.GetSchema().ColDefs {
@@ -303,7 +303,7 @@ func (blk *dataBlock) MakeBlockView() (view *model.BlockView, err error) {
 		}
 		view.Raw, err = batch.NewBatch(attrs, vecs)
 	}
-	readLock.Unlock()
+	mvcc.RUnlock()
 	if blk.node == nil {
 		// Load from block file
 		view.RawBatch, err = blk.file.LoadBatch(blk.meta.GetSchema().Attrs(), blk.meta.GetSchema().Types())
@@ -351,7 +351,6 @@ func (blk *dataBlock) GetColumnDataById(txn txnif.AsyncTxn, colIdx int, compress
 }
 
 func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompressed *bytes.Buffer, raw bool) (view *model.ColumnView, err error) {
-	view = model.NewColumnView(ts, colIdx)
 	h := blk.node.mgr.Pin(blk.node)
 	if h == nil {
 		panic("not expected")
@@ -360,13 +359,14 @@ func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompres
 
 	maxRow := uint32(0)
 	visible := true
-	readLock := blk.mvcc.GetSharedLock()
+	blk.mvcc.RLock()
 	maxRow, visible = blk.mvcc.GetMaxVisibleRowLocked(ts)
-	readLock.Unlock()
+	blk.mvcc.RUnlock()
 	if !visible {
 		return
 	}
 
+	view = model.NewColumnView(ts, colIdx)
 	if raw {
 		view.RawVec, err = blk.node.GetVectorCopy(maxRow, colIdx, compressed, decompressed)
 		return
@@ -411,11 +411,11 @@ func (blk *dataBlock) Update(txn txnif.AsyncTxn, row uint32, colIdx uint16, v in
 }
 
 func (blk *dataBlock) updateWithCoarseLock(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (node txnif.UpdateNode, err error) {
-	locker := blk.mvcc.GetExclusiveLock()
+	blk.mvcc.Lock()
+	defer blk.mvcc.Unlock()
 	err = blk.mvcc.CheckNotDeleted(row, row, txn.GetStartTS())
 	if err == nil {
 		if err = blk.mvcc.CheckNotUpdated(row, row, txn.GetStartTS()); err != nil {
-			locker.Unlock()
 			return
 		}
 		chain := blk.mvcc.GetColumnChain(colIdx)
@@ -426,12 +426,12 @@ func (blk *dataBlock) updateWithCoarseLock(txn txnif.AsyncTxn, row uint32, colId
 		}
 		chain.Unlock()
 	}
-	locker.Unlock()
 	return
 }
 
 func (blk *dataBlock) updateWithFineLock(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (node txnif.UpdateNode, err error) {
-	locker := blk.mvcc.GetSharedLock()
+	blk.mvcc.RLock()
+	defer blk.mvcc.RUnlock()
 	err = blk.mvcc.CheckNotDeleted(row, row, txn.GetStartTS())
 	if err == nil {
 		chain := blk.mvcc.GetColumnChain(colIdx)
@@ -442,12 +442,12 @@ func (blk *dataBlock) updateWithFineLock(txn txnif.AsyncTxn, row uint32, colIdx 
 		}
 		chain.Unlock()
 	}
-	locker.Unlock()
 	return
 }
 
 func (blk *dataBlock) RangeDelete(txn txnif.AsyncTxn, start, end uint32) (node txnif.DeleteNode, err error) {
-	locker := blk.mvcc.GetExclusiveLock()
+	blk.mvcc.Lock()
+	defer blk.mvcc.Unlock()
 	err = blk.mvcc.CheckNotDeleted(start, end, txn.GetStartTS())
 	if err == nil {
 		if err = blk.mvcc.CheckNotUpdated(start, end, txn.GetStartTS()); err == nil {
@@ -455,7 +455,6 @@ func (blk *dataBlock) RangeDelete(txn txnif.AsyncTxn, start, end uint32) (node t
 			node.RangeDeleteLocked(start, end)
 		}
 	}
-	locker.Unlock()
 	return
 }
 
@@ -619,7 +618,7 @@ func (blk *dataBlock) CollectAppendLogIndexes(startTs, endTs uint64) (indexes []
 
 func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (view *model.BlockView) {
 	view = model.NewBlockView(endTs)
-	readLock := blk.mvcc.GetSharedLock()
+	blk.mvcc.RLock()
 
 	for i := range blk.meta.GetSchema().ColDefs {
 		chain := blk.mvcc.GetColumnChain(uint16(i))
@@ -636,6 +635,6 @@ func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (view *model.
 	deleteChain.RLock()
 	view.DeleteMask, view.DeleteLogIndexes = deleteChain.CollectDeletesInRange(startTs, endTs)
 	deleteChain.RUnlock()
-	readLock.Unlock()
+	blk.mvcc.RUnlock()
 	return
 }
