@@ -412,7 +412,7 @@ func TestCheckpointCatalog(t *testing.T) {
 	err = tae.Catalog.Checkpoint(endTs)
 	assert.Nil(t, err)
 
-	assert.Equal(t, endTs, tae.Catalog.GetCheckpointed())
+	assert.Equal(t, endTs, tae.Catalog.GetCheckpointed().MaxTS)
 	t.Log(tae.Catalog.SimplePPString(common.PPL1))
 
 	// logEntry, err := entry.MakeLogEntry()
