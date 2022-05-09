@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
 )
 
 type BlockIt interface {
@@ -41,8 +41,8 @@ type BlockReader interface {
 	ID() uint64
 	String() string
 	GetByFilter(filter Filter) (uint32, error)
-	GetColumnDataByName(string, *bytes.Buffer, *bytes.Buffer) (*vector.Vector, *roaring.Bitmap, error)
-	GetColumnDataById(int, *bytes.Buffer, *bytes.Buffer) (*vector.Vector, *roaring.Bitmap, error)
+	GetColumnDataByName(string, *bytes.Buffer, *bytes.Buffer) (*model.ColumnView, error)
+	GetColumnDataById(int, *bytes.Buffer, *bytes.Buffer) (*model.ColumnView, error)
 	GetMeta() interface{}
 	Fingerprint() *common.ID
 	Rows() int

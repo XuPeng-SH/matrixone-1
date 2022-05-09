@@ -8,6 +8,7 @@ import (
 
 	idxCommon "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index/common/errors"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 
 	"github.com/RoaringBitmap/roaring"
@@ -259,6 +260,14 @@ func (blk *dataBlock) PPString(level common.PPLevel, depth int, prefix string) s
 	return s
 }
 
+func (blk *dataBlock) FillColumnView(view *model.ColumnView) (err error) {
+	chain := blk.mvcc.GetColumnChain(uint16(view.ColIdx))
+	chain.RLock()
+	view.UpdateMask, view.UpdateVals = chain.CollectUpdatesLocked(view.Ts)
+	chain.RUnlock()
+	return nil
+}
+
 func (blk *dataBlock) makeColumnView(colIdx uint16, view *updates.BlockView) (err error) {
 	chain := blk.mvcc.GetColumnChain(colIdx)
 	chain.RLock()
@@ -310,37 +319,39 @@ func (blk *dataBlock) MakeAppender() (appender data.BlockAppender, err error) {
 	return
 }
 
-func (blk *dataBlock) GetColumnDataByName(txn txnif.AsyncTxn, attr string, compressed, decompressed *bytes.Buffer) (vec *gvec.Vector, deletes *roaring.Bitmap, err error) {
+func (blk *dataBlock) GetColumnDataByName(txn txnif.AsyncTxn, attr string, compressed, decompressed *bytes.Buffer) (view *model.ColumnView, err error) {
 	colIdx := blk.meta.GetSchema().GetColIdx(attr)
 	return blk.GetColumnDataById(txn, colIdx, compressed, decompressed)
 }
 
-func (blk *dataBlock) GetColumnDataById(txn txnif.AsyncTxn, colIdx int, compressed, decompressed *bytes.Buffer) (vec *gvec.Vector, deletes *roaring.Bitmap, err error) {
+func (blk *dataBlock) GetColumnDataById(txn txnif.AsyncTxn, colIdx int, compressed, decompressed *bytes.Buffer) (view *model.ColumnView, err error) {
 	if blk.meta.IsAppendable() {
 		return blk.getVectorCopy(txn.GetStartTS(), colIdx, compressed, decompressed, false)
 	}
 
+	view = model.NewColumnView(txn.GetStartTS(), colIdx)
 	if compressed == nil {
 		compressed = &bytes.Buffer{}
 		decompressed = &bytes.Buffer{}
 	}
-	vec, err = blk.getVectorWithBuffer(colIdx, compressed, decompressed)
+	if view.RawVec, err = blk.getVectorWithBuffer(colIdx, compressed, decompressed); err != nil {
+		return
+	}
 
-	view := updates.NewBlockView(txn.GetStartTS())
-	sharedLock := blk.mvcc.GetSharedLock()
-	err = blk.makeColumnView(uint16(colIdx), view)
+	blk.mvcc.RLock()
+	err = blk.FillColumnView(view)
 	deleteChain := blk.mvcc.GetDeleteChain()
 	dnode := deleteChain.CollectDeletesLocked(txn.GetStartTS(), false).(*updates.DeleteNode)
-	sharedLock.Unlock()
+	blk.mvcc.RUnlock()
 	if dnode != nil {
 		view.DeleteMask = dnode.GetDeleteMaskLocked()
 	}
-	vec = compute.ApplyUpdateToVector(vec, view.UpdateMasks[uint16(colIdx)], view.UpdateVals[uint16(colIdx)])
-	deletes = view.DeleteMask
+	view.Eval(true)
 	return
 }
 
-func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompressed *bytes.Buffer, raw bool) (vec *gvec.Vector, deletes *roaring.Bitmap, err error) {
+func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompressed *bytes.Buffer, raw bool) (view *model.ColumnView, err error) {
+	view = model.NewColumnView(ts, colIdx)
 	h := blk.node.mgr.Pin(blk.node)
 	if h == nil {
 		panic("not expected")
@@ -357,7 +368,7 @@ func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompres
 	}
 
 	if raw {
-		vec, err = blk.node.GetVectorCopy(maxRow, colIdx, compressed, decompressed)
+		view.RawVec, err = blk.node.GetVectorCopy(maxRow, colIdx, compressed, decompressed)
 		return
 	}
 
@@ -373,28 +384,24 @@ func (blk *dataBlock) getVectorCopy(ts uint64, colIdx int, compressed, decompres
 		srcvec, _ = ivec.CopyToVectorWithBuffer(compressed, decompressed)
 	}
 	if maxRow < uint32(gvec.Length(srcvec)) {
-		vec = gvec.New(srcvec.Typ)
-		gvec.Window(srcvec, 0, int(maxRow), vec)
+		view.RawVec = gvec.New(srcvec.Typ)
+		gvec.Window(srcvec, 0, int(maxRow), view.RawVec)
 	} else {
-		vec = srcvec
+		view.RawVec = srcvec
 	}
 
-	view := updates.NewBlockView(ts)
-
-	sharedLock := blk.mvcc.GetSharedLock()
-	err = blk.makeColumnView(uint16(colIdx), view)
+	blk.mvcc.RLock()
+	err = blk.FillColumnView(view)
 	deleteChain := blk.mvcc.GetDeleteChain()
 	deleteChain.RLock()
 	dnode := deleteChain.CollectDeletesLocked(ts, false).(*updates.DeleteNode)
 	deleteChain.RUnlock()
-	sharedLock.Unlock()
+	blk.mvcc.RUnlock()
 	if dnode != nil {
 		view.DeleteMask = dnode.GetDeleteMaskLocked()
 	}
 
-	vec = compute.ApplyUpdateToVector(vec, view.UpdateMasks[uint16(colIdx)], view.UpdateVals[uint16(colIdx)])
-
-	deletes = view.DeleteMask
+	view.Eval(true)
 
 	return
 }
@@ -452,14 +459,8 @@ func (blk *dataBlock) RangeDelete(txn txnif.AsyncTxn, start, end uint32) (node t
 	return
 }
 
-// func (blk *dataBlock) GetUpdateChain() txnif.UpdateChain {
-// 	blk.RLock()
-// 	defer blk.RUnlock()
-// 	return blk.GetUpdateChain()
-// }
-
 func (blk *dataBlock) GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (v interface{}, err error) {
-	sharedLock := blk.mvcc.GetSharedLock()
+	blk.mvcc.RLock()
 	deleteChain := blk.mvcc.GetDeleteChain()
 	deleted := deleteChain.IsDeleted(row, txn.GetStartTS())
 	if !deleted {
@@ -474,21 +475,19 @@ func (blk *dataBlock) GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (v in
 	} else {
 		err = txnbase.ErrNotFound
 	}
-	sharedLock.Unlock()
+	blk.mvcc.RUnlock()
 	if v != nil || err != nil {
 		return
 	}
-	var raw *gvec.Vector
+	view := model.NewColumnView(txn.GetStartTS(), int(col))
 	if blk.meta.IsAppendable() {
-		var comp bytes.Buffer
-		var decomp bytes.Buffer
-		raw, _, _ = blk.getVectorCopy(txn.GetStartTS(), int(col), &comp, &decomp, true)
+		view, _ = blk.getVectorCopy(txn.GetStartTS(), int(col), nil, nil, true)
 	} else {
 		wrapper, _ := blk.getVectorWrapper(int(col))
 		defer common.GPool.Free(wrapper.MNode)
-		raw = &wrapper.Vector
+		view.RawVec = &wrapper.Vector
 	}
-	v = compute.GetValue(raw, row)
+	v = compute.GetValue(view.RawVec, row)
 	return
 }
 
@@ -596,12 +595,12 @@ func (blk *dataBlock) BatchDedup(txn txnif.AsyncTxn, pks *gvec.Vector) (err erro
 	if visibilityMap == nil {
 		panic("unexpected error")
 	}
-	pkColumnData, deletes, err := blk.GetColumnDataById(txn, int(blk.meta.GetSchema().PrimaryKey), nil, nil)
+	view, err := blk.GetColumnDataById(txn, int(blk.meta.GetSchema().PrimaryKey), nil, nil)
 	if err != nil {
 		return err
 	}
 	deduplicate := func(v interface{}) error {
-		if _, exist := compute.CheckRowExists(pkColumnData, v, deletes); exist {
+		if _, exist := compute.CheckRowExists(view.AppliedVec, v, view.DeleteMask); exist {
 			return txnbase.ErrDuplicated
 		}
 		return nil
