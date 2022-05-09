@@ -53,7 +53,6 @@ type Block interface {
 	GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (interface{}, error)
 	PPString(level common.PPLevel, depth int, prefix string) string
 	GetBlockFile() file.Block
-	RefreshIndex() error
 
 	SetMaxCheckpointTS(ts uint64)
 	GetMaxCheckpointTS() uint64
@@ -64,4 +63,5 @@ type Block interface {
 	FlushColumnDataClosure(ts uint64, colIdx int, colData *vector.Vector, sync bool) tasks.FuncT
 	ForceCompact() error
 	Destroy() error
+	ReplayData() error
 }

@@ -171,7 +171,7 @@ func (task *mergeBlocksTask) Execute() (err error) {
 		if err = BuildAndFlushBlockIndex(meta.GetBlockData().GetBlockFile(), meta, vec); err != nil {
 			return
 		}
-		if err = meta.GetBlockData().RefreshIndex(); err != nil {
+		if err = meta.GetBlockData().ReplayData(); err != nil {
 			return
 		}
 		// bf := blk.GetMeta().(*catalog.BlockEntry).GetBlockData().GetBlockFile()

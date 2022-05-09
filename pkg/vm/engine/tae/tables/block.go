@@ -87,6 +87,19 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 	return block
 }
 
+func (blk *dataBlock) ReplayData() (err error) {
+	if blk.meta.IsAppendable() {
+		w, _ := blk.getVectorWrapper(int(blk.meta.GetSchema().PrimaryKey))
+		defer common.GPool.Free(w.MNode)
+		blk.indexHolder.(acif.IAppendableBlockIndexHolder).BatchInsert(&w.Vector, 0, gvec.Length(&w.Vector), 0, false)
+		return
+	}
+	if blk.indexHolder == nil {
+		blk.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
+	}
+	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), idxCommon.MockIndexBufferManager /* TODO: use dedicated index buffer manager */)
+}
+
 func (blk *dataBlock) SetMaxCheckpointTS(ts uint64) {
 	atomic.StoreUint64(&blk.ckpTs, ts)
 }
@@ -120,16 +133,6 @@ func (blk *dataBlock) Destroy() (err error) {
 
 func (blk *dataBlock) GetBlockFile() file.Block {
 	return blk.file
-}
-
-func (blk *dataBlock) RefreshIndex() error {
-	if blk.meta.IsAppendable() {
-		panic("unexpected error")
-	}
-	if blk.indexHolder == nil {
-		blk.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
-	}
-	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), idxCommon.MockIndexBufferManager /* TODO: use dedicated index buffer manager */)
 }
 
 func (blk *dataBlock) GetID() *common.ID { return blk.meta.AsCommonID() }
