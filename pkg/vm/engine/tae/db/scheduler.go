@@ -164,6 +164,10 @@ func (s *taskScheduler) Checkpoint(indexes []*wal.Index) (err error) {
 	return
 }
 
+func (s *taskScheduler) GetSafeTS() uint64 {
+	return s.db.TxnMgr.StatSafeTS()
+}
+
 func (s *taskScheduler) GetPenddingLSNCnt() uint64 {
 	return s.db.Wal.GetPenddingCnt()
 }

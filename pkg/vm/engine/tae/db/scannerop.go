@@ -119,7 +119,7 @@ func newCatalogStatsMonitor(db *DB, cntLimit int64, intervalLimit time.Duration)
 func (monitor *catalogStatsMonitor) PreExecute() error {
 	monitor.unCheckpointedCnt = 0
 	monitor.minTs = monitor.db.Catalog.GetCheckpointed().MaxTS + 1
-	monitor.maxTs = monitor.db.TxnMgr.StatSafeTS()
+	monitor.maxTs = monitor.db.Scheduler.GetSafeTS()
 	return nil
 }
 

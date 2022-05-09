@@ -293,7 +293,7 @@ func TestCheckpointCatalog2(t *testing.T) {
 		pool.Submit(mockRes)
 	}
 	wg.Wait()
-	ts := tae.TxnMgr.StatSafeTS()
+	ts := tae.Scheduler.GetSafeTS()
 	entry := tae.Catalog.PrepareCheckpoint(0, ts)
 	maxIndex := entry.GetMaxIndex()
 	tae.Catalog.Checkpoint(ts)
@@ -349,7 +349,7 @@ func TestCheckpointCatalog(t *testing.T) {
 	t.Log(tae.Catalog.SimplePPString(common.PPL1))
 
 	startTs := uint64(0)
-	endTs := tae.TxnMgr.StatSafeTS() - 2
+	endTs := tae.Scheduler.GetSafeTS() - 2
 	t.Logf("endTs=%d", endTs)
 
 	entry := tae.Catalog.PrepareCheckpoint(startTs, endTs)
@@ -363,7 +363,7 @@ func TestCheckpointCatalog(t *testing.T) {
 	}
 	entry.PrintItems()
 	assert.Equal(t, 8, blkCnt)
-	entry2 := tae.Catalog.PrepareCheckpoint(endTs+1, tae.TxnMgr.StatSafeTS())
+	entry2 := tae.Catalog.PrepareCheckpoint(endTs+1, tae.Scheduler.GetSafeTS())
 
 	blkCnt = 0
 	for _, cmd := range entry2.Entries {
