@@ -49,9 +49,6 @@ type BlockReader interface {
 	BatchDedup(col *vector.Vector) error
 
 	IsAppendableBlock() bool
-	// IsAppendable() bool
-
-	PrepareCompact() error
 
 	GetSegment() Segment
 
@@ -60,7 +57,6 @@ type BlockReader interface {
 
 type BlockWriter interface {
 	io.Closer
-	String() string
 	Append(data *batch.Batch, offset uint32) (uint32, error)
 	Update(row uint32, col uint16, v interface{}) error
 	RangeDelete(start, end uint32) error

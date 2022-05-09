@@ -242,9 +242,7 @@ func (c *APP1Client) GetGoodRepetory(goodId uint64) (id *common.ID, offset uint3
 
 // TODO: rewrite
 func (c *APP1Client) GetGoodEntry(goodId uint64) (id *common.ID, offset uint32, entry *APP1Goods, err error) {
-	filter := new(handle.Filter)
-	filter.Op = handle.FilterEq
-	filter.Val = goodId
+	filter := handle.NewEQFilter(goodId)
 	goodRel, _ := c.DB.GetRelationByName(goods.Name)
 	id, offset, err = goodRel.GetByFilter(filter)
 	if err != nil {

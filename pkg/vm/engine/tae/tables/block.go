@@ -37,6 +37,7 @@ type dataBlock struct {
 	meta        *catalog.BlockEntry
 	node        *appendableNode
 	file        file.Block
+	colFiles    map[int]common.IRWFile
 	bufMgr      base.INodeManager
 	scheduler   tasks.TaskScheduler
 	indexHolder acif.IBlockIndexHolder
@@ -53,11 +54,24 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 	if err != nil {
 		panic(err)
 	}
+	colFiles := make(map[int]common.IRWFile)
+	for i := 0; i < colCnt; i++ {
+		if colBlk, err := file.OpenColumn(i); err != nil {
+			panic(err)
+		} else {
+			colFiles[i], err = colBlk.OpenDataFile()
+			if err != nil {
+				panic(err)
+			}
+			colBlk.Close()
+		}
+	}
 	var node *appendableNode
 	block := &dataBlock{
 		RWMutex:   new(sync.RWMutex),
 		meta:      meta,
 		file:      file,
+		colFiles:  colFiles,
 		mvcc:      updates.NewMVCCHandle(meta),
 		scheduler: scheduler,
 		bufMgr:    bufMgr,
@@ -89,6 +103,10 @@ func (blk *dataBlock) Destroy() (err error) {
 	if blk.node != nil {
 		blk.node.Close()
 	}
+	for _, file := range blk.colFiles {
+		file.Unref()
+	}
+	blk.colFiles = make(map[int]common.IRWFile)
 	if blk.file != nil {
 		blk.file.Close()
 	}
@@ -491,34 +509,28 @@ func (blk *dataBlock) GetValue(txn txnif.AsyncTxn, row uint32, col uint16) (v in
 }
 
 func (blk *dataBlock) getVectorWithBuffer(colIdx int, compressed, decompressed *bytes.Buffer) (vec *gvec.Vector, err error) {
-	colBlk, _ := blk.file.OpenColumn(colIdx)
-	vfile, _ := colBlk.OpenDataFile()
+	dataFile := blk.colFiles[colIdx]
 
 	wrapper := vector.NewEmptyWrapper(blk.meta.GetSchema().ColDefs[colIdx].Type)
-	wrapper.File = vfile
-	_, err = wrapper.ReadWithBuffer(vfile, compressed, decompressed)
+	wrapper.File = dataFile
+	_, err = wrapper.ReadWithBuffer(dataFile, compressed, decompressed)
 	if err != nil {
 		return
 	}
-	vfile.Unref()
-	colBlk.Close()
 	vec = &wrapper.Vector
 	return
 }
 
 func (blk *dataBlock) getVectorWrapper(colIdx int) (wrapper *vector.VectorWrapper, err error) {
-	colBlk, _ := blk.file.OpenColumn(colIdx)
-	vfile, _ := colBlk.OpenDataFile()
+	dataFile := blk.colFiles[colIdx]
 
 	wrapper = vector.NewEmptyWrapper(blk.meta.GetSchema().ColDefs[colIdx].Type)
-	wrapper.File = vfile
-	_, err = wrapper.ReadFrom(vfile)
+	wrapper.File = dataFile
+	_, err = wrapper.ReadFrom(dataFile)
 	if err != nil {
 		return
 	}
 
-	vfile.Unref()
-	colBlk.Close()
 	return
 }
 
