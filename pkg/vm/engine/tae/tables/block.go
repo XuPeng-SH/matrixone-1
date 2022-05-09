@@ -238,8 +238,6 @@ func (blk *dataBlock) Rows(txn txnif.AsyncTxn, coarse bool) int {
 }
 
 func (blk *dataBlock) PPString(level common.PPLevel, depth int, prefix string) string {
-	blk.RLock()
-	defer blk.RUnlock()
 	s := fmt.Sprintf("%s | [Rows=%d]", blk.meta.PPString(level, depth, prefix), blk.Rows(nil, true))
 	if level >= common.PPL1 {
 		readLock := blk.mvcc.GetSharedLock()
