@@ -9,10 +9,17 @@ import (
 // Destory is not thread-safe
 func gcBlockClosure(entry *catalog.BlockEntry) tasks.FuncT {
 	return func() error {
-		logutil.Infof("[GC] | Block | %s", entry.String())
+		// logutil.Infof("[GC] | Block | %s", entry.String())
+		// return nil
 		segment := entry.GetSegment()
-		blockData := entry.GetBlockData()
-		blockData.Destroy()
+		segment.RLock()
+		segDropped := segment.IsDroppedCommitted()
+		segment.RUnlock()
+
+		entry.DestroyData()
+		if !segDropped && entry.IsAppendable() {
+			return nil
+		}
 		err := segment.RemoveEntry(entry)
 		if err != nil {
 			logutil.Warnf("Cannot remove block %s, maybe removed before", entry.String())

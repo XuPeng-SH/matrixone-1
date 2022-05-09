@@ -80,6 +80,10 @@ func (blk *dataBlock) GetMaxCheckpointTS() uint64 {
 	return atomic.LoadUint64(&blk.ckpTs)
 }
 
+func (blk *dataBlock) GetMaxVisibleTS() uint64 {
+	return blk.mvcc.LoadMaxVisible()
+}
+
 func (blk *dataBlock) Destroy() (err error) {
 	if blk.node != nil {
 		blk.node.Close()
@@ -625,7 +629,9 @@ func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (v interface{
 		view.ColLogIndexes[uint16(i)] = indexes
 	}
 	deleteChain := blk.mvcc.GetDeleteChain()
+	deleteChain.RLock()
 	view.DeleteMask, view.DeleteLogIndexes = deleteChain.CollectDeletesInRange(startTs, endTs)
+	deleteChain.RUnlock()
 	readLock.Unlock()
 	v = view
 	return

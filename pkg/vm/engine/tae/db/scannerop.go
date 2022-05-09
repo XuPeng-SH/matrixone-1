@@ -143,8 +143,14 @@ func (monitor *catalogStatsMonitor) onBlock(entry *catalog.BlockEntry) (err erro
 		return
 	}
 	checkpointed := monitor.db.Scheduler.GetCheckpointed()
+	gcNeeded := false
 	entry.RLock()
-	gcNeeded := entry.IsDroppedCommitted() && !entry.DeleteAfter(checkpointed)
+	if entry.IsDroppedCommitted() && !entry.DeleteAfter(monitor.maxTs) {
+		logIndex := entry.GetLogIndex()
+		if logIndex != nil {
+			gcNeeded = checkpointed >= logIndex.LSN
+		}
+	}
 	entry.RUnlock()
 	if gcNeeded {
 		scopes := MakeBlockScopes(entry)
@@ -165,8 +171,14 @@ func (monitor *catalogStatsMonitor) onSegment(entry *catalog.SegmentEntry) (err 
 		return
 	}
 	checkpointed := monitor.db.Scheduler.GetCheckpointed()
+	gcNeeded := false
 	entry.RLock()
-	gcNeeded := entry.IsDroppedCommitted() && !entry.DeleteAfter(checkpointed)
+	if entry.IsDroppedCommitted() {
+		logIndex := entry.GetLogIndex()
+		if logIndex != nil {
+			gcNeeded = checkpointed >= logIndex.LSN
+		}
+	}
 	entry.RUnlock()
 	if gcNeeded {
 		scopes := MakeSegmentScopes(entry)
