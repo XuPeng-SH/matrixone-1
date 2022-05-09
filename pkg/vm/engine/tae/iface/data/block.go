@@ -43,7 +43,7 @@ type Block interface {
 	RangeDelete(txn txnif.AsyncTxn, start, end uint32) (txnif.DeleteNode, error)
 	Update(txn txnif.AsyncTxn, row uint32, colIdx uint16, v interface{}) (txnif.UpdateNode, error)
 
-	CollectChangesInRange(startTs, endTs uint64) interface{}
+	CollectChangesInRange(startTs, endTs uint64) *model.BlockView
 	CollectAppendLogIndexes(startTs, endTs uint64) []*wal.Index
 
 	// GetUpdateChain() txnif.UpdateChain

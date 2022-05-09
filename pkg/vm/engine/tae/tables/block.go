@@ -268,7 +268,7 @@ func (blk *dataBlock) FillColumnView(view *model.ColumnView) (err error) {
 	return nil
 }
 
-func (blk *dataBlock) makeColumnView(colIdx uint16, view *updates.BlockView) (err error) {
+func (blk *dataBlock) FillBlockView(colIdx uint16, view *model.BlockView) (err error) {
 	chain := blk.mvcc.GetColumnChain(colIdx)
 	chain.RLock()
 	updateMask, updateVals := chain.CollectUpdatesLocked(view.Ts)
@@ -280,13 +280,13 @@ func (blk *dataBlock) makeColumnView(colIdx uint16, view *updates.BlockView) (er
 	return
 }
 
-func (blk *dataBlock) MakeBlockView() (view *updates.BlockView, err error) {
+func (blk *dataBlock) MakeBlockView() (view *model.BlockView, err error) {
 	mvcc := blk.mvcc
 	readLock := mvcc.GetSharedLock()
 	ts := mvcc.LoadMaxVisible()
-	view = updates.NewBlockView(ts)
+	view = model.NewBlockView(ts)
 	for i := range blk.meta.GetSchema().ColDefs {
-		blk.makeColumnView(uint16(i), view)
+		blk.FillBlockView(uint16(i), view)
 	}
 	deleteChain := mvcc.GetDeleteChain()
 	dnode := deleteChain.CollectDeletesLocked(ts, true).(*updates.DeleteNode)
@@ -617,8 +617,8 @@ func (blk *dataBlock) CollectAppendLogIndexes(startTs, endTs uint64) (indexes []
 	return blk.mvcc.CollectAppendLogIndexesLocked(startTs, endTs)
 }
 
-func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (v interface{}) {
-	view := updates.NewBlockView(endTs)
+func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (view *model.BlockView) {
+	view = model.NewBlockView(endTs)
 	readLock := blk.mvcc.GetSharedLock()
 
 	for i := range blk.meta.GetSchema().ColDefs {
@@ -637,6 +637,5 @@ func (blk *dataBlock) CollectChangesInRange(startTs, endTs uint64) (v interface{
 	view.DeleteMask, view.DeleteLogIndexes = deleteChain.CollectDeletesInRange(startTs, endTs)
 	deleteChain.RUnlock()
 	readLock.Unlock()
-	v = view
 	return
 }

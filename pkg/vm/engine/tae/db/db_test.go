@@ -23,7 +23,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/jobs"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/txnentries"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/updates"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	ops "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks/worker"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils"
@@ -410,7 +409,7 @@ func TestCompactBlock1(t *testing.T) {
 		}
 
 		dataBlock := block.GetMeta().(*catalog.BlockEntry).GetBlockData()
-		changes := dataBlock.CollectChangesInRange(txn.GetStartTS(), maxTs+1).(*updates.BlockView)
+		changes := dataBlock.CollectChangesInRange(txn.GetStartTS(), maxTs+1)
 		assert.Equal(t, uint64(1), changes.DeleteMask.GetCardinality())
 
 		destBlock, err := seg.CreateNonAppendableBlock()
@@ -424,7 +423,7 @@ func TestCompactBlock1(t *testing.T) {
 		assert.Nil(t, err)
 		t.Log(destBlockData.PPString(common.PPL1, 0, ""))
 
-		view := destBlockData.CollectChangesInRange(0, math.MaxUint64).(*updates.BlockView)
+		view := destBlockData.CollectChangesInRange(0, math.MaxUint64)
 		assert.True(t, view.DeleteMask.Equals(changes.DeleteMask))
 	}
 }
