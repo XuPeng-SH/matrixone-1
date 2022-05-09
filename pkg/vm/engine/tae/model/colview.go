@@ -54,3 +54,11 @@ func (view *ColumnView) Eval(clear bool) error {
 func (view *ColumnView) GetColumnData() *movec.Vector {
 	return view.AppliedVec
 }
+
+func (view *ColumnView) Length() int {
+	return movec.Length(view.AppliedVec)
+}
+
+func (view *ColumnView) GetValue(row uint32) interface{} {
+	return compute.GetValue(view.AppliedVec, row)
+}
