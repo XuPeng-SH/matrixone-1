@@ -33,7 +33,7 @@ type BlockAppender interface {
 
 type Block interface {
 	CheckpointUnit
-	GetID() uint64
+	GetID() *common.ID
 	MutationInfo() string
 	MakeAppender() (BlockAppender, error)
 	IsAppendable() bool

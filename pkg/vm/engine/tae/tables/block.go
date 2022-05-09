@@ -114,7 +114,7 @@ func (blk *dataBlock) RefreshIndex() error {
 	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), idxCommon.MockIndexBufferManager /* TODO: use dedicated index buffer manager */)
 }
 
-func (blk *dataBlock) GetID() uint64 { return blk.meta.ID }
+func (blk *dataBlock) GetID() *common.ID { return blk.meta.AsCommonID() }
 
 func (blk *dataBlock) RunCalibration() {
 	score := blk.estimateRawScore()
