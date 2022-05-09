@@ -29,8 +29,8 @@ type TaskScheduler interface {
 	ScheduleFn(ctx *Context, taskType TaskType, fn func() error) (Task, error)
 	ScheduleScopedFn(ctx *Context, taskType TaskType, scope *common.ID, fn func() error) (Task, error)
 	Checkpoint(indexes []*wal.Index) error
-	GetCheckpointed() uint64
-	GetPenddingCnt() uint64
+	GetCheckpointedLSN() uint64
+	GetPenddingLSNCnt() uint64
 }
 
 type BaseScheduler struct {

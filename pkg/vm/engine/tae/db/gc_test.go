@@ -108,11 +108,11 @@ func TestAutoGC1(t *testing.T) {
 	testutils.WaitExpect(1000, func() bool {
 		cnt = 0
 		tae.Catalog.RecurLoop(processor)
-		return tae.Scheduler.GetPenddingCnt() == 0 && cnt == 12
+		return tae.Scheduler.GetPenddingLSNCnt() == 0 && cnt == 12
 	})
 	t.Log(tae.Catalog.SimplePPString(common.PPL1))
-	t.Logf("GetPenddingCnt: %d", tae.Scheduler.GetPenddingCnt())
-	t.Logf("GetCheckpointed: %d", tae.Scheduler.GetCheckpointed())
+	t.Logf("GetPenddingLSNCnt: %d", tae.Scheduler.GetPenddingLSNCnt())
+	t.Logf("GetCheckpointed: %d", tae.Scheduler.GetCheckpointedLSN())
 	assert.Equal(t, 12, cnt)
-	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingCnt())
+	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingLSNCnt())
 }

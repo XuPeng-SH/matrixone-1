@@ -298,10 +298,10 @@ func TestCheckpointCatalog2(t *testing.T) {
 	maxIndex := entry.GetMaxIndex()
 	tae.Catalog.Checkpoint(ts)
 	testutils.WaitExpect(1000, func() bool {
-		ckp := tae.Scheduler.GetCheckpointed()
+		ckp := tae.Scheduler.GetCheckpointedLSN()
 		return ckp == maxIndex.LSN
 	})
-	assert.Equal(t, maxIndex.LSN, tae.Scheduler.GetCheckpointed())
+	assert.Equal(t, maxIndex.LSN, tae.Scheduler.GetCheckpointedLSN())
 }
 
 func TestCheckpointCatalog(t *testing.T) {

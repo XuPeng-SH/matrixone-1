@@ -146,12 +146,12 @@ func TestAppend2(t *testing.T) {
 
 	now := time.Now()
 	testutils.WaitExpect(8000, func() bool {
-		return db.Scheduler.GetPenddingCnt() == 0
+		return db.Scheduler.GetPenddingLSNCnt() == 0
 	})
 	t.Log(time.Since(now))
-	t.Logf("Checkpointed: %d", db.Scheduler.GetCheckpointed())
-	t.Logf("GetPenddingCnt: %d", db.Scheduler.GetPenddingCnt())
-	assert.Equal(t, uint64(0), db.Scheduler.GetPenddingCnt())
+	t.Logf("Checkpointed: %d", db.Scheduler.GetCheckpointedLSN())
+	t.Logf("GetPenddingLSNCnt: %d", db.Scheduler.GetPenddingLSNCnt())
+	assert.Equal(t, uint64(0), db.Scheduler.GetPenddingLSNCnt())
 }
 
 func TestTableHandle(t *testing.T) {
@@ -607,11 +607,11 @@ func TestAutoCompactABlk1(t *testing.T) {
 		assert.Nil(t, txn.Commit())
 	}
 	testutils.WaitExpect(1000, func() bool {
-		return tae.Scheduler.GetPenddingCnt() == 0
+		return tae.Scheduler.GetPenddingLSNCnt() == 0
 	})
 	err := tae.Catalog.Checkpoint(tae.TxnMgr.StatSafeTS())
 	assert.Nil(t, err)
-	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingCnt())
+	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingLSNCnt())
 	t.Log(tae.Catalog.SimplePPString(common.PPL1))
 	{
 		txn := tae.StartTxn(nil)
@@ -701,13 +701,13 @@ func TestAutoCompactABlk2(t *testing.T) {
 	}
 	wg.Wait()
 	testutils.WaitExpect(1000, func() bool {
-		return db.Scheduler.GetPenddingCnt() == 0
+		return db.Scheduler.GetPenddingLSNCnt() == 0
 	})
-	assert.Equal(t, uint64(0), db.Scheduler.GetPenddingCnt())
+	assert.Equal(t, uint64(0), db.Scheduler.GetPenddingLSNCnt())
 	t.Log(db.MTBufMgr.String())
 	t.Log(db.Catalog.SimplePPString(common.PPL1))
-	t.Logf("GetPenddingCnt: %d", db.Scheduler.GetPenddingCnt())
-	t.Logf("GetCheckpointed: %d", db.Scheduler.GetCheckpointed())
+	t.Logf("GetPenddingLSNCnt: %d", db.Scheduler.GetPenddingLSNCnt())
+	t.Logf("GetCheckpointed: %d", db.Scheduler.GetCheckpointedLSN())
 }
 
 func TestCompactABlk(t *testing.T) {
@@ -745,9 +745,9 @@ func TestCompactABlk(t *testing.T) {
 	err := tae.Catalog.Checkpoint(tae.TxnMgr.StatSafeTS())
 	assert.Nil(t, err)
 	testutils.WaitExpect(1000, func() bool {
-		return tae.Scheduler.GetPenddingCnt() == 0
+		return tae.Scheduler.GetPenddingLSNCnt() == 0
 	})
-	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingCnt())
+	assert.Equal(t, uint64(0), tae.Scheduler.GetPenddingLSNCnt())
 	t.Log(tae.Catalog.SimplePPString(common.PPL1))
 }
 
