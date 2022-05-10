@@ -21,7 +21,9 @@ import (
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -137,6 +139,86 @@ func TestComposedCmd(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestReplay(t *testing.T) {
+	dir := testutils.InitTestEnv(ModuleName, t)
+	ctlg1, err := catalog.OpenCatalog(dir, "mock", nil, nil)
+	assert.Nil(t, err)
+	txnMgr := txnbase.NewTxnManager(catalog.MockTxnStoreFactory(ctlg1), catalog.MockTxnFactory(ctlg1))
+	txnMgr.Start()
+	driver := wal.NewDriverWithStore(ctlg1.GetStore(), false)
+
+	name := "db"
+	tbName := "tb"
+	txn1 := txnMgr.StartTxn(nil)
+
+	db, err := ctlg1.CreateDBEntry(name, txn1)
+	assert.Nil(t, err)
+	cmdMgr := newCommandManager(driver)
+	cmd, err := db.MakeCommand(0)
+	assert.Nil(t, err)
+	cmdMgr.AddCmd(cmd)
+	e, err := cmdMgr.ApplyTxnRecord()
+	assert.Nil(t, err)
+	e.WaitDone()
+
+	schema := catalog.MockSchema(1)
+	schema.Name = tbName
+	tb, err := db.CreateTableEntry(schema, txn1, nil)
+	assert.Nil(t, err)
+	cmdMgr = newCommandManager(driver)
+	cmd, err = tb.MakeCommand(0)
+	assert.Nil(t, err)
+	cmdMgr.AddCmd(cmd)
+	e, err = cmdMgr.ApplyTxnRecord()
+	assert.Nil(t, err)
+	e.WaitDone()
+
+	seg, err := tb.CreateSegment(txn1, catalog.ES_Appendable, nil)
+	assert.Nil(t, err)
+	cmdMgr = newCommandManager(driver)
+	cmd, err = seg.MakeCommand(0)
+	assert.Nil(t, err)
+	cmdMgr.AddCmd(cmd)
+	e, err = cmdMgr.ApplyTxnRecord()
+	assert.Nil(t, err)
+	e.WaitDone()
+
+	blk, err := seg.CreateBlock(txn1, 0, nil)
+	assert.Nil(t, err)
+	cmdMgr = newCommandManager(driver)
+	cmd, err = blk.MakeCommand(0)
+	assert.Nil(t, err)
+	cmdMgr.AddCmd(cmd)
+	e, err = cmdMgr.ApplyTxnRecord()
+	assert.Nil(t, err)
+	e.WaitDone()
+
+	err = txn1.Commit()
+	assert.Nil(t, err)
+	
+	driver.Close()
+	txnMgr.Stop()
+	ctlg1.Close()
+
+	catalog2, err := catalog.OpenCatalog(dir, "mock", nil, nil)
+	assert.Nil(t, err)
+	txnMgr2 := txnbase.NewTxnManager(catalog.MockTxnStoreFactory(catalog2), catalog.MockTxnFactory(catalog2))
+	txnMgr2.Start()
+
+	db2, err := catalog2.GetDatabaseByID(db.ID)
+	assert.Nil(t, err)
+	tb2, err := db2.GetTableEntryByID(tb.ID)
+	assert.Nil(t, err)
+	seg2, err := tb2.GetSegmentByID(seg.ID)
+	assert.Nil(t, err)
+	_, err = seg2.GetBlockEntryByID(blk.ID)
+	assert.Nil(t, err)
+
+	txnMgr2.Stop()
+	catalog2.Close()
+
 }
 
 func TestAppendCmd(t *testing.T) {
