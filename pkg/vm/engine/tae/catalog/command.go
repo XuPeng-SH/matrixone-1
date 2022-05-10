@@ -176,6 +176,9 @@ func (cmd *EntryCommand) WriteTo(w io.Writer) (err error) {
 	}
 	switch cmd.GetType() {
 	case CmdCreateDatabase:
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.ID); err != nil {
+			return
+		}
 		if err = binary.Write(w, binary.BigEndian, cmd.entry.CreateAt); err != nil {
 			return
 		}
@@ -184,6 +187,9 @@ func (cmd *EntryCommand) WriteTo(w io.Writer) (err error) {
 		}
 	case CmdCreateTable:
 		if err = binary.Write(w, binary.BigEndian, cmd.Table.db.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.ID); err != nil {
 			return
 		}
 		if err = binary.Write(w, binary.BigEndian, cmd.entry.CreateAt); err != nil {
@@ -203,6 +209,12 @@ func (cmd *EntryCommand) WriteTo(w io.Writer) (err error) {
 		if err = binary.Write(w, binary.BigEndian, cmd.Table.ID); err != nil {
 			return
 		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.Segment.state); err != nil {
+			return
+		}
 		if err = binary.Write(w, binary.BigEndian, cmd.entry.CreateAt); err != nil {
 			return
 		}
@@ -214,6 +226,9 @@ func (cmd *EntryCommand) WriteTo(w io.Writer) (err error) {
 			return
 		}
 		if err = binary.Write(w, binary.BigEndian, cmd.Segment.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.ID); err != nil {
 			return
 		}
 		if err = binary.Write(w, binary.BigEndian, cmd.entry.CreateAt); err != nil {
@@ -231,6 +246,35 @@ func (cmd *EntryCommand) WriteTo(w io.Writer) (err error) {
 		}
 	case CmdDropDatabase:
 		if err = binary.Write(w, binary.BigEndian, cmd.DB.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.DeleteAt); err != nil {
+			return
+		}
+	case CmdDropSegment:
+		if err = binary.Write(w, binary.BigEndian, cmd.Table.db.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.Table.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.DeleteAt); err != nil {
+			return
+		}
+	case CmdDropBlock:
+		if err = binary.Write(w, binary.BigEndian, cmd.Table.db.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.Table.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.Segment.ID); err != nil {
+			return
+		}
+		if err = binary.Write(w, binary.BigEndian, cmd.entry.ID); err != nil {
 			return
 		}
 		if err = binary.Write(w, binary.BigEndian, cmd.entry.DeleteAt); err != nil {
@@ -298,6 +342,9 @@ func (cmd *EntryCommand) ReadFrom(r io.Reader) (err error) {
 	}
 	switch cmd.GetType() {
 	case CmdCreateDatabase:
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.ID); err != nil {
+			return
+		}
 		if err = binary.Read(r, binary.BigEndian, &cmd.entry.CreateAt); err != nil {
 			return
 		}
@@ -310,6 +357,9 @@ func (cmd *EntryCommand) ReadFrom(r io.Reader) (err error) {
 		}
 	case CmdCreateTable:
 		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.ID); err != nil {
 			return
 		}
 		if err = binary.Read(r, binary.BigEndian, &cmd.entry.CreateAt); err != nil {
@@ -330,12 +380,20 @@ func (cmd *EntryCommand) ReadFrom(r io.Reader) (err error) {
 		if err = binary.Read(r, binary.BigEndian, &cmd.TableID); err != nil {
 			return
 		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.ID); err != nil {
+			return
+		}
+		var state EntryState
+		if err = binary.Read(r, binary.BigEndian, &state); err != nil {
+			return
+		}
 		if err = binary.Read(r, binary.BigEndian, &cmd.entry.CreateAt); err != nil {
 			return
 		}
 		cmd.entry.CurrOp = OpCreate
 		cmd.Segment = &SegmentEntry{
 			BaseEntry: cmd.entry,
+			state: state,
 		}
 	case CmdCreateBlock:
 		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
@@ -345,6 +403,9 @@ func (cmd *EntryCommand) ReadFrom(r io.Reader) (err error) {
 			return
 		}
 		if err = binary.Read(r, binary.BigEndian, &cmd.SegmentID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.ID); err != nil {
 			return
 		}
 		if err = binary.Read(r, binary.BigEndian, &cmd.entry.CreateAt); err != nil {
@@ -366,6 +427,35 @@ func (cmd *EntryCommand) ReadFrom(r io.Reader) (err error) {
 		}
 	case CmdDropDatabase:
 		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.DeleteAt); err != nil {
+			return
+		}
+	case CmdDropSegment:
+		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.TableID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.ID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.DeleteAt); err != nil {
+			return
+		}
+	case CmdDropBlock:
+		if err = binary.Read(r, binary.BigEndian, &cmd.DBID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.TableID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.SegmentID); err != nil {
+			return
+		}
+		if err = binary.Read(r, binary.BigEndian, &cmd.entry.ID); err != nil {
 			return
 		}
 		if err = binary.Read(r, binary.BigEndian, &cmd.entry.DeleteAt); err != nil {

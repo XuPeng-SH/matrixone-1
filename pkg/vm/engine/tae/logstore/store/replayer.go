@@ -3,9 +3,10 @@ package store
 import (
 	"errors"
 	"fmt"
+	"io"
+
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
-	"io"
 )
 
 type noopObserver struct {
