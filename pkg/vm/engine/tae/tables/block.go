@@ -34,6 +34,7 @@ import (
 
 type dataBlock struct {
 	*sync.RWMutex
+	common.ClosedState
 	meta        *catalog.BlockEntry
 	node        *appendableNode
 	file        file.Block
@@ -82,7 +83,7 @@ func newBlock(meta *catalog.BlockEntry, segFile file.Segment, bufMgr base.INodeM
 		schema := meta.GetSchema()
 		block.indexHolder = impl.NewAppendableBlockIndexHolder(block, schema)
 	} else {
-		// Non-appendable index holder would be initialized during compaction
+		block.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
 	}
 	return block
 }
@@ -93,9 +94,6 @@ func (blk *dataBlock) ReplayData() (err error) {
 		defer common.GPool.Free(w.MNode)
 		blk.indexHolder.(acif.IAppendableBlockIndexHolder).BatchInsert(&w.Vector, 0, gvec.Length(&w.Vector), 0, false)
 		return
-	}
-	if blk.indexHolder == nil {
-		blk.indexHolder = impl.NewEmptyNonAppendableBlockIndexHolder()
 	}
 	return blk.indexHolder.(acif.INonAppendableBlockIndexHolder).InitFromHost(blk, blk.meta.GetSchema(), idxCommon.MockIndexBufferManager /* TODO: use dedicated index buffer manager */)
 }
@@ -113,6 +111,9 @@ func (blk *dataBlock) GetMaxVisibleTS() uint64 {
 }
 
 func (blk *dataBlock) Destroy() (err error) {
+	if !blk.TryClose() {
+		return
+	}
 	if blk.node != nil {
 		blk.node.Close()
 	}
