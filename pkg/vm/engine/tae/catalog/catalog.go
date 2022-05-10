@@ -137,11 +137,9 @@ func (catalog *Catalog) replayCmd(txncmd txnif.TxnCmd) (err error) {
 		catalog.addEntryLocked(cmd.DB)
 	case CmdCreateDatabase:
 		cmd := txncmd.(*EntryCommand)
-		catalog.Lock()
 		entry := NewDBEntry(catalog, cmd.DB.name, nil)
 		entry.CreateAt = cmd.entry.CreateAt
 		err = catalog.addEntryLocked(entry)
-		catalog.Unlock()
 	case CmdCreateTable:
 		cmd := txncmd.(*EntryCommand)
 		db, err := catalog.GetDatabaseByID(cmd.DBID)
@@ -226,11 +224,11 @@ func (catalog *Catalog) replayCmd(txncmd txnif.TxnCmd) (err error) {
 		seg.DeleteAt = cmd.entry.DeleteAt
 	case CmdDropBlock:
 		cmd := txncmd.(*EntryCommand)
-		db, err := catalog.GetDatabaseByID(cmd.DB.ID)
+		db, err := catalog.GetDatabaseByID(cmd.DBID)
 		if err != nil {
 			return err
 		}
-		tbl, err := db.GetTableEntryByID(cmd.Table.ID)
+		tbl, err := db.GetTableEntryByID(cmd.TableID)
 		if err != nil {
 			return err
 		}
@@ -245,7 +243,7 @@ func (catalog *Catalog) replayCmd(txncmd txnif.TxnCmd) (err error) {
 		blk.CurrOp = OpSoftDelete
 		blk.DeleteAt = cmd.entry.DeleteAt
 	default:
-		panic("unsupport")
+		// panic("unsupport")
 	}
 	return
 }
