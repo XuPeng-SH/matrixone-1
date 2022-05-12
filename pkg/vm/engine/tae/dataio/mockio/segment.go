@@ -23,7 +23,7 @@ import (
 )
 
 var SegmentFileMockFactory = func(name string, id uint64) file.Segment {
-	return newSegmentFile(name, id)
+	return mockFS.OpenFile(name, id)
 }
 
 type segmentFile struct {
@@ -58,6 +58,7 @@ func (sf *segmentFile) Destory() {
 		block.Unref()
 	}
 	logutil.Infof("Destoring Segment %d", sf.id.SegmentID)
+	mockFS.RemoveFile(sf.id.SegmentID)
 }
 
 func (sf *segmentFile) OpenBlock(id uint64, colCnt int, indexCnt map[int]int) (block file.Block, err error) {
