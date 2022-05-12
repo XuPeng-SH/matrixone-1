@@ -12,45 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package builtin
+package connector
 
-import "github.com/matrixorigin/matrixone/pkg/sql/colexec/extend/overload"
-
-const (
-	Length = iota + overload.NE + 1
-	Space
-	Reverse
-	Substring
-	Ltrim
-	Rtrim
-	Oct
-	StartsWith
-	Lpad
-	Rpad
-	Empty
-	LengthUTF8
-	Round
-	Floor
-	Abs
-	Log
-	Ln
-	Ceil
-	Exp
-	Power
-	Pi
-	Sin
-	Sinh
-	Cos
-	Acos
-	Tan
-	Atan
-	Cot
-	UTCTimestamp
-	DayOfYear
-	Month
-	Year
-	Weekday
-	EndsWith
-	Date
-	Bin
+import (
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/vm/mmu/guest"
+	process "github.com/matrixorigin/matrixone/pkg/vm/process2"
 )
+
+// pipe connector
+type Argument struct {
+	Mmu  *guest.Mmu
+	vecs []*vector.Vector
+	Reg  *process.WaitRegister
+}

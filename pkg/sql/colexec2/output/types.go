@@ -12,45 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package builtin
+package output
 
-import "github.com/matrixorigin/matrixone/pkg/sql/colexec/extend/overload"
+import batch "github.com/matrixorigin/matrixone/pkg/container/batch2"
 
-const (
-	Length = iota + overload.NE + 1
-	Space
-	Reverse
-	Substring
-	Ltrim
-	Rtrim
-	Oct
-	StartsWith
-	Lpad
-	Rpad
-	Empty
-	LengthUTF8
-	Round
-	Floor
-	Abs
-	Log
-	Ln
-	Ceil
-	Exp
-	Power
-	Pi
-	Sin
-	Sinh
-	Cos
-	Acos
-	Tan
-	Atan
-	Cot
-	UTCTimestamp
-	DayOfYear
-	Month
-	Year
-	Weekday
-	EndsWith
-	Date
-	Bin
-)
+type Argument struct {
+	Data interface{}
+	Func func(interface{}, *batch.Batch) error
+}
