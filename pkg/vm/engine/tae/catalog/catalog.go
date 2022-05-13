@@ -15,7 +15,6 @@
 package catalog
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 	"time"
@@ -90,12 +89,12 @@ func OpenCatalog(dir, name string, cfg *store.StoreCfg, scheduler tasks.TaskSche
 	return catalog, err
 }
 func (catalog *Catalog) GetStore() store.Store { return catalog.store }
-func (catalog *Catalog) replayCmd(txncmd txnif.TxnCmd) (err error) {
+func (catalog *Catalog) ReplayCmd(txncmd txnif.TxnCmd) (err error) {
 	switch txncmd.GetType() {
 	case txnbase.CmdComposed:
 		cmds := txncmd.(*txnbase.ComposedCmd)
 		for _, cmds := range cmds.Cmds {
-			catalog.replayCmd(cmds)
+			catalog.ReplayCmd(cmds)
 		}
 	case CmdLogBlock:
 		cmd := txncmd.(*EntryCommand)
@@ -138,24 +137,15 @@ func (catalog *Catalog) replayCmd(txncmd txnif.TxnCmd) (err error) {
 	}
 	return
 }
-func (catalog *Catalog) OnReplayWal(group uint32, commitId uint64, payload []byte, typ uint16, info interface{}) (err error) {
-	r := bytes.NewBuffer(payload)
-	txnCmd, _, err := txnbase.BuildCommandFrom(r)
-	if err != nil {
-		return err
-	}
-	err = catalog.replayCmd(txnCmd)
-	return
-}
 
-func (catalog *Catalog) onReplayCreateDatabase(cmd *EntryCommand)(err error){
+func (catalog *Catalog) onReplayCreateDatabase(cmd *EntryCommand) (err error) {
 	entry := NewDBEntry(catalog, cmd.DB.name, nil)
 	entry.CreateAt = cmd.entry.CreateAt
 	err = catalog.addEntryLocked(entry)
 	return
 }
 
-func (catalog *Catalog) onReplayDropDatabase(cmd *EntryCommand) (err error){
+func (catalog *Catalog) onReplayDropDatabase(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)
 	if err != nil {
 		return err
@@ -190,7 +180,7 @@ func (catalog *Catalog) onReplayCreateTable(cmd *EntryCommand) (err error) {
 	return
 }
 
-func (catalog *Catalog) onReplayDropTable(cmd *EntryCommand) (err error){
+func (catalog *Catalog) onReplayDropTable(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)
 	if err != nil {
 		return err
@@ -220,7 +210,7 @@ func (catalog *Catalog) onReplayTable(cmd *EntryCommand) (err error) {
 	}
 }
 
-func (catalog *Catalog) onReplayCreateSegment(cmd *EntryCommand) (err error){
+func (catalog *Catalog) onReplayCreateSegment(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)
 	if err != nil {
 		return err
@@ -237,7 +227,7 @@ func (catalog *Catalog) onReplayCreateSegment(cmd *EntryCommand) (err error){
 	tbl.addEntryLocked(cmd.Segment)
 	return
 }
-func (catalog *Catalog) onReplayDropSegment(cmd *EntryCommand) (err error){
+func (catalog *Catalog) onReplayDropSegment(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)
 	if err != nil {
 		return err
@@ -276,7 +266,7 @@ func (catalog *Catalog) onReplaySegment(cmd *EntryCommand) (err error) {
 	return nil
 }
 
-func (catalog *Catalog) onReplayCreateBlock(cmd *EntryCommand) (err error){
+func (catalog *Catalog) onReplayCreateBlock(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)
 	if err != nil {
 		return err
@@ -296,7 +286,7 @@ func (catalog *Catalog) onReplayCreateBlock(cmd *EntryCommand) (err error){
 	seg.addEntryLocked(cmd.Block)
 	return
 }
-func (catalog *Catalog) onReplayDropBlock(cmd *EntryCommand) (err error){
+func (catalog *Catalog) onReplayDropBlock(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)
 	if err != nil {
 		return err
@@ -353,7 +343,7 @@ func (catalog *Catalog) OnRelay(group uint32, commitId uint64, payload []byte, t
 	checkpoint.LSN = commitId
 	checkpoint.MaxTS = e.MaxTS
 	for _, cmd := range e.Entries {
-		catalog.replayCmd(cmd)
+		catalog.ReplayCmd(cmd)
 	}
 	if len(catalog.checkpoints) == 0 {
 		catalog.checkpoints = append(catalog.checkpoints, checkpoint)
