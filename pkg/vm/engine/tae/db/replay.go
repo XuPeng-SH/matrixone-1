@@ -38,15 +38,14 @@ func (db *DB) replayHandle(group uint32, commitId uint64, payload []byte, typ ui
 func (db *DB) onReplayAppendCmd(cmd *txnimpl.AppendCmd) (err error) {
 	var data batch.IBatch
 	var deletes *roaring.Bitmap
-	for _, subCmd := range cmd.Cmds {
-		switch subCmd.(type) {
+	for _, subTxnCmd := range cmd.Cmds {
+		switch subCmd:=subTxnCmd.(type) {
 		case *txnbase.BatchCmd:
-			data = subCmd.(*txnbase.BatchCmd).Bat
+			data = subCmd.Bat
 		case *txnbase.DeleteBitmapCmd:
-			deletes = subCmd.(*txnbase.DeleteBitmapCmd).Bitmap
+			deletes = subCmd.Bitmap
 		case *txnbase.PointerCmd:
-			pointerCmd := subCmd.(*txnbase.PointerCmd)
-			batEntry, err := db.Wal.LoadEntry(pointerCmd.Group, pointerCmd.Lsn)
+			batEntry, err := db.Wal.LoadEntry(subCmd.Group, subCmd.Lsn)
 			if err != nil {
 				return err
 			}
