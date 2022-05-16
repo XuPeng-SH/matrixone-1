@@ -47,7 +47,8 @@ type UpdateCmd struct {
 }
 
 func NewEmptyCmd(cmdType int16) *UpdateCmd {
-	cmd := NewUpdateCmd(0, nil)
+	cmd := &UpdateCmd{}
+	cmd.BaseCustomizedCmd = txnbase.NewBaseCustomizedCmd(0, cmd)
 	cmd.cmdType = cmdType
 	if cmdType == txnbase.CmdUpdate {
 		cmd.update = NewColumnNode(nil, nil, nil)
@@ -73,10 +74,9 @@ func NewAppendCmd(id uint32, app *AppendNode) *UpdateCmd {
 func NewDeleteCmd(id uint32, del *DeleteNode) *UpdateCmd {
 	impl := &UpdateCmd{
 		delete:  del,
-		cmdType: txnbase.CmdDelete}
-	if del.chain.controller.meta != nil {
-		impl.dest = del.chain.controller.meta.AsCommonID()
-		impl.dbid = del.chain.controller.meta.GetSegment().GetTable().GetDB().ID
+		cmdType: txnbase.CmdDelete,
+		dest:    del.chain.controller.meta.AsCommonID(),
+		dbid:    del.chain.controller.meta.GetSegment().GetTable().GetDB().ID,
 	}
 	impl.BaseCustomizedCmd = txnbase.NewBaseCustomizedCmd(id, impl)
 	return impl
@@ -85,23 +85,22 @@ func NewDeleteCmd(id uint32, del *DeleteNode) *UpdateCmd {
 func NewUpdateCmd(id uint32, update *ColumnNode) *UpdateCmd {
 	impl := &UpdateCmd{
 		update:  update,
-		cmdType: txnbase.CmdUpdate,	}
-		if update != nil {
-			impl.dest = update.chain.controller.meta.AsCommonID()
-			impl.dbid = update.chain.controller.meta.GetSegment().GetTable().GetDB().ID
+		cmdType: txnbase.CmdUpdate,
+		dest:    update.chain.controller.meta.AsCommonID(),
+		dbid:    update.chain.controller.meta.GetSegment().GetTable().GetDB().ID,
 	}
 	impl.BaseCustomizedCmd = txnbase.NewBaseCustomizedCmd(id, impl)
 	return impl
 }
 
-func (c *UpdateCmd) GetUpdateNode() *ColumnNode {
+func (c *UpdateCmd) GetUpdateNode() *ColumnNode{
 	return c.update
 }
 
-func (c *UpdateCmd) GetAppendNode() *AppendNode {
+func (c *UpdateCmd) GetAppendNode() *AppendNode{
 	return c.append
 }
-func (c *UpdateCmd) GetDeleteNode() *DeleteNode {
+func (c *UpdateCmd) GetDeleteNode() *DeleteNode{
 	return c.delete
 }
 func (c *UpdateCmd) GetDBID() uint64 {
