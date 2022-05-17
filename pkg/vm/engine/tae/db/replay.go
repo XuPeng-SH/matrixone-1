@@ -20,6 +20,7 @@ import (
 type Replayer struct {
 	DataFactory *tables.DataFactory
 	db          *DB
+	ts          uint64
 }
 
 func newReplayer(dataFactory *tables.DataFactory, db *DB) *Replayer {
@@ -28,9 +29,10 @@ func newReplayer(dataFactory *tables.DataFactory, db *DB) *Replayer {
 		db:          db,
 	}
 }
-func (db *DB) Replay(dataFactory *tables.DataFactory) {
+func (db *DB) Replay(dataFactory *tables.DataFactory) uint64 {
 	replayer := newReplayer(dataFactory, db)
 	replayer.Replay()
+	return replayer.ts
 }
 
 func (replayer *Replayer) Replay() {
@@ -51,17 +53,21 @@ func (replayer *Replayer) replayHandle(group uint32, commitId uint64, payload []
 }
 
 func (replayer *Replayer) replayWalCmd(txncmd txnif.TxnCmd) (err error) {
+	ts := uint64(0)
 	switch cmd := txncmd.(type) {
 	case *txnbase.ComposedCmd:
 		for _, cmds := range cmd.Cmds {
 			replayer.replayWalCmd(cmds)
 		}
 	case *catalog.EntryCommand:
-		err = replayer.db.Catalog.ReplayCmd(txncmd, replayer.DataFactory)
+		ts, err = replayer.db.Catalog.ReplayCmd(txncmd, replayer.DataFactory)
 	case *txnimpl.AppendCmd:
 		err = replayer.db.onReplayAppendCmd(cmd)
 	case *updates.UpdateCmd:
 		err = replayer.db.onReplayUpdateCmd(cmd)
+	}
+	if ts > replayer.ts {
+		replayer.ts = ts
 	}
 	return
 }
