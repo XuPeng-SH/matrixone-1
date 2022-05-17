@@ -14,8 +14,6 @@
 
 package catalog
 
-import "github.com/matrixorigin/matrixone/pkg/logutil"
-
 type Replayer struct {
 	dataFactory DataFactory
 	catalog     *Catalog
@@ -48,7 +46,6 @@ func (replayer *Replayer) ReplayerHandle(group uint32, commitId uint64, payload 
 			return
 		}
 		if replayer.ts < ts {
-			logutil.Infof("ts=%d", ts)
 			replayer.ts = ts
 		}
 	}
