@@ -196,6 +196,7 @@ func (store *txnStore) UseDatabase(name string) (err error) {
 func (store *txnStore) GetDatabase(name string) (h handle.Database, err error) {
 	meta, err := store.catalog.GetDBEntry(name, store.txn)
 	if err != nil {
+		logutil.Infof("lalala")
 		return
 	}
 	var db *txnDB
