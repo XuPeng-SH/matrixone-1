@@ -157,7 +157,7 @@ func (catalog *Catalog) ReplayCmd(txncmd txnif.TxnCmd) (err error) {
 		cmd := txncmd.(*EntryCommand)
 		err = catalog.onReplayDropBlock(cmd)
 	default:
-		// panic("unsupport")
+		panic("unsupport")
 	}
 	return
 }
@@ -176,7 +176,7 @@ func (catalog *Catalog) onReplayDropDatabase(cmd *EntryCommand) (err error) {
 	}
 	db.CurrOp = OpSoftDelete
 	db.DeleteAt = cmd.entry.DeleteAt
-	return
+	return catalog.addEntryLocked(db)
 }
 func (catalog *Catalog) onReplayDatabase(cmd *EntryCommand) (err error) {
 	cmd.DB.catalog = catalog
@@ -199,12 +199,7 @@ func (catalog *Catalog) onReplayCreateTable(cmd *EntryCommand) (err error) {
 	if err != nil {
 		return err
 	}
-	meta, err := db.CreateTableEntry(cmd.Table.schema, nil, nil)
-	if err != nil {
-		return err
-	}
-	meta.CreateAt = cmd.entry.CreateAt
-	return
+	return db.addEntryLocked(cmd.Table)
 }
 
 func (catalog *Catalog) onReplayDropTable(cmd *EntryCommand) (err error) {
@@ -218,7 +213,7 @@ func (catalog *Catalog) onReplayDropTable(cmd *EntryCommand) (err error) {
 	}
 	tbl.CurrOp = OpSoftDelete
 	tbl.DeleteAt = cmd.entry.DeleteAt
-	return
+	return db.addEntryLocked(tbl)
 }
 func (catalog *Catalog) onReplayTable(cmd *EntryCommand) (err error) {
 	db, err := catalog.GetDatabaseByID(cmd.DBID)

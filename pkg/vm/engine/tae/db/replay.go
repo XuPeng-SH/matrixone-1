@@ -9,9 +9,11 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/container/compute"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/updates"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnimpl"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 )
 
 func (db *DB) ReplayDDL() {
@@ -19,14 +21,26 @@ func (db *DB) ReplayDDL() {
 }
 
 func (db *DB) replayHandle(group uint32, commitId uint64, payload []byte, typ uint16, info interface{}) (err error) {
+	if group != wal.GroupC {
+		return
+	}
 	r := bytes.NewBuffer(payload)
 	txnCmd, _, err := txnbase.BuildCommandFrom(r)
 	if err != nil {
 		return err
 	}
-	switch cmd := txnCmd.(type) {
+	db.replayWalCmd(txnCmd)
+	return
+}
+
+func (db *DB) replayWalCmd(txncmd txnif.TxnCmd) (err error) {
+	switch cmd := txncmd.(type) {
+	case *txnbase.ComposedCmd:
+		for _, cmds := range cmd.Cmds {
+			db.replayWalCmd(cmds)
+		}
 	case *catalog.EntryCommand:
-		err = db.Catalog.ReplayCmd(txnCmd)
+		err = db.Catalog.ReplayCmd(txncmd)
 	case *txnimpl.AppendCmd:
 		err = db.onReplayAppendCmd(cmd)
 	case *updates.UpdateCmd:

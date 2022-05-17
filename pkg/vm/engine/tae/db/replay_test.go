@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/panjf2000/ants/v2"
@@ -67,18 +68,22 @@ func TestReplayCatalog1(t *testing.T) {
 		assert.Nil(t, err)
 	}
 	wg.Wait()
-	t.Log(tae.Catalog.SimplePPString(common.PPL1))
+	logutil.Info(tae.Catalog.SimplePPString(common.PPL1))
 	t.Logf("GetPenddingLSNCnt: %d", tae.Scheduler.GetPenddingLSNCnt())
 	t.Logf("GetCheckpointed: %d", tae.Scheduler.GetCheckpointedLSN())
 	// ckpTs := tae.Catalog.GetCheckpointed().MaxTS
 	// ckpEntry := tae.Catalog.PrepareCheckpoint(0, ckpTs)
 	tae.Close()
 
-	c, err := catalog.OpenCatalog(tae.Dir, CATALOGDir, nil, nil)
+	tae2, err := Open(tae.Dir, nil)
 	assert.Nil(t, err)
-	defer c.Close()
+	defer tae2.Close()
 
-	t.Log(c.SimplePPString(common.PPL1))
+	c := tae2.Catalog
+	defer c.Close()
+	tae2.ReplayDDL()
+
+	logutil.Info(c.SimplePPString(common.PPL1))
 	t.Logf("GetCatalogCheckpointed: %v", tae.Catalog.GetCheckpointed())
 	t.Logf("GetCatalogCheckpointed2: %v", c.GetCheckpointed())
 	assert.Equal(t, tae.Catalog.GetCheckpointed(), c.GetCheckpointed())
@@ -150,8 +155,13 @@ func TestReplayCatalog2(t *testing.T) {
 	assert.Nil(t, err)
 	tae.Close()
 
-	c, err := catalog.OpenCatalog(tae.Dir, CATALOGDir, nil, nil)
+	tae2, err := Open(tae.Dir, nil)
 	assert.Nil(t, err)
+	defer tae2.Close()
+
+	tae2.ReplayDDL()
+
+	c := tae2.Catalog
 	defer c.Close()
 
 	t.Log(c.SimplePPString(common.PPL1))

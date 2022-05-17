@@ -17,6 +17,7 @@ package wal
 import (
 	"sync"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/store"
 )
@@ -113,6 +114,7 @@ func (driver *walDriver) LoadEntry(groupId uint32, lsn uint64) (LogEntry, error)
 
 func (driver *walDriver) AppendEntry(group uint32, e LogEntry) (uint64, error) {
 	id, err := driver.impl.AppendEntry(group, e)
+	logutil.Infof("append %d", id)
 	return id, err
 }
 
