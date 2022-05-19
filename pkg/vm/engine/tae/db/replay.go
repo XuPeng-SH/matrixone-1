@@ -91,7 +91,6 @@ func (replayer *Replayer) OnReplayCmd(txncmd txnif.TxnCmd, idxCtx *wal.Index) {
 	if err != nil {
 		panic(err)
 	}
-	return
 }
 
 func (db *DB) onReplayAppendCmd(cmd *txnimpl.AppendCmd) {
@@ -212,6 +211,9 @@ func (db *DB) onReplayDelete(cmd *updates.UpdateCmd) {
 	if err != nil {
 		panic(err)
 	}
+	if blk.CurrOp == catalog.OpSoftDelete {
+		return
+	}
 	datablk := blk.GetBlockData()
 	iterator := deleteNode.GetDeleteMaskLocked().Iterator()
 	for iterator.HasNext() {
@@ -272,6 +274,9 @@ func (db *DB) onReplayUpdate(cmd *updates.UpdateCmd) {
 	blk, err := seg.GetBlockEntryByID(id.BlockID)
 	if err != nil {
 		panic(err)
+	}
+	if blk.CurrOp == catalog.OpSoftDelete {
+		return
 	}
 	blkdata := blk.GetBlockData()
 	iterator := updateNode.GetMask().Iterator()
