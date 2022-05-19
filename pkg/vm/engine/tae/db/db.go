@@ -94,10 +94,7 @@ func (db *DB) Replay(dataFactory *tables.DataFactory) {
 	replayer.Replay()
 
 	// TODO: init txn id
-	err := db.TxnMgr.Init(0, replayer.GetMaxTS())
-	if err != nil {
-		panic(err)
-	}
+	db.TxnMgr.Init(0, replayer.GetMaxTS())
 }
 
 func (db *DB) Close() error {
