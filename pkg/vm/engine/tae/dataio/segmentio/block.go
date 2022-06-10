@@ -185,8 +185,14 @@ func (bf *blockFile) Destroy() error {
 		cb.Unref()
 	}
 	bf.columns = nil
-	bf.deletes = nil
-	bf.indexMeta = nil
+	if bf.deletes.file[0] != nil {
+		bf.deletes.file[0].driver.ReleaseFile(bf.deletes.file[0])
+		bf.deletes = nil
+	}
+	if bf.indexMeta.file[0] != nil {
+		bf.indexMeta.file[0].driver.ReleaseFile(bf.indexMeta.file[0])
+		bf.indexMeta = nil
+	}
 	if bf.seg != nil {
 		bf.seg.RemoveBlock(bf.id)
 	}
