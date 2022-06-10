@@ -30,10 +30,9 @@ type BlockDataFactory = func(meta *BlockEntry) data.Block
 
 type BlockEntry struct {
 	*BaseEntry
-	segment       *SegmentEntry
-	state         EntryState
-	blkData       data.Block
-	maxTsReplayed uint64
+	segment *SegmentEntry
+	state   EntryState
+	blkData data.Block
 }
 
 func NewReplayBlockEntry() *BlockEntry {
@@ -94,14 +93,6 @@ func NewSysBlockEntry(segment *SegmentEntry, id uint64) *BlockEntry {
 	return e
 }
 
-func (entry *BlockEntry) GetMaxTsReplayed() uint64 {
-	return entry.maxTsReplayed
-}
-func (entry *BlockEntry) OnReplayTs(ts uint64) {
-	if ts > entry.maxTsReplayed {
-		entry.maxTsReplayed = ts
-	}
-}
 func (entry *BlockEntry) GetCatalog() *Catalog { return entry.segment.table.db.catalog }
 
 func (entry *BlockEntry) IsAppendable() bool {
