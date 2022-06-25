@@ -54,3 +54,21 @@ func TestBatch2(t *testing.T) {
 	cloned.Close()
 	bat.Close()
 }
+
+func TestBatch3(t *testing.T) {
+	vecTypes := types.MockColTypes(17)
+	bat := MockBatch(vecTypes, 101, 3, nil)
+	defer bat.Close()
+	bats := bat.Split(5)
+	assert.Equal(t, 5, len(bats))
+	row := 0
+	for _, b := range bats {
+		row += b.Length()
+	}
+	assert.Equal(t, bat.Length(), row)
+
+	bat2 := MockBatch(vecTypes, 20, 3, nil)
+	bats = bat2.Split(2)
+	t.Log(bats[0].Vecs[3].Length())
+	t.Log(bats[1].Vecs[3].Length())
+}
