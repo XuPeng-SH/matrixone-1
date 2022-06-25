@@ -71,44 +71,7 @@ func SortBlockColumns(cols []containers.Vector, pk int) error {
 		if i == pk {
 			continue
 		}
-		switch cols[i].GetType().Oid {
-		case types.Type_BOOL:
-			bools.Shuffle(cols[i], sortedIdx)
-		case types.Type_INT8:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_INT16:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_INT32:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_INT64:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_UINT8:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_UINT16:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_UINT32:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_UINT64:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_FLOAT32:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_FLOAT64:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_DATE:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_DATETIME:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_DECIMAL64:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_DECIMAL128:
-			decimal128s.Shuffle(cols[i], sortedIdx)
-		case types.Type_TIMESTAMP:
-			numerics.Shuffle(cols[i], sortedIdx)
-		case types.Type_CHAR, types.Type_JSON, types.Type_VARCHAR:
-			varchar.Shuffle(cols[i], sortedIdx)
-		default:
-			panic(fmt.Sprintf("%s not supported", cols[i].GetType().String()))
-		}
+		Shuffle(cols[i], sortedIdx)
 	}
 
 	return nil
@@ -157,84 +120,38 @@ func MergeSortedColumn(column []containers.Vector, sortedIdx *[]uint32, fromLayo
 }
 
 func Reshape(column []containers.Vector, fromLayout, toLayout []uint32) (ret []containers.Vector) {
-	switch column[0].GetType().Oid {
-	case types.Type_BOOL:
-		ret = bools.Reshape(column, fromLayout, toLayout)
-	case types.Type_INT8:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_INT16:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_INT32:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_INT64:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_UINT8:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_UINT16:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_UINT32:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_UINT64:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_FLOAT32:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_FLOAT64:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_DATE:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_DATETIME:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_DECIMAL64:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_DECIMAL128:
-		ret = decimal128s.Reshape(column, fromLayout, toLayout)
-	case types.Type_TIMESTAMP:
-		ret = numerics.Reshape(column, fromLayout, toLayout)
-	case types.Type_CHAR, types.Type_JSON, types.Type_VARCHAR:
-		ret = varchar.Reshape(column, fromLayout, toLayout)
+	ret = make([]containers.Vector, len(toLayout))
+	fromIdx := 0
+	fromOffset := 0
+	for i := 0; i < len(toLayout); i++ {
+		ret[i] = containers.MakeVector(column[0].GetType(), column[0].Nullable())
+		toOffset := 0
+		for toOffset < int(toLayout[i]) {
+			fromLeft := fromLayout[fromIdx] - uint32(fromOffset)
+			if fromLeft == 0 {
+				fromIdx++
+				fromOffset = 0
+				fromLeft = fromLayout[fromIdx]
+			}
+			length := 0
+			if fromLeft < toLayout[i]-uint32(toOffset) {
+				length = int(fromLeft)
+			} else {
+				length = int(toLayout[i]) - toOffset
+			}
+			ret[i].Extend(column[fromIdx].CloneWindow(fromOffset, length))
+			fromOffset += length
+			toOffset += length
+		}
+	}
+	for _, v := range column {
+		v.Close()
 	}
 	return
 }
 
 func ShuffleColumn(column []containers.Vector, sortedIdx []uint32, fromLayout, toLayout []uint32) (ret []containers.Vector) {
-	switch column[0].GetType().Oid {
-	case types.Type_BOOL:
-		ret = bools.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_INT8:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_INT16:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_INT32:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_INT64:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_UINT8:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_UINT16:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_UINT32:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_UINT64:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_FLOAT32:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_FLOAT64:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_DATE:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_DATETIME:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_DECIMAL64:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_DECIMAL128:
-		ret = decimal128s.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_TIMESTAMP:
-		ret = numerics.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	case types.Type_CHAR, types.Type_JSON, types.Type_VARCHAR:
-		ret = varchar.Multiplex(column, sortedIdx, fromLayout, toLayout)
-	default:
-		panic(fmt.Sprintf("%s not supported", column[0].GetType().String()))
-	}
+	ret = Multiplex(column, sortedIdx, fromLayout, toLayout)
 	return
 }
 
