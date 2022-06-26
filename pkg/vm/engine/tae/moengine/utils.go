@@ -17,6 +17,7 @@ package moengine
 import (
 	"bytes"
 	"fmt"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/compute"
 	"strconv"
 
 	"github.com/RoaringBitmap/roaring"
@@ -143,7 +144,7 @@ func MockVec(typ types.Type, rows int, offset int) *vector.Vector {
 	return vec
 }
 
-func BatchWindow(bat *batch.Batch, start, end int) *batch.Batch {
+/*func BatchWindow(bat *batch.Batch, start, end int) *batch.Batch {
 	window := batch.New(true, bat.Attrs)
 	window.Vecs = make([]*vector.Vector, len(bat.Vecs))
 	for i := range window.Vecs {
@@ -202,7 +203,7 @@ func SplitBatch(bat *batch.Batch, cnt int) []*batch.Batch {
 		bats = append(bats, newBat)
 	}
 	return bats
-}
+}*/
 
 func GenericUpdateFixedValue[T any](vec *vector.Vector, row uint32, v any) {
 	_, isNull := v.(types.Null)
@@ -355,7 +356,8 @@ func GetValue(col *vector.Vector, row uint32) any {
 		// return string(data.Data[s : e+s])
 		return data.Data[s : e+s]
 	default:
-		return vector.ErrVecTypeNotSupport
+		//return vector.ErrVecTypeNotSupport
+		panic(any("No Support"))
 	}
 }
 
@@ -518,7 +520,7 @@ func ApplyDeleteToVector(vec *vector.Vector, deletes *roaring.Bitmap) *vector.Ve
 		types.Type_UINT8, types.Type_UINT16, types.Type_UINT32, types.Type_UINT64,
 		types.Type_DECIMAL64, types.Type_DECIMAL128, types.Type_FLOAT32, types.Type_FLOAT64,
 		types.Type_DATE, types.Type_DATETIME, types.Type_TIMESTAMP:
-		vec.Col = InplaceDeleteRows(vec.Col, deletesIterator)
+		vec.Col = compute.InplaceDeleteRows(vec.Col, deletesIterator)
 		deletesIterator = deletes.Iterator()
 		for deletesIterator.HasNext() {
 			row := deletesIterator.Next()
