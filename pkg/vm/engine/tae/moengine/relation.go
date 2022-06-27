@@ -150,7 +150,7 @@ func (rel *txnRelation) Update(_ uint64, data *batch.Batch, _ engine.Snapshot) e
 	bat := containers.NewEmptyBatch()
 	defer bat.Close()
 	for i, vec := range data.Vecs {
-		idx := catalog.GetAttrIdx(schema.Attrs(), data.Attrs[i])
+		idx := catalog.GetAttrIdx(schema.AllNames(), data.Attrs[i])
 		v := MOToVector(vec, allNullables[idx])
 		bat.AddVector(data.Attrs[i], v)
 	}

@@ -82,6 +82,9 @@ func TestEngine(t *testing.T) {
 	attr := rel.GetPrimaryKeys(nil)
 	key := attr[0]
 	bat = catalog.MockBatch(schema, 20)
+	defer bat.Close()
+	newbat = mobat.New(true, bat.Attrs)
+	newbat.Vecs = CopyToMoVectors(bat.Vecs)
 	err = rel.Delete(0, newbat.Vecs[12], key.Name, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
