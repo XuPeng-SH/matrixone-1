@@ -705,7 +705,7 @@ func MOToVector(v *vector.Vector, nullable bool) containers.Vector {
 		bs.Offset = vbs.Offsets
 		bs.Length = vbs.Lengths
 	default:
-		panic(fmt.Errorf("%s not supported", v.Typ.String()))
+		panic(any(fmt.Errorf("%s not supported", v.Typ.String())))
 	}
 	return vec
 }
@@ -750,7 +750,7 @@ func CToMoVector(vec containers.Vector) *vector.Vector {
 		var nullBuf []byte
 		nullBuf, _ = vec.NullMask().ToBytes()
 		if err := mov.Nsp.Read(nullBuf); err != nil {
-			panic(err)
+			panic(any(err))
 		}
 	}
 	mov.Data = data
@@ -805,7 +805,7 @@ func CToMoVector(vec containers.Vector) *vector.Vector {
 			Col.Data = bs.DataBuf()
 		}
 	default:
-		panic(any(""))
+		panic(any(fmt.Errorf("%s not supported", vec.GetType().String())))
 	}
 	return mov
 }

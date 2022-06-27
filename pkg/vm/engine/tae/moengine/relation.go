@@ -154,7 +154,7 @@ func (rel *txnRelation) Update(_ uint64, data *batch.Batch, _ engine.Snapshot) e
 		v := MOToVector(vec, allNullables[idx])
 		bat.AddVector(data.Attrs[i], v)
 	}
-	hiddenIdx := catalog.GetAttrIdx(bat.Attrs, schema.HiddenKey.Name)
+	hiddenIdx := catalog.GetAttrIdx(data.Attrs, schema.HiddenKey.Name)
 	for idx := 0; idx < bat.Vecs[hiddenIdx].Length(); idx++ {
 		v := bat.Vecs[hiddenIdx].Get(idx)
 		for i, attr := range bat.Attrs {
@@ -174,7 +174,9 @@ func (rel *txnRelation) Update(_ uint64, data *batch.Batch, _ engine.Snapshot) e
 func (rel *txnRelation) Delete(_ uint64, data *vector.Vector, col string, _ engine.Snapshot) error {
 	schema := rel.handle.GetMeta().(*catalog.TableEntry).GetSchema()
 	logutil.Debugf("Delete col: %v", col)
-	vec := MOToVector(data, false)
+	allNullables := schema.AllNullables()
+	idx := catalog.GetAttrIdx(schema.AllNames(), col)
+	vec := MOToVector(data, allNullables[idx])
 	defer vec.Close()
 	if schema.HiddenKey.Name == col {
 		return rel.handle.DeleteByHiddenKeys(vec)
