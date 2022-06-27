@@ -41,7 +41,6 @@ func (blk *txnBlock) Read(cs []uint64, attrs []string, compressed []*bytes.Buffe
 			return nil, err
 		}
 		view.ApplyDeletes()
-		//view.AppliedVec.Ref = cs[i]
 		if view.GetData().Allocated() > 0 {
 			bat.Vecs[i] = CopyToMoVector(view.GetData())
 		} else {
