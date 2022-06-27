@@ -30,18 +30,72 @@ func (win *windowBase) Length() int                          { return win.length
 func (win *windowBase) Capacity() int                        { return win.length }
 func (win *windowBase) Allocated() int                       { return 0 }
 func (win *windowBase) DataWindow(offset, length int) []byte { panic("cannot window a window") }
-func (win *windowBase) GetView() VectorView                  { panic("not implemented") }
 func (win *windowBase) Close()                               {}
-func (win *windowBase) Equals(o Vector) bool                 { panic("implement me") }
-func (win *windowBase) ReadFrom(io.Reader) (int64, error)    { panic("not implemented") }
+func (win *windowBase) ReadFrom(io.Reader) (int64, error)    { panic("cannot modify window") }
 
-func (win *windowBase) ReadFromFile(common.IVFile, *bytes.Buffer) error { panic("not implemented") }
-func (win *windowBase) Reset()                                          { panic("cannot modify window") }
-func (win *windowBase) ResetWithData(*Bytes, *roaring64.Bitmap)         { panic("not implemented") }
+func (win *windowBase) ReadFromFile(common.IVFile, *bytes.Buffer) error {
+	panic("cannot modify window")
+}
+func (win *windowBase) Reset()                                  { panic("cannot modify window") }
+func (win *windowBase) ResetWithData(*Bytes, *roaring64.Bitmap) { panic("cannot modify window") }
 
 type vectorWindow[T any] struct {
 	*windowBase
 	ref *vector[T]
+}
+
+func (win *vectorWindow[T]) Equals(o Vector) bool {
+	if win.Length() != o.Length() {
+		return false
+	}
+	if win.GetType() != o.GetType() {
+		return false
+	}
+	if win.Nullable() != o.Nullable() {
+		return false
+	}
+	if win.HasNull() != o.HasNull() {
+		return false
+	}
+	if win.HasNull() {
+		if !win.NullMask().Equals(o.NullMask()) {
+			return false
+		}
+	}
+	mask := win.NullMask()
+	for i := 0; i < win.Length(); i++ {
+		if mask != nil && mask.ContainsInt(i) {
+			continue
+		}
+		var v T
+		if _, ok := any(v).([]byte); ok {
+			if !bytes.Equal(win.Get(i).([]byte), o.Get(i).([]byte)) {
+				return false
+			}
+		} else if _, ok := any(v).(types.Decimal128); ok {
+			d := win.Get(i).(types.Decimal128)
+			od := win.Get(i).(types.Decimal128)
+			if d.Hi != od.Hi || d.Lo != od.Lo {
+				return false
+			}
+		} else {
+			if win.Get(i) != o.Get(i) {
+				return false
+			}
+		}
+	}
+	return true
+
+}
+
+func (win *vectorWindow[T]) GetView() VectorView {
+	return &vectorWindow[T]{
+		ref: win.ref,
+		windowBase: &windowBase{
+			offset: win.offset,
+			length: win.length,
+		},
+	}
 }
 
 func (win *vectorWindow[T]) CloneWindow(offset, length int, allocator ...MemAllocator) Vector {

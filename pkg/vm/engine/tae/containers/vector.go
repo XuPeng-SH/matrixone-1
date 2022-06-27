@@ -76,6 +76,12 @@ func (vec *vector[T]) Equals(o Vector) bool {
 			if !bytes.Equal(vec.Get(i).([]byte), o.Get(i).([]byte)) {
 				return false
 			}
+		} else if _, ok := any(v).(types.Decimal128); ok {
+			d := vec.Get(i).(types.Decimal128)
+			od := vec.Get(i).(types.Decimal128)
+			if d.Hi != od.Hi || d.Lo != od.Lo {
+				return false
+			}
 		} else {
 			if vec.Get(i) != o.Get(i) {
 				return false
