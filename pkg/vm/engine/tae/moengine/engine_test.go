@@ -1,6 +1,7 @@
 package moengine
 
 import (
+	mobat "github.com/matrixorigin/matrixone/pkg/container/batch"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
@@ -64,8 +65,12 @@ func TestEngine(t *testing.T) {
 	assert.Equal(t, false, rAttr.Default.Exist)
 	assert.Equal(t, 1, len(rel.Nodes(nil)))
 	assert.Equal(t, ADDR, rel.Nodes(nil)[0].Addr)
-	bat := catalog.MockData(schema, 100)
-	err = rel.Write(0, bat, txn.GetCtx())
+	bat := catalog.MockBatch(schema, 100)
+	defer bat.Close()
+
+	newbat := mobat.New(true, bat.Attrs)
+	newbat.Vecs = CopyToMoVectors(bat.Vecs)
+	err = rel.Write(0, newbat, txn.GetCtx())
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 	txn, err = e.StartTxn(nil)
@@ -76,8 +81,8 @@ func TestEngine(t *testing.T) {
 	assert.Nil(t, err)
 	attr := rel.GetPrimaryKeys(nil)
 	key := attr[0]
-	bat = catalog.MockData(schema, 20)
-	err = rel.Delete(0, bat.Vecs[12], key.Name, nil)
+	bat = catalog.MockBatch(schema, 20)
+	err = rel.Delete(0, newbat.Vecs[12], key.Name, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 
@@ -123,8 +128,12 @@ func TestTxnRelation_GetHideKey(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(rel.Nodes(nil)))
 	assert.Equal(t, ADDR, rel.Nodes(nil)[0].Addr)
-	bat := catalog.MockData(schema, 100)
-	err = rel.Write(0, bat, txn.GetCtx())
+	bat := catalog.MockBatch(schema, 100)
+	defer bat.Close()
+
+	newbat := mobat.New(true, bat.Attrs)
+	newbat.Vecs = CopyToMoVectors(bat.Vecs)
+	err = rel.Write(0, newbat, txn.GetCtx())
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 	txn, err = e.StartTxn(nil)
@@ -135,7 +144,7 @@ func TestTxnRelation_GetHideKey(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 	readers := rel.NewReader(10, nil, nil, nil)
-	delete := bat
+	delete := mobat.New(true, bat.Attrs)
 	for _, reader := range readers {
 		bat, err := reader.Read([]uint64{uint64(1)}, []string{schema.ColDefs[13].Name})
 		assert.Nil(t, err)
@@ -196,8 +205,12 @@ func TestTxnRelation_Update(t *testing.T) {
 	assert.Nil(t, err)
 	rel, err := dbase.Relation(schema.Name, txn.GetCtx())
 	assert.Nil(t, err)
-	bat := catalog.MockData(schema, 4)
-	err = rel.Write(0, bat, txn.GetCtx())
+	bat := catalog.MockBatch(schema, 4)
+	defer bat.Close()
+
+	newbat := mobat.New(true, bat.Attrs)
+	newbat.Vecs = CopyToMoVectors(bat.Vecs)
+	err = rel.Write(0, newbat, txn.GetCtx())
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 	txn, err = e.StartTxn(nil)
@@ -208,7 +221,7 @@ func TestTxnRelation_Update(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 	readers := rel.NewReader(10, nil, nil, nil)
-	update := bat
+	update := newbat
 	for _, reader := range readers {
 		bat1, err := reader.Read([]uint64{uint64(1), uint64(1), uint64(1)}, []string{schema.ColDefs[13].Name, schema.ColDefs[0].Name, schema.ColDefs[1].Name})
 		assert.Nil(t, err)
@@ -217,10 +230,10 @@ func TestTxnRelation_Update(t *testing.T) {
 			update = bat1
 		}
 	}
-	assert.Equal(t, bat.Vecs[0].Col.([]int32)[0], update.Vecs[1].Col.([]int32)[0])
-	assert.Equal(t, bat.Vecs[0].Col.([]int32)[1], update.Vecs[1].Col.([]int32)[1])
-	assert.Equal(t, bat.Vecs[1].Col.([]int32)[0], update.Vecs[2].Col.([]int32)[0])
-	assert.Equal(t, bat.Vecs[1].Col.([]int32)[1], update.Vecs[2].Col.([]int32)[1])
+	assert.Equal(t, newbat.Vecs[0].Col.([]int32)[0], update.Vecs[1].Col.([]int32)[0])
+	assert.Equal(t, newbat.Vecs[0].Col.([]int32)[1], update.Vecs[1].Col.([]int32)[1])
+	assert.Equal(t, newbat.Vecs[1].Col.([]int32)[0], update.Vecs[2].Col.([]int32)[0])
+	assert.Equal(t, newbat.Vecs[1].Col.([]int32)[1], update.Vecs[2].Col.([]int32)[1])
 	update.Vecs[1].Col.([]int32)[0] = 5
 	update.Vecs[1].Col.([]int32)[1] = 6
 	update.Vecs[1].Col.([]int32)[3] = 8
@@ -271,7 +284,7 @@ func TestTxnRelation_Update(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, txn.Commit())
 	readers = rel.NewReader(10, nil, nil, nil)
-	updatePK := bat
+	updatePK := newbat
 	for _, reader := range readers {
 		bat, err := reader.Read([]uint64{uint64(1), uint64(1), uint64(1), uint64(1)},
 			[]string{schema.ColDefs[0].Name,
