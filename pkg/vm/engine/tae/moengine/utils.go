@@ -740,7 +740,7 @@ func CopyToMoVector(vec containers.Vector) *vector.Vector {
 	return mov
 }
 
-func CToMoVector(vec containers.Vector) *vector.Vector {
+func VectorsToMO(vec containers.Vector) *vector.Vector {
 	mov := vector.New(vec.GetType())
 	data := vec.Data()
 	typ := vec.GetType()

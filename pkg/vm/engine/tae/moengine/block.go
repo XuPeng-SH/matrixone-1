@@ -35,20 +35,20 @@ func (blk *txnBlock) Read(cs []uint64, attrs []string, compressed []*bytes.Buffe
 	bat.Vecs = make([]*vector.Vector, len(attrs))
 	for i, attr := range attrs {
 		view, err = blk.handle.GetColumnDataByName(attr, compressed[i], deCompressed[i])
-		us := view.GetDataView().GetAllocator().Usage()
+		view.GetData().Allocated()
 		if err != nil {
-			if us == 0 {
-				view.Close()
-			}
+			view.Close()
 			return nil, err
 		}
 		view.ApplyDeletes()
 		//view.AppliedVec.Ref = cs[i]
-		bat.Vecs[i] = CToMoVector(view.GetData())
-		bat.Attrs[i] = attr
-		if us == 0 {
-			view.Close()
+		if view.GetData().Allocated() > 0 {
+			bat.Vecs[i] = CopyToMoVector(view.GetData())
+		} else {
+			bat.Vecs[i] = VectorsToMO(view.GetData())
 		}
+		bat.Attrs[i] = attr
+		view.Close()
 	}
 	return bat, nil
 }
