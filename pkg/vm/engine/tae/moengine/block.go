@@ -35,7 +35,6 @@ func (blk *txnBlock) Read(cs []uint64, attrs []string, compressed []*bytes.Buffe
 	bat.Vecs = make([]*vector.Vector, len(attrs))
 	for i, attr := range attrs {
 		view, err = blk.handle.GetColumnDataByName(attr, compressed[i], deCompressed[i])
-		view.GetData().Allocated()
 		if err != nil {
 			view.Close()
 			return nil, err
