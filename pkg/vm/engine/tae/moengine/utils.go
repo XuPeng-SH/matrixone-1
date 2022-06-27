@@ -748,11 +748,7 @@ func VectorsToMO(vec containers.Vector) *vector.Vector {
 	mov.Typ = typ
 	mov.Or = true
 	if vec.HasNull() {
-		var nullBuf []byte
-		nullBuf, _ = vec.NullMask().ToBytes()
-		if err := mov.Nsp.Read(nullBuf); err != nil {
-			panic(any(err))
-		}
+		mov.Nsp.Np = vec.NullMask()
 	}
 	mov.Data = data
 	switch vec.GetType().Oid {
