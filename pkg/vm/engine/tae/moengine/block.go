@@ -16,7 +16,6 @@ package moengine
 
 import (
 	"bytes"
-
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
@@ -36,15 +35,20 @@ func (blk *txnBlock) Read(cs []uint64, attrs []string, compressed []*bytes.Buffe
 	bat.Vecs = make([]*vector.Vector, len(attrs))
 	for i, attr := range attrs {
 		view, err = blk.handle.GetColumnDataByName(attr, compressed[i], deCompressed[i])
+		us := view.GetDataView().GetAllocator().Usage()
 		if err != nil {
-			view.Close()
+			if us == 0 {
+				view.Close()
+			}
 			return nil, err
 		}
 		view.ApplyDeletes()
 		//view.AppliedVec.Ref = cs[i]
-		bat.Vecs[i] = CopyToMoVector(view.GetData())
+		bat.Vecs[i] = CToMoVector(view.GetData())
 		bat.Attrs[i] = attr
-		view.Close()
+		if us == 0 {
+			view.Close()
+		}
 	}
 	return bat, nil
 }

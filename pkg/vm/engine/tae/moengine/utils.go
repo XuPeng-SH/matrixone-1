@@ -740,6 +740,76 @@ func CopyToMoVector(vec containers.Vector) *vector.Vector {
 	return mov
 }
 
+func CToMoVector(vec containers.Vector) *vector.Vector {
+	mov := vector.New(vec.GetType())
+	data := vec.Data()
+	typ := vec.GetType()
+	mov.Typ = typ
+	mov.Or = true
+	if vec.HasNull() {
+		var nullBuf []byte
+		nullBuf, _ = vec.NullMask().ToBytes()
+		if err := mov.Nsp.Read(nullBuf); err != nil {
+			panic(err)
+		}
+	}
+	mov.Data = data
+	switch vec.GetType().Oid {
+	case types.Type_BOOL:
+		mov.Col = encoding.DecodeBoolSlice(data)
+	case types.Type_INT8:
+		mov.Col = encoding.DecodeInt8Slice(data)
+	case types.Type_INT16:
+		mov.Col = encoding.DecodeInt16Slice(data)
+	case types.Type_INT32:
+		mov.Col = encoding.DecodeInt32Slice(data)
+	case types.Type_INT64:
+		mov.Col = encoding.DecodeInt64Slice(data)
+	case types.Type_UINT8:
+		mov.Col = encoding.DecodeUint8Slice(data)
+	case types.Type_UINT16:
+		mov.Col = encoding.DecodeUint16Slice(data)
+	case types.Type_UINT32:
+		mov.Col = encoding.DecodeUint32Slice(data)
+	case types.Type_UINT64:
+		mov.Col = encoding.DecodeUint64Slice(data)
+	case types.Type_FLOAT32:
+		mov.Col = encoding.DecodeFloat32Slice(data)
+	case types.Type_FLOAT64:
+		mov.Col = encoding.DecodeFloat64Slice(data)
+	case types.Type_DATE:
+		mov.Col = encoding.DecodeDateSlice(data)
+	case types.Type_DATETIME:
+		mov.Col = encoding.DecodeDatetimeSlice(data)
+	case types.Type_TIMESTAMP:
+		mov.Col = encoding.DecodeTimestampSlice(data)
+	case types.Type_DECIMAL64:
+		mov.Col = encoding.DecodeDecimal64Slice(data)
+	case types.Type_DECIMAL128:
+		mov.Col = encoding.DecodeDecimal128Slice(data)
+	case types.Type_TUPLE:
+		cnt := encoding.DecodeInt32(data)
+		if cnt == 0 {
+			break
+		}
+		if err := encoding.Decode(data, &mov.Col); err != nil {
+			panic(any(err))
+		}
+	case types.Type_CHAR, types.Type_VARCHAR, types.Type_JSON:
+		Col := mov.Col.(*types.Bytes)
+		Col.Reset()
+		bs := vec.Bytes()
+		Col.Offsets = make([]uint32, vec.Length())
+		if vec.Length() > 0 {
+			Col.Lengths = encoding.DecodeUint32Slice(bs.LengthBuf())
+			Col.Data = bs.DataBuf()
+		}
+	default:
+		panic(any(""))
+	}
+	return mov
+}
+
 func CopyToMoVectors(vecs []containers.Vector) []*vector.Vector {
 	movecs := make([]*vector.Vector, len(vecs))
 	for i := range movecs {
