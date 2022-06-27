@@ -107,6 +107,82 @@ func TestEngine(t *testing.T) {
 	t.Log(tae.Catalog.SimplePPString(common.PPL1))
 }
 
+func TestEngineAllType(t *testing.T) {
+	testutils.EnsureNoLeak(t)
+	tae := initDB(t, nil)
+	defer tae.Close()
+	e := NewEngine(tae)
+	txn, err := e.StartTxn(nil)
+	assert.Nil(t, err)
+	err = e.Create(0, "db", 0, txn.GetCtx())
+	assert.Nil(t, err)
+	names := e.Databases(txn.GetCtx())
+	assert.Equal(t, 2, len(names))
+	dbase, err := e.Database("db", txn.GetCtx())
+	assert.Nil(t, err)
+
+	schema := catalog.MockSchemaAll(18, 12)
+	defs, err := SchemaToDefs(schema)
+	defs[5].(*engine.AttributeDef).Attr.Default = engine.MakeDefaultExpr(true, uint16(3), false)
+	defs[6].(*engine.AttributeDef).Attr.Default = engine.MakeDefaultExpr(true, nil, true)
+	assert.NoError(t, err)
+	err = dbase.Create(0, schema.Name, defs, txn.GetCtx())
+	assert.Nil(t, err)
+	names = dbase.Relations(txn.GetCtx())
+	assert.Equal(t, 1, len(names))
+
+	rel, err := dbase.Relation(schema.Name, txn.GetCtx())
+	assert.Nil(t, err)
+	rDefs := rel.TableDefs(nil)
+	assert.Equal(t, 19, len(rDefs))
+	rAttr := rDefs[5].(*engine.AttributeDef).Attr
+	assert.Equal(t, uint16(3), rAttr.Default.Value.(uint16))
+	rAttr = rDefs[6].(*engine.AttributeDef).Attr
+	assert.Equal(t, true, rAttr.Default.IsNull)
+	basebat := catalog.MockBatch(schema, 100)
+	defer basebat.Close()
+
+	newbat := mobat.New(true, basebat.Attrs)
+	newbat.Vecs = CopyToMoVectors(basebat.Vecs)
+	err = rel.Write(0, newbat, txn.GetCtx())
+	assert.Nil(t, err)
+	assert.Nil(t, txn.Commit())
+	txn, err = e.StartTxn(nil)
+	assert.Nil(t, err)
+	dbase, err = e.Database("db", txn.GetCtx())
+	assert.Nil(t, err)
+	rel, err = dbase.Relation(schema.Name, txn.GetCtx())
+	assert.Nil(t, err)
+	attr := rel.GetPrimaryKeys(nil)
+	key := attr[0]
+	bat := catalog.MockBatch(schema, 20)
+	defer bat.Close()
+	newbat1 := mobat.New(true, bat.Attrs)
+	newbat1.Vecs = CopyToMoVectors(bat.Vecs)
+	err = rel.Delete(0, newbat1.Vecs[12], key.Name, nil)
+	assert.Nil(t, err)
+	assert.Nil(t, txn.Commit())
+
+	txn, err = e.StartTxn(nil)
+	assert.Nil(t, err)
+	dbase, err = e.Database("db", txn.GetCtx())
+	assert.Nil(t, err)
+	rel, err = dbase.Relation(schema.Name, txn.GetCtx())
+	assert.Nil(t, err)
+	refs := make([]uint64, len(schema.Attrs()))
+	readers := rel.NewReader(10, nil, nil, nil)
+	for _, reader := range readers {
+		bat, err := reader.Read(refs, schema.Attrs())
+		assert.Nil(t, err)
+		if bat != nil {
+			assert.Equal(t, 80, vector.Length(bat.Vecs[0]))
+			vec := MOToVector(bat.Vecs[12], false)
+			assert.Equal(t, vec.Get(0), basebat.Vecs[12].Get(20))
+		}
+	}
+	t.Log(tae.Catalog.SimplePPString(common.PPL1))
+}
+
 func TestTxnRelation_GetHideKey(t *testing.T) {
 	testutils.EnsureNoLeak(t)
 	tae := initDB(t, nil)

@@ -704,6 +704,7 @@ func MOToVector(v *vector.Vector, nullable bool) containers.Vector {
 		bs.Data = vbs.Data
 		bs.Offset = vbs.Offsets
 		bs.Length = vbs.Lengths
+		vec.ResetWithData(bs, v.Nsp.Np)
 	default:
 		panic(any(fmt.Errorf("%s not supported", v.Typ.String())))
 	}
