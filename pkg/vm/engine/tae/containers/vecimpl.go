@@ -125,9 +125,7 @@ func (impl *nullableVecImpl[T]) DeleteBatch(deletes *roaring.Bitmap) {
 			null := nullsIt.PeekNext()
 			if null < uint64(idx) {
 				nullsIt.Next()
-				if deleted != 0 {
-					newNulls.Add(null - uint64(deleted))
-				}
+				newNulls.Add(null - uint64(deleted))
 			} else {
 				if null == uint64(idx) {
 					nullsIt.Next()
