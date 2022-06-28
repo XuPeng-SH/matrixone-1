@@ -137,7 +137,7 @@ func (impl *nullableVecImpl[T]) DeleteBatch(deletes *roaring.Bitmap) {
 		}
 		deleted++
 	}
-	impl.derived.nulls=newNulls
+	impl.derived.nulls = newNulls
 	impl.vecBase.DeleteBatch(deletes)
 }
 
