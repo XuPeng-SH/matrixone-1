@@ -726,7 +726,6 @@ func MOToVectorTmp(v *vector.Vector, nullable bool) containers.Vector {
 		} else {
 			bs.Data = encoding.EncodeFixedSlice(v.Col.([]bool), 1)
 		}
-		vec.ResetWithData(bs, v.Nsp.Np)
 	case types.Type_INT8:
 		if len(v.Col.([]int8)) == 0 {
 			bs.Data = make([]byte, v.Length)
@@ -735,7 +734,6 @@ func MOToVectorTmp(v *vector.Vector, nullable bool) containers.Vector {
 		} else {
 			bs.Data = encoding.EncodeFixedSlice(v.Col.([]int8), 1)
 		}
-		vec.ResetWithData(bs, v.Nsp.Np)
 	case types.Type_INT16:
 		if len(v.Col.([]int16)) == 0 {
 			bs.Data = make([]byte, v.Length*2)
@@ -744,7 +742,6 @@ func MOToVectorTmp(v *vector.Vector, nullable bool) containers.Vector {
 		} else {
 			bs.Data = encoding.EncodeFixedSlice(v.Col.([]int16), 2)
 		}
-		vec.ResetWithData(bs, v.Nsp.Np)
 	case types.Type_INT32:
 		if len(v.Col.([]int32)) == 0 {
 			bs.Data = make([]byte, v.Length*4)
@@ -753,7 +750,6 @@ func MOToVectorTmp(v *vector.Vector, nullable bool) containers.Vector {
 		} else {
 			bs.Data = encoding.EncodeFixedSlice(v.Col.([]int32), 4)
 		}
-		vec.ResetWithData(bs, v.Nsp.Np)
 	case types.Type_INT64:
 		if len(v.Col.([]int64)) == 0 {
 			bs.Data = make([]byte, v.Length*8)
@@ -771,7 +767,6 @@ func MOToVectorTmp(v *vector.Vector, nullable bool) containers.Vector {
 		} else {
 			bs.Data = encoding.EncodeFixedSlice(v.Col.([]uint8), 1)
 		}
-		vec.ResetWithData(bs, v.Nsp.Np)
 	case types.Type_UINT16:
 		if len(v.Col.([]uint16)) == 0 {
 			bs.Data = make([]byte, v.Length*2)
