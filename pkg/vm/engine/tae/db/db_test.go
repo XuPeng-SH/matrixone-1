@@ -2446,26 +2446,6 @@ func TestCompactBlk(t *testing.T) {
 			_ = rel.UpdateByFilter(filter, 0, int8(111))
 			assert.Nil(t, txn2.Commit())
 		}
-		// {
-		// 	v := getSingleSortKeyValue(bat, schema, 3)
-		// 	t.Logf("v is %v**********",v)
-		// 	filter := handle.NewEQFilter(v)
-		// 	txn2, rel := tae.getRelation()
-		// 	t.Log("********before delete******************")
-		// 	checkAllColRowsByScan(t, rel, 2, true)
-		// 	rel.DeleteByFilter(filter)
-		// 	assert.Nil(t, txn2.Commit())
-		// }
-		// {
-		// 	v := getSingleSortKeyValue(bat, schema, 4)
-		// 	t.Logf("v is %v**********",v)
-		// 	filter := handle.NewEQFilter(v)
-		// 	txn2, rel := tae.getRelation()
-		// 	t.Log("********before delete******************")
-		// 	checkAllColRowsByScan(t, rel, 1, true)
-		// 	rel.DeleteByFilter(filter)
-		// 	assert.Nil(t, txn2.Commit())
-		// }
 
 		err = txn.Commit()
 		assert.NoError(t, err)
@@ -2490,7 +2470,3 @@ func TestCompactBlk(t *testing.T) {
 	_, _, err = rel.GetByFilter(filter)
 	assert.NotNil(t, err)
 }
-
-//prepare data
-//delete
-//shuffle
