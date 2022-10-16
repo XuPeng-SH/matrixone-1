@@ -52,7 +52,7 @@ func (info *partialCkpInfo) MergePartialCkpInfo(o *partialCkpInfo) {
 
 func (info *partialCkpInfo) MergeCommandInfos(cmds *entry.CommandInfo) {
 	if info.size != cmds.Size {
-		panic("logic error")
+		panic(fmt.Sprintf("logic error %d != %d", info.size, cmds.Size))
 	}
 	for _, csn := range cmds.CommandIds {
 		info.ckps.Add(csn)
