@@ -116,6 +116,14 @@ func (be *MVCCChain) HasCommittedNodeInRange(start, end types.TS) (ok bool) {
 	return
 }
 
+func (be *MVCCChain) IsFirstNodeActive() bool {
+	if be.MVCC.Depth() == 1 {
+		return be.MVCC.GetHead().GetPayload().IsActive()
+	}
+
+	return false
+}
+
 // GetLatestNodeLocked gets the latest mvcc node.
 // It is useful in making command, apply state(e.g. ApplyCommit),
 // check confilct.

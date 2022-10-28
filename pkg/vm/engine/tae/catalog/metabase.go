@@ -202,12 +202,20 @@ func (be *MetaBaseEntry) NeedWaitCommitting(startTS types.TS) (bool, txnif.TxnRe
 	return un.NeedWaitCommitting(startTS)
 }
 
+func (be *MetaBaseEntry) HasUncommitedNode() bool {
+	un := be.GetLatestNodeLocked()
+	if un == nil {
+		return false
+	}
+	return !un.IsCommitted()
+}
+
 func (be *MetaBaseEntry) IsCreating() bool {
 	un := be.GetLatestNodeLocked()
 	if un == nil {
 		return true
 	}
-	return un.IsActive()
+	return be.IsFirstNodeActive()
 }
 
 func (be *MetaBaseEntry) HasDropCommitted() bool {

@@ -285,7 +285,7 @@ func (blk *dataBlock) BuildCompactionTaskFactory() (
 	blk.FreezeAppend()
 	blk.meta.RLock()
 	dropped := blk.meta.HasDropCommittedLocked()
-	inTxn := blk.meta.IsCreating()
+	inTxn := blk.meta.HasUncommitedNode()
 	anyCommitted := blk.meta.HasCommittedNode()
 	blk.meta.RUnlock()
 	if dropped || inTxn || !anyCommitted {
