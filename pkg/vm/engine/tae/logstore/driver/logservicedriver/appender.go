@@ -44,6 +44,10 @@ func (a *driverAppender) appendEntry(e *entry.Entry) {
 }
 
 func (a *driverAppender) append(retryTimout, appendTimeout time.Duration) {
+	logutil.Infof("UUUUUUUUUUUUUU")
+	defer func() {
+		logutil.Infof("SSSSSSSSSSSSSS")
+	}()
 	size := a.entry.prepareRecord()
 	// if size > int(common.K)*20 { //todo
 	// 	panic(moerr.NewInternalError("record size %d, larger than max size 20K", size))
@@ -72,11 +76,16 @@ func (a *driverAppender) append(retryTimout, appendTimeout time.Duration) {
 }
 
 func (a *driverAppender) waitDone() {
+	logutil.Infof("YYYYYYYYYY")
+	defer func() {
+		logutil.Infof("PPPPPPPPPP")
+	}()
 	a.wg.Wait()
 }
 
 func (a *driverAppender) freeEntries() {
 	for _, e := range a.entry.entries {
+		logutil.Infof("ZZZZZZZZZZZZZZZ")
 		e.DoneWithErr(nil)
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/entry"
 )
 
@@ -94,6 +95,10 @@ func (e *Entry) WriteTo(w io.Writer) (int64, error) {
 }
 
 func (e *Entry) WaitDone() error {
+	logutil.Infof("QQQQQQQQQQQQQ")
+	defer func() {
+		logutil.Infof("TTTTTTTTTTTTTT")
+	}()
 	e.wg.Wait()
 	return e.err
 }

@@ -500,15 +500,21 @@ func (store *txnStore) ApplyRollback() (err error) {
 }
 
 func (store *txnStore) WaitPrepared() (err error) {
+	logutil.Infof("EEEEEEEEEEEE WaitPrepared %s", store.txn.String())
+	defer func() {
+		logutil.Infof("WWWWWWWWWWW WaitPrepared %s", store.txn.String())
+	}()
 	for _, db := range store.dbs {
 		if err = db.WaitPrepared(); err != nil {
 			return
 		}
 	}
 	for _, e := range store.logs {
+		logutil.Infof("x. WaitPrepared %s", store.txn.String())
 		if err = e.WaitDone(); err != nil {
 			break
 		}
+		logutil.Infof("y. WaitPrepared %s", store.txn.String())
 		e.Free()
 	}
 	return

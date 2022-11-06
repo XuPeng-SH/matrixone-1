@@ -301,6 +301,10 @@ func (b *Base) GetError() error {
 }
 
 func (b *Base) WaitDone() error {
+	logutil.Infof("FFFFFFFFFF. waitdone")
+	defer func() {
+		logutil.Infof("BBBBBBBBBB. waitdone")
+	}()
 	b.wg.Wait()
 	return b.err
 }
