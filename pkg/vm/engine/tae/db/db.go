@@ -125,6 +125,7 @@ func (db *DB) Replay(dataFactory *tables.DataFactory, maxTs types.TS) {
 }
 
 func (db *DB) PrintStats() {
+	return
 	pc, _, _, _ := runtime.Caller(1)
 	caller := runtime.FuncForPC(pc).Name()
 	stats := db.CollectStats()

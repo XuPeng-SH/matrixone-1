@@ -129,7 +129,6 @@ func (task *compactBlockTask) Execute() (err error) {
 		return err
 	}
 	newMeta := newBlk.GetMeta().(*catalog.BlockEntry)
-	logutil.Infof("ZZZZZZZ newMeta=%s", newMeta.String())
 	oldBMeta := task.compacted.GetMeta().(*catalog.BlockEntry)
 	// data, sortCol, closer, err := task.PrepareData(newMeta.MakeKey())
 	preparer, err := task.PrepareData(newMeta.MakeKey())

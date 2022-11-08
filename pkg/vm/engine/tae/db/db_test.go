@@ -4075,31 +4075,36 @@ func TestDelete4(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, int(vv.Load()), int(v.(uint32)))
 		txn.Commit()
-		t.Logf("getv=%v", v)
+		t.Logf("xxxxxxxxxxxxx getv=%v", v)
+	}
+	scan := func() {
+		txn, rel := tae.getRelation()
+		it := rel.MakeBlockIt()
+		for it.Valid() {
+			blk := it.GetBlock()
+			view, err := blk.GetColumnDataById(0, nil)
+			assert.NoError(t, err)
+			view.ApplyDeletes()
+			if view.Length() != 0 {
+				t.Logf("block-%d, dara=%s", blk.ID(), view.String())
+			}
+			// t.Logf("deletes: %v", view.DeleteMask)
+			it.Next()
+		}
+		txn.Commit()
 	}
 
-	getV()
 	for i := 0; i < 20; i++ {
+		getV()
+		scan()
 		tae.restart()
 		getV()
+		scan()
 		for j := 0; j < 100; j++ {
 			wg.Add(1)
 			p.Submit(run)
 		}
 		wg.Wait()
 	}
-	{
-		txn, rel := tae.getRelation()
-		it := rel.MakeBlockIt()
-		for it.Valid() {
-			blk := it.GetBlock()
-			view, err := blk.GetColumnDataById(0, nil)
-			t.Log(err)
-			assert.NoError(t, err)
-			t.Logf("block-%d, dara=%s", blk.ID(), view.String())
-			t.Logf("deletes: %v", view.DeleteMask)
-			it.Next()
-		}
-		txn.Commit()
-	}
+	t.Log(tae.Catalog.SimplePPString(common.PPL1))
 }

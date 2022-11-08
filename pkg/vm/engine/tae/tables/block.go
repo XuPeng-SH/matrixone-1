@@ -139,8 +139,10 @@ func (blk *dataBlock) IsAppendFrozen() bool {
 }
 
 func (blk *dataBlock) FreeData() {
-	blk.Lock()
-	defer blk.Unlock()
+	// blk.Lock()
+	// defer blk.Unlock()
+	blk.mvcc.Lock()
+	defer blk.mvcc.Unlock()
 	if blk.node != nil {
 		_ = blk.node.Close()
 	}
