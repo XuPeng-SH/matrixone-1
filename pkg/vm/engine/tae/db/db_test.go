@@ -4013,3 +4013,93 @@ func TestReadCheckpoint(t *testing.T) {
 		}
 	}
 }
+
+func TestDelete4(t *testing.T) {
+	opts := config.WithQuickScanAndCKPOpts(nil)
+	tae := newTestEngine(t, opts)
+	defer tae.Close()
+	schema := catalog.NewEmptySchema("xx")
+	schema.AppendPKCol("name", types.T_varchar.ToType(), 0)
+	schema.AppendCol("offset", types.T_uint32.ToType())
+	schema.Finalize(false)
+	schema.BlockMaxRows = 50
+	schema.SegmentMaxBlocks = 5
+	tae.bindSchema(schema)
+	bat := catalog.MockBatch(schema, 1)
+	bat.Vecs[1].Update(0, uint32(0))
+	tae.createRelAndAppend(bat, true)
+
+	filter := handle.NewEQFilter(bat.Vecs[0].Get(0))
+	var wg sync.WaitGroup
+	var vv atomic.Uint32
+	run := func() {
+		defer wg.Done()
+		time.Sleep(time.Duration(rand.Intn(20)+1) * time.Millisecond)
+		cloneBat := bat.CloneWindow(0, 1)
+		txn, rel := tae.getRelation()
+		id, offset, err := rel.GetByFilter(filter)
+		if err != nil {
+			txn.Rollback()
+			return
+		}
+		v, err := rel.GetValue(id, offset, 1)
+		if err != nil {
+			txn.Rollback()
+			return
+		}
+		oldV := v.(uint32)
+		newV := oldV + 1
+		if err := rel.RangeDelete(id, offset, offset, handle.DT_Normal); err != nil {
+			txn.Rollback()
+			return
+		}
+		cloneBat.Vecs[1].Update(0, newV)
+		if err := rel.Append(cloneBat); err != nil {
+			txn.Rollback()
+			return
+		}
+		if err := txn.Commit(); err == nil {
+			vv.CompareAndSwap(oldV, newV)
+		}
+	}
+	p, _ := ants.NewPool(20)
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		p.Submit(run)
+	}
+	wg.Wait()
+	t.Logf("vv=%v", vv.Load())
+	getV := func() {
+		txn, rel := tae.getRelation()
+		v, err := rel.GetValueByFilter(filter, 1)
+		assert.NoError(t, err)
+		assert.Equal(t, int(vv.Load()), int(v.(uint32)))
+		txn.Commit()
+		t.Logf("getv=%v", v)
+	}
+
+	getV()
+	for i := 0; i < 20; i++ {
+		tae.restart()
+		getV()
+		for j := 0; j < 100; j++ {
+			wg.Add(1)
+			p.Submit(run)
+		}
+		wg.Wait()
+	}
+	{
+		txn, rel := tae.getRelation()
+		it := rel.MakeBlockIt()
+		for it.Valid() {
+			blk := it.GetBlock()
+			view, err := blk.GetColumnDataById(0, nil)
+			t.Log(err)
+			assert.NoError(t, err)
+			t.Logf("block-%d, dara=%s", blk.ID(), view.String())
+			t.Logf("deletes: %v", view.DeleteMask)
+			it.Next()
+		}
+		txn.Commit()
+	}
+}

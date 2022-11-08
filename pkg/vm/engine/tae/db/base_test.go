@@ -64,6 +64,7 @@ func (e *testEngine) bindTenantID(tenantID uint32) { e.tenantID = tenantID }
 func (e *testEngine) restart() {
 	_ = e.DB.Close()
 	var err error
+	e.t.Log("restart.........")
 	e.DB, err = Open(e.Dir, e.Opts)
 	assert.NoError(e.t, err)
 }

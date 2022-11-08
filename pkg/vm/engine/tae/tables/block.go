@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/dataio/blockio"
 
@@ -531,6 +532,9 @@ func (blk *dataBlock) LoadColumnData(
 	metaLoc := blk.meta.GetMetaLoc()
 	id := blk.meta.AsCommonID()
 	id.Idx = uint16(colIdx)
+	if metaLoc == "" {
+		logutil.Infof("blk-%s, metaloc=%s", blk.meta.StringWithLevel(common.PPL1), metaLoc)
+	}
 	return evictable.FetchColumnData(buffer, blk.bufMgr, id, blk.fs, uint16(colIdx), metaLoc, def)
 }
 

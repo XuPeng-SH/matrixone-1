@@ -106,10 +106,10 @@ func WithQuickScanAndCKPOpts(in *options.Options) (opts *options.Options) {
 		opts = in
 	}
 	opts.CheckpointCfg = new(options.CheckpointCfg)
-	opts.CheckpointCfg.ScanInterval = time.Millisecond * 10
-	opts.CheckpointCfg.FlushInterval = time.Millisecond * 10
+	opts.CheckpointCfg.ScanInterval = time.Millisecond * 5
+	opts.CheckpointCfg.FlushInterval = time.Millisecond * 5
 	opts.CheckpointCfg.MinCount = 1
-	opts.CheckpointCfg.IncrementalInterval = time.Millisecond * 20
+	opts.CheckpointCfg.IncrementalInterval = time.Millisecond * 10
 	opts.CheckpointCfg.GlobalInterval = time.Millisecond * 100
 	return opts
 }

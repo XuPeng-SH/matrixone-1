@@ -16,11 +16,13 @@ package blockio
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 )
 
@@ -70,6 +72,9 @@ func EncodeMetaLocWithObject(
 
 func DecodeMetaLoc(metaLoc string) (string, objectio.Extent, uint32) {
 	info := strings.Split(metaLoc, ":")
+	if len(info) < 2 {
+		logutil.Infof("YYYYYYYY metaloc=%s", metaLoc)
+	}
 	name := info[0]
 	location := strings.Split(info[1], "_")
 	offset, err := strconv.ParseUint(location[0], 10, 32)

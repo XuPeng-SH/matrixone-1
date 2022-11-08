@@ -129,6 +129,7 @@ func (task *compactBlockTask) Execute() (err error) {
 		return err
 	}
 	newMeta := newBlk.GetMeta().(*catalog.BlockEntry)
+	logutil.Infof("ZZZZZZZ newMeta=%s", newMeta.String())
 	oldBMeta := task.compacted.GetMeta().(*catalog.BlockEntry)
 	// data, sortCol, closer, err := task.PrepareData(newMeta.MakeKey())
 	preparer, err := task.PrepareData(newMeta.MakeKey())
@@ -245,9 +246,9 @@ func (task *compactBlockTask) Execute() (err error) {
 				return err
 			}
 		}
-		if err = oldBlkData.ReplayIndex(); err != nil {
-			return err
-		}
+		// if err = oldBlkData.ReplayIndex(); err != nil {
+		// 	return err
+		// }
 	}
 	txnEntry := txnentries.NewCompactBlockEntry(task.txn, task.compacted, task.created, task.scheduler, task.mapping, task.deletes)
 	if err = task.txn.LogTxnEntry(table.GetDB().ID, table.ID, txnEntry, []*common.ID{task.compacted.Fingerprint()}); err != nil {

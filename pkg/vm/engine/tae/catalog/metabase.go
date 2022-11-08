@@ -22,6 +22,7 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
@@ -67,6 +68,7 @@ func (be *MetaBaseEntry) GetMetaLoc() string {
 	be.RLock()
 	defer be.RUnlock()
 	if be.GetLatestNodeLocked() == nil {
+		logutil.Info(be.StringLocked())
 		return ""
 	}
 	str := be.GetLatestNodeLocked().(*MetadataMVCCNode).MetaLoc
