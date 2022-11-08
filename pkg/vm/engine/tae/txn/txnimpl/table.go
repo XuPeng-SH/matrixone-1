@@ -27,6 +27,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tables/updates"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 )
@@ -63,6 +64,46 @@ func newTxnTable(store *txnStore, entry *catalog.TableEntry) *txnTable {
 		txnEntries:  make([]txnif.TxnEntry, 0),
 	}
 	return tbl
+}
+
+func (tbl *txnTable) TryTransfer() (err error) {
+	if len(tbl.deleteNodes) == 0 {
+		return
+	}
+	for id, node := range tbl.deleteNodes {
+		seg, err := tbl.GetMeta().GetSegmentByID(id.SegmentID)
+		if err != nil {
+			return err
+		}
+		blk, err := seg.GetBlockEntryByID(id.BlockID)
+		if err != nil {
+			return err
+		}
+		commitTs := tbl.store.txn.GetCommitTS()
+		blk.RLock()
+		needWait, txnToWait := blk.GetLatestNodeLocked().NeedWaitCommitting(commitTs)
+		if needWait {
+			blk.RUnlock()
+			txnToWait.GetTxnState(true)
+			blk.RLock()
+		}
+		deleted := !blk.DeleteBefore(commitTs)
+		blk.RUnlock()
+		if deleted {
+			rows := node.(*updates.DeleteNode).DeletedRows()
+			rowids := transfer.TransferMany(rows)
+			for _, rowid := range rowids {
+				segmentID, blockID, offset := model.DecodePhyAddrKey(rowid)
+				if err = tbl.RangeDelete(&common.ID{
+					TableID:   table.ID,
+					SegmentID: segmentID,
+					BlockID:   blockID,
+				}, offset, offset, handle.DT_Normal); err != nil {
+					return
+				}
+			}
+		}
+	}
 }
 
 func (tbl *txnTable) LogSegmentID(sid uint64) {
