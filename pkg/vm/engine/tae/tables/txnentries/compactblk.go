@@ -22,8 +22,10 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
 )
@@ -34,7 +36,7 @@ type compactBlockEntry struct {
 	from      handle.Block
 	to        handle.Block
 	scheduler tasks.TaskScheduler
-	mapping   []uint32
+	mapping   containers.Vector
 	deletes   *roaring.Bitmap
 }
 
@@ -42,11 +44,24 @@ func NewCompactBlockEntry(
 	txn txnif.AsyncTxn,
 	from, to handle.Block,
 	scheduler tasks.TaskScheduler,
-	sortIdx []uint32,
+	sortIdx containers.Vector,
+	length int,
 	deletes *roaring.Bitmap) *compactBlockEntry {
-	mapping := make([]uint32, len(sortIdx))
-	for i, idx := range sortIdx {
-		mapping[idx] = uint32(i)
+	mapping := containers.MakeVector(types.T_Rowid.ToType(), false)
+	helper := make([]int32, length)
+	for i := 0; i < length; i++ {
+		helper[i] = -1
+	}
+	for i := 0; i < sortIdx.Length(); i++ {
+		idx := sortIdx.Get(i).(uint32)
+		helper[idx] = int32(i)
+	}
+	for _, idx := range helper {
+		var rowID types.Rowid
+		if idx != -1 {
+			rowID = model.EncodePhyAddrKey(from.GetSegment().GetID(), from.ID(), uint32(idx))
+		}
+		mapping.Append(rowID)
 	}
 	return &compactBlockEntry{
 		txn:       txn,

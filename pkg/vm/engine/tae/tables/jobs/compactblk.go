@@ -42,14 +42,24 @@ var CompactBlockTaskFactory = func(meta *catalog.BlockEntry, scheduler tasks.Tas
 
 type compactBlockTask struct {
 	*tasks.BaseTask
-	txn       txnif.AsyncTxn
-	compacted handle.Block
-	created   handle.Block
-	meta      *catalog.BlockEntry
-	scheduler tasks.TaskScheduler
-	scopes    []common.ID
-	mapping   []uint32
-	deletes   *roaring.Bitmap
+	txn        txnif.AsyncTxn
+	compacted  handle.Block
+	created    handle.Block
+	meta       *catalog.BlockEntry
+	scheduler  tasks.TaskScheduler
+	scopes     []common.ID
+	mapping    []uint32
+	mappingVec containers.Vector
+	deletes    *roaring.Bitmap
+	length     int
+}
+
+func makeMappingVec(maxRow uint32) containers.Vector {
+	vec := containers.MakeVector(types.T_uint32.ToType(), false)
+	for i := uint32(0); i < maxRow; i++ {
+		vec.Append(i)
+	}
+	return vec
 }
 
 func NewCompactBlockTask(
@@ -101,11 +111,14 @@ func (task *compactBlockTask) PrepareData(blkKey []byte) (preparer *model.Prepar
 		if err != nil {
 			return
 		}
+		task.length = view.GetData().Length()
 		task.deletes = view.DeleteMask
 		view.ApplyDeletes()
 		vec := view.Orphan()
 		preparer.Columns.AddVector(def.Name, vec)
 	}
+	task.mappingVec = makeMappingVec(uint32(task.length))
+	task.mappingVec.Compact(task.deletes)
 	// Sort only if sort key is defined
 	if schema.HasSortKey() {
 		idx := schema.GetSingleSortKeyIdx()
@@ -114,6 +127,7 @@ func (task *compactBlockTask) PrepareData(blkKey []byte) (preparer *model.Prepar
 			return preparer, err
 		}
 	}
+	task.mappingVec = mergesort.Shuffle(task.mappingVec, task.mapping)
 	return
 }
 
@@ -258,7 +272,8 @@ func (task *compactBlockTask) Execute() (err error) {
 		task.compacted,
 		task.created,
 		task.scheduler,
-		task.mapping,
+		task.mappingVec,
+		task.length,
 		task.deletes)
 
 	if err = task.txn.LogTxnEntry(
