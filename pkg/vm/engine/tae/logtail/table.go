@@ -73,7 +73,7 @@ func (blk *txnBlock) ForeachRowInBetween(
 	blk.RUnlock()
 	for _, row := range rows {
 		ts := row.GetPrepareTS()
-		if ts.IsEmpty() || ts.Greater(to) {
+		if ts.Greater(to) {
 			outOfRange = true
 			return
 		}
@@ -123,9 +123,7 @@ func NewTxnTable(blockSize int, clock *types.TsAlloctor) *TxnTable {
 		}
 	}
 	return &TxnTable{
-		AOT: model.NewAOT[
-			BlockT,
-			RowT](
+		AOT: model.NewAOT(
 			blockSize,
 			factory,
 			blockCompareFn,
@@ -146,15 +144,49 @@ func (table *TxnTable) TruncateByTimeStamp(ts types.TS) (cnt int) {
 	return table.Truncate(filter)
 }
 
+// Invariants:
+// 1. txn is sorted by prepareTS if it has one
+// 2. bornTS of every block is sorted
+// 3. for every block, bornTS <= txn.prepareTS for txn in block
+// 4. empty prepareTS = maxTS
+
+// legend: (bornTS) [prepareTS, prepareTS, prepareTS] and
+// normal case:
+// 	(0)[2,3,4]  (7)[8,10,11] (12)[14,16,19]
+//  from = 13,
+// rare case:
+// 	(0)[2,3,4]  (7)[8,10,15] (12)[17,18,19]
+// super super rare case:
+// 	(0)[2,3,4]  (7)[8,10,None] (12)[None,None,None]
+// 	(0)[20,21,22]  (1)[28,30,31] (2)[34,36,39]
+
 func (table *TxnTable) ForeachRowInBetween(
 	from, to types.TS,
 	op func(row RowT) (goNext bool),
 ) {
 	snapshot := table.Snapshot()
 	pivot := &txnBlock{bornTS: from}
+	first_run := true
 	snapshot.Descend(pivot, func(blk BlockT) bool {
-		pivot.bornTS = blk.bornTS
-		return false
+		if first_run {
+			// found first bornTS where bornTS <= from
+			pivot.bornTS = blk.bornTS
+			first_run = false
+			// previous block has to be checked
+			return true
+		} else {
+			blk.RLock()
+			// there is at least one row in a block, so no boundry check here
+			lastTs := blk.rows[len(blk.rows)-1].GetPrepareTS()
+			blk.RUnlock()
+			// rare cases
+			if lastTs.GreaterEq(from) {
+				pivot.bornTS = blk.bornTS
+				return true
+			}
+			// the last txn is absolutely not in range [from..], stop backtracing
+			return false
+		}
 	})
 	snapshot.Ascend(pivot, func(blk BlockT) bool {
 		if blk.bornTS.Greater(to) {
