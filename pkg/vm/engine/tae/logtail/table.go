@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
 )
@@ -181,6 +182,7 @@ func (table *TxnTable) ForeachRowInBetween(
 			blk.RUnlock()
 			// rare cases
 			if lastTs.GreaterEq(from) {
+				logutil.Info("[Logtail] rare case happens")
 				pivot.bornTS = blk.bornTS
 				return true
 			}
