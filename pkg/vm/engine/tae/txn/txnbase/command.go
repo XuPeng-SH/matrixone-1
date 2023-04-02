@@ -16,7 +16,6 @@ package txnbase
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 
@@ -182,11 +181,12 @@ func (c *TxnStateCmd) WriteTo(w io.Writer) (n int64, err error) {
 		return
 	}
 	n += sn
-	if err = binary.Write(w, binary.BigEndian, c.State); err != nil {
+	state := int32(c.State)
+	if _, err = w.Write(types.EncodeInt32(&state)); err != nil {
 		return
 	}
 	n += 4
-	if err = binary.Write(w, binary.BigEndian, c.CommitTs); err != nil {
+	if _, err = w.Write(c.CommitTs[:]); err != nil {
 		return
 	}
 	n += types.TxnTsSize
@@ -198,11 +198,13 @@ func (c *TxnStateCmd) ReadFrom(r io.Reader) (n int64, err error) {
 		return
 	}
 	n += sn
-	if err = binary.Read(r, binary.BigEndian, &c.State); err != nil {
+	state := int32(0)
+	if _, err = r.Read(types.EncodeInt32(&state)); err != nil {
 		return
 	}
+	c.State = txnif.TxnState(state)
 	n += 4
-	if err = binary.Read(r, binary.BigEndian, &c.CommitTs); err != nil {
+	if _, err = r.Read(c.CommitTs[:]); err != nil {
 		return
 	}
 	n += types.TxnTsSize
@@ -273,22 +275,23 @@ func (c *TxnCmd) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	n += sn
 	//start ts
-	if err = binary.Write(w, binary.BigEndian, c.StartTS); err != nil {
+	if _, err = w.Write(c.StartTS[:]); err != nil {
 		return
 	}
 	n += types.TxnTsSize
 	//prepare ts
-	if err = binary.Write(w, binary.BigEndian, c.PrepareTS); err != nil {
+	if _, err = w.Write(c.PrepareTS[:]); err != nil {
 		return
 	}
 	n += types.TxnTsSize
 	//participants
-	if err = binary.Write(w, binary.BigEndian, uint32(len(c.Participants))); err != nil {
+	length := uint32(len(c.Participants))
+	if _, err = w.Write(types.EncodeUint32(&length)); err != nil {
 		return
 	}
 	n += 4
 	for _, p := range c.Participants {
-		if err = binary.Write(w, binary.BigEndian, p); err != nil {
+		if _, err = w.Write(types.EncodeUint64(&p)); err != nil {
 			return
 		}
 		n += 8
@@ -313,25 +316,25 @@ func (c *TxnCmd) ReadFrom(r io.Reader) (n int64, err error) {
 	}
 	n += sn
 	// start timestamp
-	if err = binary.Read(r, binary.BigEndian, &c.StartTS); err != nil {
+	if _, err = r.Read(c.StartTS[:]); err != nil {
 		return
 	}
 	n += types.TxnTsSize
 	// prepare timestamp
-	if err = binary.Read(r, binary.BigEndian, &c.PrepareTS); err != nil {
+	if _, err = r.Read(c.PrepareTS[:]); err != nil {
 		return
 	}
 	n += types.TxnTsSize
 	// participants
 	num := uint32(0)
-	if err = binary.Read(r, binary.BigEndian, &num); err != nil {
+	if _, err = r.Read(types.EncodeUint32(&num)); err != nil {
 		return
 	}
 	n += 4
 	c.Participants = make([]uint64, num)
 	for i := 0; i < int(num); i++ {
 		id := uint64(0)
-		if err = binary.Read(r, binary.BigEndian, &id); err != nil {
+		if _, err = r.Read(types.EncodeUint64(&id)); err != nil {
 			break
 		} else {
 			c.Participants = append(c.Participants, id)
@@ -395,10 +398,10 @@ func (e *PointerCmd) WriteTo(w io.Writer) (n int64, err error) {
 	if _, err = w.Write(types.EncodeInt16(&t)); err != nil {
 		return
 	}
-	if err = binary.Write(w, binary.BigEndian, e.Group); err != nil {
+	if _, err = w.Write(types.EncodeUint32(&e.Group)); err != nil {
 		return
 	}
-	if err = binary.Write(w, binary.BigEndian, e.Lsn); err != nil {
+	if _, err = w.Write(types.EncodeUint64(&e.Lsn)); err != nil {
 		return
 	}
 	n = 14
@@ -415,10 +418,10 @@ func (e *PointerCmd) Marshal() (buf []byte, err error) {
 }
 
 func (e *PointerCmd) ReadFrom(r io.Reader) (n int64, err error) {
-	if err = binary.Read(r, binary.BigEndian, &e.Group); err != nil {
+	if _, err = r.Read(types.EncodeUint32(&e.Group)); err != nil {
 		return
 	}
-	if err = binary.Read(r, binary.BigEndian, &e.Lsn); err != nil {
+	if _, err = r.Read(types.EncodeUint64(&e.Lsn)); err != nil {
 		return
 	}
 	n = 12
@@ -601,12 +604,12 @@ func (cc *ComposedCmd) WriteTo(w io.Writer) (n int64, err error) {
 	// 	return
 	// }
 	n += 2
-	if err = binary.Write(w, binary.BigEndian, cc.CmdSize); err != nil {
+	if _, err = w.Write(types.EncodeUint32(&cc.CmdSize)); err != nil {
 		return
 	}
 	n += 4
 	cmds := uint32(len(cc.Cmds))
-	if err = binary.Write(w, binary.BigEndian, cmds); err != nil {
+	if _, err = w.Write(types.EncodeUint32(&cmds)); err != nil {
 		return
 	}
 	n += 4
@@ -622,12 +625,12 @@ func (cc *ComposedCmd) WriteTo(w io.Writer) (n int64, err error) {
 }
 
 func (cc *ComposedCmd) ReadFrom(r io.Reader) (n int64, err error) {
-	if err = binary.Read(r, binary.BigEndian, &cc.CmdSize); err != nil {
+	if _, err = r.Read(types.EncodeUint32(&cc.CmdSize)); err != nil {
 		return
 	}
 	n += 4
 	cmds := uint32(0)
-	if err = binary.Read(r, binary.BigEndian, &cmds); err != nil {
+	if _, err = r.Read(types.EncodeUint32(&cmds)); err != nil {
 		return
 	}
 	n += 4
