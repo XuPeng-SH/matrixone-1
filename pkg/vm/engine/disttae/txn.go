@@ -22,10 +22,10 @@ import (
 	"unsafe"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
-	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
@@ -36,17 +36,16 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (txn *Transaction) getBlockMetas(
+func (txn *Transaction) getBlockList(
 	ctx context.Context,
 	databaseId uint64,
 	tableId uint64,
 	needUpdated bool,
 	columnLength int,
 	prefetch bool,
-) ([][]BlockMeta, error) {
+) (blocks [][]catalog.BlockInfo, err error) {
 
-	blocks := make([][]BlockMeta, len(txn.dnStores))
-	name := genMetaTableName(tableId)
+	blocks = make([][]catalog.BlockInfo, len(txn.dnStores))
 	ts := types.TimestampToTS(txn.meta.SnapshotTS)
 	if needUpdated {
 		states := txn.engine.getPartitions(databaseId, tableId).Snapshot()
@@ -54,26 +53,20 @@ func (txn *Transaction) getBlockMetas(
 			if i >= len(states) {
 				continue
 			}
-			var blockInfos []catalog.BlockInfo
 			state := states[i]
 			iter := state.Blocks.Iter()
+			defer iter.Release()
 			for ok := iter.First(); ok; ok = iter.Next() {
 				entry := iter.Item()
 				if !entry.Visible(ts) {
 					continue
 				}
-				blockInfos = append(blockInfos, entry.BlockInfo)
+				blocks[i] = append(blocks[i], entry.BlockInfo)
 			}
 			iter.Release()
-			var err error
-			blocks[i], err = genBlockMetas(ctx, blockInfos, columnLength, txn.proc.FileService,
-				txn.proc.GetMPool(), prefetch)
-			if err != nil {
-				return nil, moerr.NewInternalError(ctx, "disttae: getTableMeta err: %v, table: %v", err.Error(), name)
-			}
 		}
 	}
-	return blocks, nil
+	return
 }
 
 // detecting whether a transaction is a read-only transaction
@@ -422,7 +415,16 @@ func (txn *Transaction) genRowId() types.Rowid {
 }
 
 // needRead determine if a block needs to be read
-func needRead(ctx context.Context, expr *plan.Expr, blkInfo BlockMeta, tableDef *plan.TableDef, columnMap map[int]int, columns []int, maxCol int, proc *process.Process) bool {
+func needRead(
+	ctx context.Context,
+	expr *plan.Expr,
+	meta objectio.ObjectMeta,
+	blkInfo *catalog.BlockInfo,
+	tableDef *plan.TableDef,
+	columnMap map[int]int,
+	columns []int,
+	maxCol int,
+	proc *process.Process) bool {
 	var err error
 	if expr == nil {
 		return true
@@ -440,14 +442,11 @@ func needRead(ctx context.Context, expr *plan.Expr, blkInfo BlockMeta, tableDef 
 		return ifNeed
 	}
 
-	// get min max data from Meta
-	datas, dataTypes, err := getZonemapDataFromMeta(columns, blkInfo, tableDef)
-	if err != nil || datas == nil {
+	buildVectors, err := buildColumnsZMVectors(meta, blkInfo.MetaLocation().ID(), columns, tableDef, proc.Mp())
+	if err != nil || len(buildVectors) == 0 {
 		return true
 	}
 
-	// use all min/max data to build []vectors.
-	buildVectors := plan2.BuildVectorsByData(datas, dataTypes, proc.Mp())
 	bat := batch.NewWithSize(maxCol + 1)
 	defer bat.Clean(proc.Mp())
 	for k, v := range columnMap {
@@ -464,22 +463,22 @@ func needRead(ctx context.Context, expr *plan.Expr, blkInfo BlockMeta, tableDef 
 	if err != nil {
 		return true
 	}
+	// for i, vec := range buildVectors {
+	// 	logutil.Infof("YYYYY %d=%s", i, vec.String())
+	// }
+	// logutil.Infof("%v ZZZZ %s", ifNeed, expr.String())
+	logutil.Infof("%v ZZZZZZZ", ifNeed)
 	return ifNeed
 
 }
 
-// get row count of block
-func blockRows(meta BlockMeta) int64 {
-	return meta.Rows
+func blockInfoMarshal(info *catalog.BlockInfo) []byte {
+	sz := unsafe.Sizeof(*info)
+	return unsafe.Slice((*byte)(unsafe.Pointer(info)), sz)
 }
 
-func blockInfoMarshal(meta BlockMeta) []byte {
-	sz := unsafe.Sizeof(meta.Info)
-	return unsafe.Slice((*byte)(unsafe.Pointer(&meta.Info)), sz)
-}
-
-func BlockInfoUnmarshal(data []byte) catalog.BlockInfo {
-	return *(*catalog.BlockInfo)(unsafe.Pointer(&data[0]))
+func BlockInfoUnmarshal(data []byte) *catalog.BlockInfo {
+	return (*catalog.BlockInfo)(unsafe.Pointer(&data[0]))
 }
 
 /* used by multi-dn

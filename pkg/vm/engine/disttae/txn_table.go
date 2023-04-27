@@ -25,6 +25,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
+	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/api"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
@@ -35,7 +37,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -49,14 +50,14 @@ func (tbl *txnTable) Stats(ctx context.Context, expr *plan.Expr, statsInfoMap an
 	if !ok {
 		return plan2.DefaultStats(), nil
 	}
-	if len(tbl.blockMetas) == 0 || !tbl.updated {
+	if len(tbl.blockList) == 0 || !tbl.updated {
 		err := tbl.updateMeta(ctx, expr)
 		if err != nil {
 			return plan2.DefaultStats(), err
 		}
 	}
-	if len(tbl.blockMetas) > 0 {
-		return CalcStats(ctx, &tbl.blockMetas, expr, tbl.getTableDef(), tbl.db.txn.proc, tbl.getCbName(), s)
+	if len(tbl.blockList) > 0 {
+		return CalcStats(ctx, &tbl.blockList, expr, tbl.getTableDef(), tbl.db.txn.proc, tbl.getCbName(), s)
 	} else {
 		// no meta means not flushed yet, very small table
 		return plan2.DefaultStats(), nil
@@ -109,10 +110,10 @@ func (tbl *txnTable) Rows(ctx context.Context) (rows int64, err error) {
 		iter.Close()
 	}
 
-	if len(tbl.blockMetas) > 0 {
-		for _, blks := range tbl.blockMetas {
+	if len(tbl.blockList) > 0 {
+		for _, blks := range tbl.blockList {
 			for _, blk := range blks {
-				rows += blockRows(blk)
+				rows += int64(blk.MetaLocation().Rows())
 			}
 		}
 	}
@@ -125,7 +126,7 @@ func (tbl *txnTable) MaxAndMinValues(ctx context.Context) ([][2]any, []uint8, er
 	dataLength := len(cols) - 1
 	//dateType of each column for table
 	tableTypes := make([]uint8, dataLength)
-	dataTypes := make([]types.Type, dataLength)
+	// dataTypes := make([]types.Type, dataLength)
 
 	columns := make([]int, dataLength)
 	for i := 0; i < dataLength; i++ {
@@ -134,42 +135,43 @@ func (tbl *txnTable) MaxAndMinValues(ctx context.Context) ([][2]any, []uint8, er
 	//minimum --- maximum
 	tableVal := make([][2]any, dataLength)
 
-	if len(tbl.blockMetas) == 0 {
+	if len(tbl.blockList) == 0 {
 		return nil, nil, moerr.NewInvalidInputNoCtx("table meta is nil")
 	}
 
-	var init bool
-	for _, blks := range tbl.blockMetas {
-		for _, blk := range blks {
-			blkVal, blkTypes, err := getZonemapDataFromMeta(columns, blk, tbl.getTableDef())
-			if err != nil {
-				return nil, nil, err
-			}
+	// TODO
+	//var init bool
+	//for _, blks := range tbl.blockList {
+	//	for _, blk := range blks {
+	//		blkVal, blkTypes, err := getZonemapDataFromMeta(columns, blk, tbl.getTableDef())
+	//		if err != nil {
+	//			return nil, nil, err
+	//		}
 
-			if !init {
-				//init the tableVal
-				init = true
+	//		if !init {
+	//			//init the tableVal
+	//			init = true
 
-				for i := range blkVal {
-					tableVal[i][0] = blkVal[i][0]
-					tableVal[i][1] = blkVal[i][1]
-					dataTypes[i] = types.T(blkTypes[i]).ToType()
-				}
+	//			for i := range blkVal {
+	//				tableVal[i][0] = blkVal[i][0]
+	//				tableVal[i][1] = blkVal[i][1]
+	//				dataTypes[i] = types.T(blkTypes[i]).ToType()
+	//			}
 
-				tableTypes = blkTypes
-			} else {
-				for i := range blkVal {
-					if compute.CompareGeneric(blkVal[i][0], tableVal[i][0], dataTypes[i].Oid) < 0 {
-						tableVal[i][0] = blkVal[i][0]
-					}
+	//			tableTypes = blkTypes
+	//		} else {
+	//			for i := range blkVal {
+	//				if compute.CompareGeneric(blkVal[i][0], tableVal[i][0], dataTypes[i].Oid) < 0 {
+	//					tableVal[i][0] = blkVal[i][0]
+	//				}
 
-					if compute.CompareGeneric(blkVal[i][1], tableVal[i][1], dataTypes[i].Oid) > 0 {
-						tableVal[i][1] = blkVal[i][1]
-					}
-				}
-			}
-		}
-	}
+	//				if compute.CompareGeneric(blkVal[i][1], tableVal[i][1], dataTypes[i].Oid) > 0 {
+	//					tableVal[i][1] = blkVal[i][1]
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 	return tableVal, tableTypes, nil
 }
 
@@ -218,7 +220,7 @@ func (tbl *txnTable) reset(newId uint64) {
 	tbl.tableId = newId
 	tbl.setPartsOnce = sync.Once{}
 	tbl._parts = nil
-	tbl.blockMetas = nil
+	tbl.blockList = nil
 	tbl.modifiedBlocks = nil
 	tbl.updated = false
 	tbl.localState = NewPartitionState(true)
@@ -252,16 +254,18 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) ([][]byte, err
 	ranges := make([][]byte, 0, 1)
 	ranges = append(ranges, []byte{})
 	tbl.skipBlocks = make(map[types.Blockid]uint8)
-	if len(tbl.blockMetas) == 0 {
+	if len(tbl.blockList) == 0 {
 		return ranges, nil
 	}
-	tbl.modifiedBlocks = make([][]ModifyBlockMeta, len(tbl.blockMetas))
 
 	exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
+
+	tbl.modifiedBlocks = make([][]ModifyBlockMeta, len(tbl.blockList))
+
 	columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 	for _, i := range tbl.dnList {
-		blocks := tbl.blockMetas[i]
-		blks := make([]BlockMeta, 0, len(blocks))
+		blocks := tbl.blockList[i]
+		blks := make([]catalog.BlockInfo, 0, len(blocks))
 		deletes := make(map[types.Blockid][]int)
 		if len(blocks) > 0 {
 			ts := tbl.db.txn.meta.SnapshotTS
@@ -270,9 +274,9 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) ([][]byte, err
 				// if cn can see a appendable block, this block must contain all updates
 				// in cache, no need to do merge read, BlockRead will filter out
 				// invisible and deleted rows with respect to the timestamp
-				if !blocks[i].Info.EntryState {
-					if blocks[i].Info.CommitTs.ToTimestamp().Less(ts) { // hack
-						ids[i] = blocks[i].Info.BlockID
+				if !blocks[i].EntryState {
+					if blocks[i].CommitTs.ToTimestamp().Less(ts) { // hack
+						ids[i] = blocks[i].BlockID
 					}
 				}
 			}
@@ -298,23 +302,37 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) ([][]byte, err
 					for _, v := range vs {
 						id, offset := v.Decode()
 						deletes[id] = append(deletes[id], int(offset))
+						logutil.Infof("JJJJJJJJJ %s", v.String())
 					}
 				}
 			}
 			for i := range blocks {
-				if _, ok := deletes[blocks[i].Info.BlockID]; !ok {
+				if _, ok := deletes[blocks[i].BlockID]; !ok {
 					blks = append(blks, blocks[i])
 				}
 			}
 		}
+		var meta objectio.ObjectMeta
 		for _, blk := range blks {
-			tbl.skipBlocks[blk.Info.BlockID] = 0
-			if !exprMono || needRead(ctx, expr, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc) {
-				ranges = append(ranges, blockInfoMarshal(blk))
+			tbl.skipBlocks[blk.BlockID] = 0
+			ok := true
+			if exprMono {
+				location := blk.MetaLocation()
+				if !objectio.IsSameObjectLocVsMeta(location, meta) {
+					if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
+						return nil, err
+					}
+				}
+				ok = needRead(ctx, expr, meta, &blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
+			}
+			if ok {
+				ranges = append(ranges, blockInfoMarshal(&blk))
 			}
 		}
-		tbl.modifiedBlocks[i] = genModifedBlocks(ctx, deletes,
-			tbl.blockMetas[i], blks, expr, tbl.getTableDef(), tbl.db.txn.proc)
+		if tbl.modifiedBlocks[i], err = genModifedBlocks(ctx, deletes,
+			tbl.blockList[i], blks, expr, tbl.getTableDef(), tbl.db.txn.proc); err != nil {
+			return nil, err
+		}
 	}
 	return ranges, nil
 }
@@ -773,7 +791,7 @@ func (tbl *txnTable) newMergeReader(ctx context.Context, num int,
 	for _, i := range tbl.dnList {
 		var blks []ModifyBlockMeta
 
-		if len(tbl.blockMetas) > 0 {
+		if len(tbl.blockList) > 0 {
 			blks = tbl.modifiedBlocks[i]
 		}
 		rds0, err := tbl.newReader(
@@ -801,7 +819,7 @@ func (tbl *txnTable) newBlockReader(ctx context.Context, num int, expr *plan.Exp
 	rds := make([]engine.Reader, num)
 	blks := make([]catalog.BlockInfo, len(ranges))
 	for i := range ranges {
-		blks[i] = BlockInfoUnmarshal(ranges[i])
+		blks[i] = *BlockInfoUnmarshal(ranges[i])
 	}
 	ts := tbl.db.txn.meta.SnapshotTS
 	tableDef := tbl.getTableDef()
@@ -882,11 +900,11 @@ func (tbl *txnTable) newReader(
 	}
 	// get append block deletes rowids
 	non_append_block := make(map[string]bool)
-	if len(tbl.blockMetas) > 0 {
-		for _, blk := range tbl.blockMetas[0] {
+	if len(tbl.blockList) > 0 {
+		for _, blk := range tbl.blockList[0] {
 			// append non_append_block
-			if !blk.Info.EntryState {
-				non_append_block[string(blk.Info.BlockID[:])] = true
+			if !blk.EntryState {
+				non_append_block[string(blk.BlockID[:])] = true
 			}
 		}
 	}
