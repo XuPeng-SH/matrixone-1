@@ -35,7 +35,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
-func (txn *Transaction) getBlockMetas(
+func (txn *Transaction) getBlockList(
 	ctx context.Context,
 	databaseId uint64,
 	tableId uint64,
@@ -47,7 +47,6 @@ func (txn *Transaction) getBlockMetas(
 		if i >= len(states) {
 			continue
 		}
-		// var blockInfos []catalog.BlockInfo
 		state := states[i]
 		iter := state.Blocks.Iter()
 		for ok := iter.First(); ok; ok = iter.Next() {

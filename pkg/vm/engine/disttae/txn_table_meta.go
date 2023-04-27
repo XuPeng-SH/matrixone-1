@@ -38,11 +38,11 @@ func (tbl *txnTable) updateMeta(ctx context.Context, expr *plan.Expr) error {
 				return err
 			}
 		}
-		metas, err := tbl.db.txn.getBlockMetas(ctx, tbl.db.databaseId, tbl.tableId)
+		blocks, err := tbl.db.txn.getBlockList(ctx, tbl.db.databaseId, tbl.tableId)
 		if err != nil {
 			return err
 		}
-		tbl.blockMetas = metas
+		tbl.blockList = blocks
 		tbl.updated = true
 	}
 	return nil
