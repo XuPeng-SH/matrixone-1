@@ -1323,3 +1323,34 @@ func BenchmarkCompareWithMinMax(b *testing.B) {
 		}
 	})
 }
+
+func TestCompareWithMinMax3(t *testing.T) {
+	m := mpool.MustNewZero()
+	v1 := NewVec(types.T_char.ToType())
+	defer v1.Free(m)
+	result := NewVec(types.T_bool.ToType())
+	defer result.Free(m)
+
+	err := AppendBytesList(v1, [][]byte{
+		[]byte("2"), []byte("5"),
+		[]byte("6"), []byte("8"),
+	}, nil, m)
+	require.NoError(t, err)
+	v2 := NewConstBytes(types.T_char.ToType(), []byte("1"), v1.Length(), m)
+	defer v2.Free(m)
+
+	err = CompareWithMinMax(v1, v2, result, 0, m) // v1 > v2
+	require.NoError(t, err)
+	require.True(t, GetFixedAt[bool](result, 0))
+	require.True(t, GetFixedAt[bool](result, 1))
+	require.True(t, GetFixedAt[bool](result, 2))
+	require.True(t, GetFixedAt[bool](result, 3))
+
+	result.Reset(*result.GetType())
+	err = CompareWithMinMax(v1, v2, result, 1, m) // v1 < v2
+	require.NoError(t, err)
+	require.False(t, GetFixedAt[bool](result, 0))
+	require.False(t, GetFixedAt[bool](result, 1))
+	require.False(t, GetFixedAt[bool](result, 2))
+	require.False(t, GetFixedAt[bool](result, 3))
+}
