@@ -15,6 +15,7 @@
 package vector
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -642,4 +643,233 @@ func MakeAppendBytesFunc(vec *Vector) func([]byte, bool, *mpool.MPool) error {
 		return appendBytesToFixSized[types.Blockid](vec)
 	}
 	panic(fmt.Sprintf("unexpected type: %s", vec.GetType().String()))
+}
+
+func genericCompareMinMax[T any](
+	col1, col2 []T,
+	result *Vector,
+	comp func(T, T, T, T) bool,
+	m *mpool.MPool,
+) (err error) {
+	for i := 0; i < len(col1); i += 2 {
+		v1Minv, v1Maxv, v2Minv, v2Maxv := col1[i], col1[i+1], col2[i], col2[i+1]
+		v := comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func compareBytesMinMax(
+	v1, v2, result *Vector,
+	compType uint8,
+	m *mpool.MPool,
+) (err error) {
+	data1, area1 := MustVarlenaRawData(v1)
+	data2, area2 := MustVarlenaRawData(v2)
+	var comp func([]byte, []byte, []byte, []byte) bool
+	switch compType {
+	case 0: /* '>'  */
+		comp = func(_, v1Maxv, v2Minv, _ []byte) bool {
+			return bytes.Compare(v1Maxv, v2Minv) > 0
+		}
+	case 1: /* '<'  */
+		comp = func(v1Minv, _, _, v2Maxv []byte) bool {
+			return bytes.Compare(v1Minv, v2Maxv) < 0
+		}
+	case 2: /* '>=' */
+		comp = func(_, v1Maxv, v2Minv, _ []byte) bool {
+			return bytes.Compare(v1Maxv, v2Minv) >= 0
+		}
+	case 3: /* '<=' */
+		comp = func(v1Minv, _, _, v2Maxv []byte) bool {
+			return bytes.Compare(v1Minv, v2Maxv) <= 0
+		}
+	case 4: /* '==' */
+		comp = func(v1Minv, v1Maxv, v2Minv, v2Maxv []byte) bool {
+			return bytes.Compare(v1Maxv, v2Minv) >= 0 && bytes.Compare(v1Minv, v2Maxv) <= 0
+		}
+	default:
+		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
+	}
+	for i := 0; i < len(data1); i += 2 {
+		v1Minv, v1Maxv := data1[i].GetByteSlice(area1), data1[i+1].GetByteSlice(area1)
+		v2Minv, v2Maxv := data2[i].GetByteSlice(area2), data2[i+1].GetByteSlice(area2)
+		v := comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func compareFixeSizedMinMax[T types.FixedSizeT](
+	v1, v2, result *Vector,
+	elemComp func(T, T) int64,
+	compType uint8,
+	m *mpool.MPool,
+) (err error) {
+	col1 := MustFixedCol[T](v1)
+	col2 := MustFixedCol[T](v2)
+	var comp func(T, T, T, T) bool
+	switch compType {
+	case 0: /* '>'  */
+		comp = func(_, v1Maxv, v2Minv, _ T) bool {
+			return elemComp(v1Maxv, v2Minv) > 0
+		}
+	case 1: /* '<'  */
+		comp = func(v1Minv, _, _, v2Maxv T) bool {
+			return elemComp(v1Minv, v2Maxv) < 0
+		}
+	case 2: /* '>=' */
+		comp = func(_, v1Maxv, v2Minv, _ T) bool {
+			return elemComp(v1Maxv, v2Minv) >= 0
+		}
+	case 3: /* '<=' */
+		comp = func(v1Minv, _, _, v2Maxv T) bool {
+			return elemComp(v1Minv, v2Maxv) <= 0
+		}
+	case 4: /* '==' */
+		comp = func(v1Minv, v1Maxv, v2Minv, v2Maxv T) bool {
+			return elemComp(v1Maxv, v2Minv) >= 0 && elemComp(v1Minv, v2Maxv) <= 0
+		}
+	default:
+		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
+	}
+	err = genericCompareMinMax(col1, col2, result, comp, m)
+	return
+}
+
+func compareOrderedMinMax[T types.OrderedT](
+	v1, v2, result *Vector,
+	compType uint8,
+	m *mpool.MPool,
+) (err error) {
+	col1 := MustFixedCol[T](v1)
+	col2 := MustFixedCol[T](v2)
+	switch compType {
+	case 0: /* '>'  */
+		for i := 0; i < v1.Length(); i += 2 {
+			v1Maxv := col1[i+1]
+			v2Minv := col2[i]
+			v := v1Maxv > v2Minv
+			if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
+				return
+			}
+		}
+	case 1: /* '<'  */
+		for i := 0; i < v1.Length(); i += 2 {
+			v1Minv := col1[i]
+			v2Maxv := col2[i+1]
+			v := v1Minv < v2Maxv
+			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
+				return
+			}
+		}
+	case 2: /* '>=' */
+		for i := 0; i < v1.Length(); i += 2 {
+			v1Maxv := col1[i+1]
+			v2Minv := col2[i]
+			v := v1Maxv >= v2Minv
+			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
+				return
+			}
+		}
+	case 3: /* '<=' */
+		for i := 0; i < v1.Length(); i += 2 {
+			v1Minv := col1[i]
+			v2Maxv := col2[i+1]
+			v := v1Minv <= v2Maxv
+			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
+				return
+			}
+		}
+	case 4: /* '==' */
+		for i := 0; i < v1.Length(); i += 2 {
+			v1Minv, v1Maxv := col1[i], col1[i+1]
+			v2Minv, v2Maxv := col2[i], col2[i+1]
+			v := v1Maxv >= v2Minv && v1Minv <= v2Maxv
+			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
+				return
+			}
+		}
+	default:
+		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
+	}
+	return
+}
+
+// Two consecutive rows are pairs of data, where even rows are min
+// and odd rows are max
+//
+// [minv1,maxv1,minv2,maxv2,...,minvn,maxvn]
+//
+// CompType: compType
+// 0 - '>'
+// 1 - '<'
+// 2 - '>='
+// 3 - '<='
+// 4 - '=='
+//
+// Compare Operators: v1,v2
+// v1 >  v2:  v1.maxv >  v2.minv
+// v1 <  v2:  v1.minv <  v2.maxv
+// v1 >= v2:  v1.maxv >= v2.minv
+// v1 <= v2:  v1.minv <= v2.maxv
+// v1 == v2:  v1.maxv >= v2.minv && v1.minv <= v2.maxv
+//
+// Result: result
+// result is of type bool vector with length v1.Length()
+// the result of two consecutive rows should be always same.
+func CompareWithMinMax(
+	v1, v2, result *Vector,
+	compType uint8,
+	m *mpool.MPool,
+) (err error) {
+	t := v1.GetType()
+	if t.IsVarlen() {
+		return compareBytesMinMax(v1, v2, result, compType, m)
+	}
+	switch t.Oid {
+	case types.T_int8:
+		return compareOrderedMinMax[int8](v1, v2, result, compType, m)
+	case types.T_int16:
+		return compareOrderedMinMax[int16](v1, v2, result, compType, m)
+	case types.T_int32:
+		return compareOrderedMinMax[int32](v1, v2, result, compType, m)
+	case types.T_int64:
+		return compareOrderedMinMax[int64](v1, v2, result, compType, m)
+	case types.T_uint8:
+		return compareOrderedMinMax[uint8](v1, v2, result, compType, m)
+	case types.T_uint16:
+		return compareOrderedMinMax[uint16](v1, v2, result, compType, m)
+	case types.T_uint32:
+		return compareOrderedMinMax[uint32](v1, v2, result, compType, m)
+	case types.T_uint64:
+		return compareOrderedMinMax[uint64](v1, v2, result, compType, m)
+	case types.T_decimal64:
+		return compareFixeSizedMinMax[types.Decimal64](v1, v2, result, types.CompareDecimal64, compType, m)
+	case types.T_decimal128:
+		return compareFixeSizedMinMax[types.Decimal128](v1, v2, result, types.CompareDecimal128, compType, m)
+	case types.T_decimal256:
+		return compareFixeSizedMinMax[types.Decimal256](v1, v2, result, types.CompareDecimal256, compType, m)
+	case types.T_float32:
+		return compareOrderedMinMax[float32](v1, v2, result, compType, m)
+	case types.T_float64:
+		return compareOrderedMinMax[float64](v1, v2, result, compType, m)
+	case types.T_timestamp:
+		return compareOrderedMinMax[types.Timestamp](v1, v2, result, compType, m)
+	case types.T_date:
+		return compareOrderedMinMax[types.Date](v1, v2, result, compType, m)
+	case types.T_time:
+		return compareOrderedMinMax[types.Time](v1, v2, result, compType, m)
+	case types.T_datetime:
+		return compareOrderedMinMax[types.Datetime](v1, v2, result, compType, m)
+	case types.T_uuid:
+		return compareFixeSizedMinMax[types.Uuid](v1, v2, result, types.CompareUuid, compType, m)
+	default:
+		err = moerr.NewInternalErrorNoCtx("unsupport vector type \"%v\" to compare min max", t)
+	}
+	return
 }

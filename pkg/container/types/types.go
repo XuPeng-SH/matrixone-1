@@ -816,3 +816,13 @@ func (t T) IsDecimal() bool {
 	}
 	return false
 }
+
+func (t T) IsOrdered() bool {
+	switch t {
+	case T_int8, T_int16, T_int32, T_int64, T_uint8,
+		T_uint16, T_uint32, T_uint64, T_float32, T_float64,
+		T_timestamp, T_date, T_time, T_datetime:
+		return true
+	}
+	return false
+}
