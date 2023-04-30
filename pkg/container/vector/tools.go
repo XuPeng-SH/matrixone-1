@@ -647,13 +647,19 @@ func MakeAppendBytesFunc(vec *Vector) func([]byte, bool, *mpool.MPool) error {
 
 func genericCompareMinMax[T any](
 	col1, col2 []T,
+	nsp1, nsp2 *nulls.Nulls,
 	result *Vector,
 	comp func(T, T, T, T) bool,
 	m *mpool.MPool,
 ) (err error) {
 	for i := 0; i < len(col1); i += 2 {
-		v1Minv, v1Maxv, v2Minv, v2Maxv := col1[i], col1[i+1], col2[i], col2[i+1]
-		v := comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+		var v bool
+		if nsp1.Contains(uint64(i)) || nsp2.Contains(uint64(i)) {
+			v = true
+		} else {
+			v1Minv, v1Maxv, v2Minv, v2Maxv := col1[i], col1[i+1], col2[i], col2[i+1]
+			v = comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+		}
 		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
 			return
 		}
@@ -694,9 +700,14 @@ func compareBytesMinMax(
 		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
 	}
 	for i := 0; i < len(data1); i += 2 {
-		v1Minv, v1Maxv := data1[i].GetByteSlice(area1), data1[i+1].GetByteSlice(area1)
-		v2Minv, v2Maxv := data2[i].GetByteSlice(area2), data2[i+1].GetByteSlice(area2)
-		v := comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+		var v bool
+		if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
+			v = true
+		} else {
+			v1Minv, v1Maxv := data1[i].GetByteSlice(area1), data1[i+1].GetByteSlice(area1)
+			v2Minv, v2Maxv := data2[i].GetByteSlice(area2), data2[i+1].GetByteSlice(area2)
+			v = comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+		}
 		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
 			return
 		}
@@ -737,7 +748,7 @@ func compareFixeSizedMinMax[T types.FixedSizeT](
 	default:
 		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
 	}
-	err = genericCompareMinMax(col1, col2, result, comp, m)
+	err = genericCompareMinMax(col1, col2, v1.nsp, v2.nsp, result, comp, m)
 	return
 }
 
@@ -751,45 +762,70 @@ func compareOrderedMinMax[T types.OrderedT](
 	switch compType {
 	case 0: /* '>'  */
 		for i := 0; i < v1.Length(); i += 2 {
-			v1Maxv := col1[i+1]
-			v2Minv := col2[i]
-			v := v1Maxv > v2Minv
+			var v bool
+			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
+				v = true
+			} else {
+				v1Maxv := col1[i+1]
+				v2Minv := col2[i]
+				v = v1Maxv > v2Minv
+			}
 			if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
 				return
 			}
 		}
 	case 1: /* '<'  */
 		for i := 0; i < v1.Length(); i += 2 {
-			v1Minv := col1[i]
-			v2Maxv := col2[i+1]
-			v := v1Minv < v2Maxv
+			var v bool
+			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
+				v = true
+			} else {
+				v1Minv := col1[i]
+				v2Maxv := col2[i+1]
+				v = v1Minv < v2Maxv
+			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
 			}
 		}
 	case 2: /* '>=' */
 		for i := 0; i < v1.Length(); i += 2 {
-			v1Maxv := col1[i+1]
-			v2Minv := col2[i]
-			v := v1Maxv >= v2Minv
+			var v bool
+			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
+				v = true
+			} else {
+				v1Maxv := col1[i+1]
+				v2Minv := col2[i]
+				v = v1Maxv >= v2Minv
+			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
 			}
 		}
 	case 3: /* '<=' */
 		for i := 0; i < v1.Length(); i += 2 {
-			v1Minv := col1[i]
-			v2Maxv := col2[i+1]
-			v := v1Minv <= v2Maxv
+			var v bool
+			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
+				v = true
+			} else {
+				v1Minv := col1[i]
+				v2Maxv := col2[i+1]
+				v = v1Minv <= v2Maxv
+			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
 			}
 		}
 	case 4: /* '==' */
 		for i := 0; i < v1.Length(); i += 2 {
-			v1Minv, v1Maxv := col1[i], col1[i+1]
-			v2Minv, v2Maxv := col2[i], col2[i+1]
-			v := v1Maxv >= v2Minv && v1Minv <= v2Maxv
+			var v bool
+			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
+				v = true
+			} else {
+				v1Minv, v1Maxv := col1[i], col1[i+1]
+				v2Minv, v2Maxv := col2[i], col2[i+1]
+				v = v1Maxv >= v2Minv && v1Minv <= v2Maxv
+			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
 			}
@@ -828,6 +864,18 @@ func CompareWithMinMax(
 	m *mpool.MPool,
 ) (err error) {
 	t := v1.GetType()
+	if t.Oid != v2.GetType().Oid {
+		return moerr.NewInternalErrorNoCtx("can not compare two vector because their type is not match")
+	}
+	if v1.Length() != v2.Length() {
+		return moerr.NewInternalErrorNoCtx("can not compare two vector because their length is not match")
+	}
+
+	if v1.IsConstNull() || v2.IsConstNull() {
+		err = SetConstFixed[bool](result, true, v1.Length(), m)
+		return
+	}
+
 	if t.IsVarlen() {
 		return compareBytesMinMax(v1, v2, result, compType, m)
 	}
