@@ -794,7 +794,7 @@ func getColumnMapByExpr(expr *plan.Expr, tableDef *plan.TableDef, columnMap *map
 		dotIdx := strings.Index(colName, ".")
 		colName = colName[dotIdx+1:]
 		colIdx := tableDef.Name2ColIndex[colName]
-		(*columnMap)[int(idx)] = int(colIdx)
+		(*columnMap)[int(colIdx)] = int(idx)
 	}
 }
 
@@ -808,10 +808,10 @@ func GetColumnsByExpr(expr *plan.Expr, tableDef *plan.TableDef) (map[int]int, []
 	columns := make([]int, useColumn)
 	i := 0
 	for k, v := range columnMap {
-		if k > maxCol {
-			maxCol = k
+		if v > maxCol {
+			maxCol = v
 		}
-		columns[i] = v //tableDef's ColPos
+		columns[i] = k //tableDef's ColPos
 		i = i + 1
 	}
 	return columnMap, columns, maxCol
