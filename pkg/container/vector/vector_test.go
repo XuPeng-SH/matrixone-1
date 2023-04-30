@@ -1289,3 +1289,37 @@ func TestCompareWithMinMax2(t *testing.T) {
 	require.False(t, GetFixedAt[bool](result, 8))
 	require.False(t, GetFixedAt[bool](result, 9))
 }
+
+func BenchmarkCompareWithMinMax(b *testing.B) {
+	m := mpool.MustNewZero()
+	v1 := NewVec(types.T_char.ToType())
+	defer v1.Free(m)
+	v2 := NewVec(types.T_char.ToType())
+	defer v1.Free(m)
+
+	err := AppendBytesList(v1, [][]byte{
+		[]byte("3"), []byte("7"),
+		[]byte("3"), []byte("7"),
+		[]byte("3"), []byte("7"),
+		[]byte("3"), []byte("7"),
+		[]byte("3"), []byte("7"),
+	}, nil, m)
+	require.NoError(b, err)
+	err = AppendBytesList(v2, [][]byte{
+		[]byte("1"), []byte("2"),
+		[]byte("1"), []byte("3"),
+		[]byte("2"), []byte("6"),
+		[]byte("7"), []byte("9"),
+		[]byte("8"), []byte("9"),
+	}, nil, m)
+	require.NoError(b, err)
+	result := NewVec(types.T_bool.ToType())
+	defer result.Free(m)
+
+	b.Run("compare-min-max", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			CompareWithMinMax(v1, v2, result, 4 /*==*/, m)
+		}
+	})
+}
