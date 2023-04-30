@@ -648,16 +648,31 @@ func MakeAppendBytesFunc(vec *Vector) func([]byte, bool, *mpool.MPool) error {
 func genericCompareMinMax[T any](
 	col1, col2 []T,
 	nsp1, nsp2 *nulls.Nulls,
+	isV1Const, isV2Const bool,
 	result *Vector,
 	comp func(T, T, T, T) bool,
 	m *mpool.MPool,
 ) (err error) {
+	var v1Minv, v1Maxv, v2Minv, v2Maxv T
 	for i := 0; i < len(col1); i += 2 {
 		var v bool
 		if nsp1.Contains(uint64(i)) || nsp2.Contains(uint64(i)) {
 			v = true
 		} else {
-			v1Minv, v1Maxv, v2Minv, v2Maxv := col1[i], col1[i+1], col2[i], col2[i+1]
+			if isV1Const {
+				v1Minv = col1[0]
+				v1Maxv = v1Minv
+			} else {
+				v1Minv = col1[i]
+				v1Maxv = col1[i+1]
+			}
+			if isV2Const {
+				v2Minv = col2[0]
+				v2Maxv = v2Minv
+			} else {
+				v2Minv = col2[i]
+				v2Maxv = col2[i+1]
+			}
 			v = comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
 		}
 		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
@@ -699,13 +714,29 @@ func compareBytesMinMax(
 	default:
 		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
 	}
+	isV1Const := v1.IsConst()
+	isV2Const := v2.IsConst()
+	var (
+		v1Minv, v1Maxv []byte
+		v2Minv, v2Maxv []byte
+	)
 	for i := 0; i < len(data1); i += 2 {
 		var v bool
 		if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 			v = true
 		} else {
-			v1Minv, v1Maxv := data1[i].GetByteSlice(area1), data1[i+1].GetByteSlice(area1)
-			v2Minv, v2Maxv := data2[i].GetByteSlice(area2), data2[i+1].GetByteSlice(area2)
+			if isV1Const {
+				v1Minv = data1[0].GetByteSlice(area1)
+				v1Maxv = v1Minv
+			} else {
+				v1Minv, v1Maxv = data1[i].GetByteSlice(area1), data1[i+1].GetByteSlice(area1)
+			}
+			if isV2Const {
+				v2Minv = data2[0].GetByteSlice(area2)
+				v2Maxv = v2Minv
+			} else {
+				v2Minv, v2Maxv = data2[i].GetByteSlice(area2), data2[i+1].GetByteSlice(area2)
+			}
 			v = comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
 		}
 		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
@@ -748,7 +779,13 @@ func compareFixeSizedMinMax[T types.FixedSizeT](
 	default:
 		err = moerr.NewInternalErrorNoCtx("unsupport compare type: %d", compType)
 	}
-	err = genericCompareMinMax(col1, col2, v1.nsp, v2.nsp, result, comp, m)
+	err = genericCompareMinMax(
+		col1, col2,
+		v1.nsp, v2.nsp,
+		v1.IsConst(), v2.IsConst(),
+		result,
+		comp,
+		m)
 	return
 }
 
@@ -759,6 +796,36 @@ func compareOrderedMinMax[T types.OrderedT](
 ) (err error) {
 	col1 := MustFixedCol[T](v1)
 	col2 := MustFixedCol[T](v2)
+
+	var (
+		v1GetMin, v1GetMax, v2GetMin, v2GetMax func([]T, int) T
+	)
+	if v1.IsConst() {
+		v1GetMin = func(vs []T, _ int) T {
+			return vs[0]
+		}
+		v1GetMax = v1GetMin
+	} else {
+		v1GetMin = func(vs []T, i int) T {
+			return vs[i]
+		}
+		v1GetMax = func(vs []T, i int) T {
+			return vs[i+1]
+		}
+	}
+	if v2.IsConst() {
+		v2GetMin = func(vs []T, _ int) T {
+			return vs[0]
+		}
+		v2GetMax = v2GetMin
+	} else {
+		v2GetMin = func(vs []T, i int) T {
+			return vs[i]
+		}
+		v2GetMax = func(vs []T, i int) T {
+			return vs[i+1]
+		}
+	}
 	switch compType {
 	case 0: /* '>'  */
 		for i := 0; i < v1.Length(); i += 2 {
@@ -766,8 +833,8 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Maxv := col1[i+1]
-				v2Minv := col2[i]
+				v1Maxv := v1GetMax(col1, i)
+				v2Minv := v1GetMin(col2, i)
 				v = v1Maxv > v2Minv
 			}
 			if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
@@ -780,8 +847,8 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Minv := col1[i]
-				v2Maxv := col2[i+1]
+				v1Minv := v1GetMin(col1, i)
+				v2Maxv := v2GetMax(col2, i)
 				v = v1Minv < v2Maxv
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
@@ -794,8 +861,8 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Maxv := col1[i+1]
-				v2Minv := col2[i]
+				v1Maxv := v1GetMax(col1, i)
+				v2Minv := v2GetMin(col2, i)
 				v = v1Maxv >= v2Minv
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
@@ -808,8 +875,8 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Minv := col1[i]
-				v2Maxv := col2[i+1]
+				v1Minv := v1GetMin(col1, i)
+				v2Maxv := v2GetMax(col2, i)
 				v = v1Minv <= v2Maxv
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
@@ -822,8 +889,8 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Minv, v1Maxv := col1[i], col1[i+1]
-				v2Minv, v2Maxv := col2[i], col2[i+1]
+				v1Minv, v1Maxv := v1GetMin(col1, i), v1GetMax(col1, i)
+				v2Minv, v2Maxv := v2GetMin(col2, i), v2GetMax(col2, i)
 				v = v1Maxv >= v2Minv && v1Minv <= v2Maxv
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
