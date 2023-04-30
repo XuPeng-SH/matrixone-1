@@ -308,7 +308,18 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 		}
 
 		exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
-		columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
+
+		var (
+			columnMap map[int]int
+			columns   []int
+			maxCol    int
+		)
+
+		// do not collect columns used by non-mono expr
+		if exprMono {
+			columnMap, columns, maxCol = plan2.GetColumnsByExpr(expr, tbl.getTableDef())
+		}
+
 		var meta objectio.ObjectMeta
 		for _, blk := range blks {
 			tbl.skipBlocks[blk.BlockID] = 0

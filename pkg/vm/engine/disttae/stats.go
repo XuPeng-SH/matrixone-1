@@ -106,11 +106,20 @@ func getInfoFromZoneMap(ctx context.Context, columns []int, blocks [][]catalog.B
 // calculate the stats for scan node.
 // we need to get the zonemap from cn, and eval the filters with zonemap
 func CalcStats(ctx context.Context, blocks [][]catalog.BlockInfo, expr *plan.Expr, tableDef *plan.TableDef, proc *process.Process, sortKeyName string, s *plan2.StatsInfoMap) (stats *plan.Stats, err error) {
-	var blockNumNeed, blockNumTotal int
-	var tableCnt, cost int64
 	exprMono := plan2.CheckExprIsMonotonic(ctx, expr)
-	columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tableDef)
-	var meta objectio.ObjectMeta
+
+	var (
+		columnMap                   map[int]int
+		columns                     []int
+		maxCol                      int
+		blockNumNeed, blockNumTotal int
+		tableCnt, cost              int64
+		meta                        objectio.ObjectMeta
+	)
+
+	if exprMono {
+		columnMap, columns, maxCol = plan2.GetColumnsByExpr(expr, tableDef)
+	}
 	for i := range blocks {
 		for _, blk := range blocks[i] {
 			location := blk.MetaLocation()

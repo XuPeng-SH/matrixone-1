@@ -419,7 +419,17 @@ func (txn *Transaction) genRowId() types.Rowid {
 }
 
 // needRead determine if a block needs to be read
-func needRead(ctx context.Context, expr *plan.Expr, meta objectio.ObjectMeta, blkInfo catalog.BlockInfo, tableDef *plan.TableDef, columnMap map[int]int, columns []int, maxCol int, proc *process.Process) bool {
+func needRead(
+	ctx context.Context,
+	expr *plan.Expr,
+	meta objectio.ObjectMeta,
+	blkInfo catalog.BlockInfo,
+	tableDef *plan.TableDef,
+	columnMap map[int]int,
+	columns []int,
+	maxCol int,
+	proc *process.Process,
+) bool {
 	var err error
 	if expr == nil {
 		return true
@@ -437,27 +447,14 @@ func needRead(ctx context.Context, expr *plan.Expr, meta objectio.ObjectMeta, bl
 		return ifNeed
 	}
 
-	// // get min max data from Meta
-	// datas, dataTypes, err := getZonemapDataFromMeta(columns, blkInfo, tableDef)
-	// if err != nil || datas == nil {
-	//  return true
-	// }
-
-	// // use all min/max data to build []vectors.
-	// buildVectors := plan2.BuildVectorsByData(datas, dataTypes, proc.Mp())
 	buildVectors, err := buildColumnsZMVectors(meta, int(blkInfo.MetaLocation().ID()), columns, tableDef, proc.Mp())
 	if err != nil || len(buildVectors) == 0 {
 		return true
 	}
 	bat := batch.NewWithSize(maxCol + 1)
 	defer bat.Clean(proc.Mp())
-	for k, v := range columnMap {
-		for i, realIdx := range columns {
-			if realIdx == v {
-				bat.SetVector(int32(k), buildVectors[i])
-				break
-			}
-		}
+	for i, colDefIdx := range columns {
+		bat.SetVector(int32(columnMap[colDefIdx]), buildVectors[i])
 	}
 	bat.SetZs(buildVectors[0].Length(), proc.Mp())
 

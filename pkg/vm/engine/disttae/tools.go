@@ -1073,7 +1073,14 @@ func genModifedBlocks(ctx context.Context, deletes map[types.Blockid][]int, orgs
 	}
 
 	exprMono := plantool.CheckExprIsMonotonic(ctx, expr)
-	columnMap, columns, maxCol := plantool.GetColumnsByExpr(expr, tableDef)
+	var (
+		columnMap map[int]int
+		columns   []int
+		maxCol    int
+	)
+	if exprMono {
+		columnMap, columns, maxCol = plantool.GetColumnsByExpr(expr, tableDef)
+	}
 	var meta objectio.ObjectMeta
 	for i, blk := range orgs {
 		if !inBlockMap(blk, blockMap) {
