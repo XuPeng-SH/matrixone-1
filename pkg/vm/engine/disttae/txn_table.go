@@ -258,8 +258,6 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 	}
 	tbl.modifiedBlocks = make([][]ModifyBlockMeta, len(tbl.blockInfos))
 
-	exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
-	columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 	for _, i := range tbl.dnList {
 		blocks := tbl.blockInfos[i]
 		blks := make([]catalog.BlockInfo, 0, len(blocks))
@@ -308,15 +306,22 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 				}
 			}
 		}
+
+		exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
+		columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 		var meta objectio.ObjectMeta
 		for _, blk := range blks {
 			tbl.skipBlocks[blk.BlockID] = 0
 			ok := true
+			// 1. no need to filter non-mono expr
 			if exprMono {
-				location := blk.MetaLocation()
-				if !objectio.IsSameObjectLocVsMeta(location, meta) {
-					if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
-						return
+				// 2. no need to load object meta if no column is used in the expr
+				if len(columns) > 0 {
+					location := blk.MetaLocation()
+					if !objectio.IsSameObjectLocVsMeta(location, meta) {
+						if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
+							return
+						}
 					}
 				}
 				ok = needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)

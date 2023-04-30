@@ -1080,9 +1080,12 @@ func genModifedBlocks(ctx context.Context, deletes map[types.Blockid][]int, orgs
 			location := blk.MetaLocation()
 			ok := true
 			if exprMono {
-				if !objectio.IsSameObjectLocVsMeta(location, meta) {
-					if meta, err = loadObjectMeta(ctx, location, proc.FileService, proc.Mp()); err != nil {
-						return
+				// do not read object meta when no column is used in the expr
+				if len(columns) > 0 {
+					if !objectio.IsSameObjectLocVsMeta(location, meta) {
+						if meta, err = loadObjectMeta(ctx, location, proc.FileService, proc.Mp()); err != nil {
+							return
+						}
 					}
 				}
 				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, columns, maxCol, proc)
