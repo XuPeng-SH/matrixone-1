@@ -834,7 +834,7 @@ func compareOrderedMinMax[T types.OrderedT](
 				v = true
 			} else {
 				v1Maxv := v1GetMax(col1, i)
-				v2Minv := v1GetMin(col2, i)
+				v2Minv := v2GetMin(col2, i)
 				v = v1Maxv > v2Minv
 			}
 			if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {

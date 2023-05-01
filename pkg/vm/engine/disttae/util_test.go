@@ -195,10 +195,50 @@ func TestEvalFilterExpr1(t *testing.T) {
 				plan2.MakePlan2Int64ConstExprWithType(100),
 			}),
 		},
+		// abs(a)
 		{
 			expect64: []int64{1, 3, 4, 7, 7, 10},
 			expr: makeFunctionExprForTest("abs", []*plan.Expr{
 				makeColExprForTest(0, types.T_int64),
+			}),
+		},
+		// a > 10000 or b > 5
+		{
+			expect: []bool{true, true, false, false, true, true},
+			expr: makeFunctionExprForTest("or", []*plan.Expr{
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(0, types.T_int64),
+					plan2.MakePlan2Int64ConstExprWithType(10000),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(1, types.T_int64),
+					plan2.MakePlan2Int64ConstExprWithType(5),
+				}),
+			}),
+		},
+		// a < 5 and b > 5
+		{
+			expect: []bool{true, true, false, false, false, false},
+			expr: makeFunctionExprForTest("and", []*plan.Expr{
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeColExprForTest(0, types.T_int64),
+					plan2.MakePlan2Int64ConstExprWithType(5),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(1, types.T_int64),
+					plan2.MakePlan2Int64ConstExprWithType(5),
+				}),
+			}),
+		},
+		// a + b > 10
+		{
+			expect: []bool{false, false, true, true, true, true},
+			expr: makeFunctionExprForTest(">", []*plan.Expr{
+				makeFunctionExprForTest("+", []*plan.Expr{
+					makeColExprForTest(0, types.T_int64),
+					makeColExprForTest(1, types.T_int64),
+				}),
+				plan2.MakePlan2Int64ConstExprWithType(10),
 			}),
 		},
 	}
