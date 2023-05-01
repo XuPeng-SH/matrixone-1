@@ -76,6 +76,65 @@ func buildOneBlockOneColumnZMVector(
 	return
 }
 
+func buildObjectOneColumnZMVector(
+	meta objectio.ObjectMeta,
+	colIdx uint16,
+	t types.T,
+	mp *mpool.MPool,
+) (vec *vector.Vector, err error) {
+	typ := t.ToType()
+	vec = vector.NewVec(typ)
+	defer func() {
+		if err != nil {
+			vec.Free(mp)
+		}
+	}()
+	appendFn := vector.MakeAppendBytesFunc(vec)
+	for i := uint32(0); i < meta.BlockCount(); i++ {
+		zm := meta.GetColumnMeta(i, colIdx).ZoneMap()
+		if err = appendFn(zm.GetMinBuf(), false, mp); err != nil {
+			return
+		}
+		if err = appendFn(zm.GetMaxBuf(), false, mp); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func buildObjectZMVectors(
+	meta objectio.ObjectMeta,
+	cols []int,
+	def *plan.TableDef,
+	mp *mpool.MPool,
+) (vecs []*vector.Vector, err error) {
+	toClean := false
+	vecs = make([]*vector.Vector, len(cols))
+	defer func() {
+		if toClean {
+			for i, vec := range vecs {
+				if vec != nil {
+					vec.Free(mp)
+					vecs[i] = nil
+				} else {
+					break
+				}
+			}
+			vecs = vecs[:0]
+		}
+	}()
+	var vec *vector.Vector
+	for i, colIdx := range cols {
+		t := types.T(def.Cols[colIdx].Typ.Id)
+		if vec, err = buildObjectOneColumnZMVector(meta, uint16(colIdx), t, mp); err != nil {
+			toClean = true
+			return
+		}
+		vecs[i] = vec
+	}
+	return
+}
+
 func buildOneBlockZMVectors(
 	meta objectio.ObjectMeta,
 	blknum int,

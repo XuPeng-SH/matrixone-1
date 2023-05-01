@@ -183,7 +183,7 @@ func TestBuildColumnVector(t *testing.T) {
 	zm.Update(maxv)
 	t.Log(zm.String())
 
-	vec2, err := buildColumnZMVector(*zm, mp)
+	vec2, err := buildOneBlockOneColumnZMVector(*zm, mp)
 	assert.NoError(t, err)
 	defer vec2.Free(mp)
 	assert.Equal(t, minv, vector.GetFixedAt[int32](vec2, 0))
@@ -199,7 +199,7 @@ func BenchmarkBuildColumnZMVector(b *testing.B) {
 	b.Run("build-column-zm-vec", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			vec, _ := buildColumnZMVector(*zm, mp)
+			vec, _ := buildOneBlockOneColumnZMVector(*zm, mp)
 			vec.Free(mp)
 		}
 	})
