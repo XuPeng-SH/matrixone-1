@@ -114,64 +114,91 @@ func TestCheckExprIsMonotonic(t *testing.T) {
 }
 
 func TestEvalFilterExpr1(t *testing.T) {
-	tag := "TestEvalFilterExpr"
-	m := mpool.MustNewNoFixed(tag)
+	m := mpool.MustNewNoFixed(t.Name())
 	proc := testutil.NewProcessWithMPool(m)
 	attrs := []string{"a", "b"}
 	bat := batch.NewWithSize(len(attrs))
 
-	vecA := vector.NewVec(types.T_int32.ToType())
-	vector.AppendFixedList[int32](vecA,
-		[]int32{1, 3, 4, 7, 7, 10},
+	vecA := vector.NewVec(types.T_int64.ToType())
+	vector.AppendFixedList[int64](vecA,
+		[]int64{-1, 3, 4, 7, 7, 10},
 		nil, m)
 	bat.SetVector(0, vecA)
 
-	vecB := vector.NewVec(types.T_int32.ToType())
-	vector.AppendFixedList[int32](vecB,
-		[]int32{3, 7, 1, 4, 2, 6},
+	vecB := vector.NewVec(types.T_int64.ToType())
+	vector.AppendFixedList[int64](vecB,
+		[]int64{3, 7, 1, 4, 2, 6},
 		nil, m)
 	bat.SetVector(1, vecB)
 	bat.SetZs(vecA.Length(), m)
 
 	type testCase struct {
-		expr   *plan.Expr
-		expect []bool
+		expr     *plan.Expr
+		expect   []bool
+		expect64 []int64
 	}
 
 	cases := []testCase{
+		// a > b
 		{
 			expect: []bool{false, false, true, true, true, true},
 			expr: makeFunctionExprForTest(">", []*plan.Expr{
-				makeColExprForTest(0, types.T_int32),
-				makeColExprForTest(1, types.T_int32),
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
 			}),
 		},
+		// a < b
 		{
 			expect: []bool{true, true, false, false, false, false},
 			expr: makeFunctionExprForTest("<", []*plan.Expr{
-				makeColExprForTest(0, types.T_int32),
-				makeColExprForTest(1, types.T_int32),
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
 			}),
 		},
+		// a >= b
 		{
 			expect: []bool{true, true, true, true, true, true},
 			expr: makeFunctionExprForTest(">=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int32),
-				makeColExprForTest(1, types.T_int32),
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
 			}),
 		},
+		// a <= b
 		{
 			expect: []bool{true, true, true, true, false, false},
 			expr: makeFunctionExprForTest("<=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int32),
-				makeColExprForTest(1, types.T_int32),
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
 			}),
 		},
+		// a = b
 		{
 			expect: []bool{true, true, true, true, false, false},
 			expr: makeFunctionExprForTest("=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int32),
-				makeColExprForTest(1, types.T_int32),
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
+			}),
+		},
+		// a >= 6
+		{
+			expect: []bool{false, false, true, true, true, true},
+			expr: makeFunctionExprForTest(">=", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+				plan2.MakePlan2Int64ConstExprWithType(6),
+			}),
+		},
+		// a >= 100
+		{
+			expect: []bool{false, false, false, false, false, false},
+			expr: makeFunctionExprForTest(">=", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+				plan2.MakePlan2Int64ConstExprWithType(100),
+			}),
+		},
+		{
+			expect64: []int64{1, 3, 4, 7, 7, 10},
+			expr: makeFunctionExprForTest("abs", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
 			}),
 		},
 	}
@@ -179,7 +206,11 @@ func TestEvalFilterExpr1(t *testing.T) {
 	for _, tcase := range cases {
 		outVec, stopped := colexec.EvalFilterExpr2(context.Background(), tcase.expr, bat, proc)
 		require.False(t, stopped)
-		require.Equal(t, tcase.expect, vector.MustFixedCol[bool](outVec))
+		if outVec.GetType().Oid == types.T_bool {
+			require.Equal(t, tcase.expect, vector.MustFixedCol[bool](outVec))
+		} else {
+			require.Equal(t, tcase.expect64, vector.MustFixedCol[int64](outVec))
+		}
 		outVec.Free(m)
 	}
 	bat.Clean(m)

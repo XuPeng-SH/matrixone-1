@@ -382,8 +382,9 @@ func EvalFilterExpr2(
 				outVec.Free(proc.Mp())
 				outVec = nil
 				stopped = true
-				return
 			}
+			cleanVectorsExceptList(proc, vecs, input.Vecs)
+			return
 		} else {
 			outVec, err = evalFunction(proc, f, vecs, len(input.Zs))
 			if err != nil {
