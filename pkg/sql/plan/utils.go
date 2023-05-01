@@ -817,6 +817,55 @@ func GetColumnsByExpr(expr *plan.Expr, tableDef *plan.TableDef) (map[int]int, []
 	return columnMap, columns, maxCol
 }
 
+func EvalFilterExpr2(
+	ctx context.Context,
+	expr *plan.Expr,
+	input *batch.Batch,
+	proc *process.Process,
+) (sels *vector.Vector) {
+	var err error
+	// no column specified. only eval the expr
+	if input == nil {
+		var e *plan.Expr
+		bat := batch.NewWithSize(0)
+		defer bat.Clean(proc.Mp())
+		if e, err = ConstantFold(bat, expr, proc); err != nil {
+			err = nil
+			sels = vector.NewConstFixed[bool](types.T_bool.ToType(), true, 1, proc.Mp())
+			return
+		}
+		bv := true
+		if ce, ok := e.Expr.(*plan.Expr_C); ok {
+			if v, vok := ce.C.Value.(*plan.Const_Bval); vok {
+				bv = v.Bval
+			}
+		}
+		sels = vector.NewConstFixed[bool](types.T_bool.ToType(), bv, 1, proc.Mp())
+		return
+	}
+
+	var stopped bool
+	sels, stopped = colexec.EvalFilterExprWithMinMax(
+		ctx,
+		expr,
+		input,
+		proc,
+	)
+	if stopped {
+		if sels != nil {
+			panic("fix me")
+		}
+		// select all
+		sels = vector.NewConstFixed[bool](types.T_bool.ToType(), true, 1, proc.Mp())
+	} else if sels.GetType().Oid != types.T_bool {
+		sels.Free(proc.Mp())
+		// select all
+		sels = vector.NewConstFixed[bool](types.T_bool.ToType(), true, 1, proc.Mp())
+	}
+
+	return
+}
+
 func EvalFilterExpr(ctx context.Context, expr *plan.Expr, bat *batch.Batch, proc *process.Process) (bool, error) {
 	if len(bat.Vecs) == 0 { //that's constant expr
 		e, err := ConstantFold(bat, expr, proc)

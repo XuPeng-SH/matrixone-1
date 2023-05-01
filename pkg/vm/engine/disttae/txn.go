@@ -418,6 +418,49 @@ func (txn *Transaction) genRowId() types.Rowid {
 	return types.DecodeFixed[types.Rowid](types.EncodeSlice(txn.rowId[:]))
 }
 
+func filterExprOnObject(
+	ctx context.Context,
+	meta objectio.ObjectMeta,
+	expr *plan.Expr,
+	def *plan.TableDef,
+	columnMap map[int]int,
+	columns []int,
+	maxCol int,
+	proc *process.Process,
+) (sels *vector.Vector) {
+	if expr == nil {
+		sels = vector.NewConstFixed[bool](
+			types.T_bool.ToType(),
+			true,
+			1,
+			proc.Mp(),
+		)
+		return
+	}
+	errCtx := errutil.ContextWithNoReport(ctx, true)
+
+	if len(columns) == 0 {
+		sels = plan2.EvalFilterExpr2(errCtx, expr, nil, proc)
+		return
+	}
+
+	vecs, err := buildObjectZMVectors(meta, columns, def, proc.Mp())
+	if err != nil || len(vecs) == 0 {
+		sels = vector.NewConstFixed[bool](types.T_bool.ToType(), true, 1, proc.Mp())
+		return
+	}
+
+	bat := batch.NewWithSize(maxCol + 1)
+	defer bat.Clean(proc.Mp())
+	for i, colDefIdx := range columns {
+		bat.SetVector(int32(columnMap[colDefIdx]), vecs[i])
+	}
+	bat.SetZs(vecs[0].Length(), proc.Mp())
+
+	sels = plan2.EvalFilterExpr2(errCtx, expr, bat, proc)
+	return
+}
+
 // needRead determine if a block needs to be read
 func needRead(
 	ctx context.Context,

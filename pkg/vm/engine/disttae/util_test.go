@@ -26,11 +26,13 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 )
 
 func makeColExprForTest(idx int32, typ types.T) *plan.Expr {
@@ -266,6 +268,105 @@ func TestEvalFilterExpr1(t *testing.T) {
 	bat.Clean(m)
 	t.Log(m.Report())
 	require.Equal(t, int64(0), m.CurrNB())
+}
+
+func mockZMTestContexts() (def *plan.TableDef, meta objectio.ObjectMeta, vs0, vs1 []int64, vs2 [][]byte) {
+	def = &plan.TableDef{
+		Cols: []*plan.ColDef{
+			&plan.ColDef{
+				ColId: 0,
+				Name:  "a",
+				Typ:   &plan.Type{Id: int32(types.T_int64)},
+			},
+			&plan.ColDef{
+				ColId: 1,
+				Name:  "b",
+				Typ:   &plan.Type{Id: int32(types.T_int64)},
+			},
+			&plan.ColDef{
+				ColId: 2,
+				Name:  "c",
+				Typ:   &plan.Type{Id: int32(types.T_char)},
+			},
+		},
+	}
+	def.Name2ColIndex = make(map[string]int32)
+	def.Name2ColIndex[def.Cols[0].Name] = 0
+	def.Name2ColIndex[def.Cols[1].Name] = 1
+	def.Name2ColIndex[def.Cols[2].Name] = 2
+	meta = objectio.BuildMetaData(3, 3)
+	vs0 = []int64{-6, -3, 4, 7, 7, 10}
+	vs1 = []int64{-3, 7, 1, 4, 2, 6}
+	vs2 = [][]byte{[]byte("1"), []byte("2"),
+		[]byte("1"), []byte("4"), []byte("4"), []byte("6")}
+	for i := 0; i < int(meta.BlockCount()); i++ {
+		zm0 := index.NewZM(types.T_int64)
+		zm0.Update(vs0[i*2])
+		zm0.Update(vs0[i*2+1])
+		zm1 := index.NewZM(types.T_int64)
+		zm1.Update(vs1[i*2])
+		zm1.Update(vs1[i*2+1])
+		zm2 := index.NewZM(types.T_char)
+		zm2.Update(vs2[i*2])
+		zm2.Update(vs2[i*2+1])
+		meta.GetColumnMeta(uint32(i), 0).SetZoneMap(*zm0)
+		meta.GetColumnMeta(uint32(i), 1).SetZoneMap(*zm1)
+		meta.GetColumnMeta(uint32(i), 2).SetZoneMap(*zm2)
+	}
+	return
+}
+
+func TestBuildZMVectors(t *testing.T) {
+	m := mpool.MustNewNoFixed(t.Name())
+
+	def, meta, vs0, vs1, vs2 := mockZMTestContexts()
+
+	vecs, err := buildObjectZMVectors(meta, []int{0, 1, 2}, def, m)
+	require.NoError(t, err)
+	require.Equal(t, vs0, vector.MustFixedCol[int64](vecs[0]))
+	require.Equal(t, vs1, vector.MustFixedCol[int64](vecs[1]))
+	require.Equal(t, vs2, vector.MustBytesCol(vecs[2]))
+}
+
+func TestEvalFilterOnObject(t *testing.T) {
+	m := mpool.MustNewNoFixed(t.Name())
+	proc := testutil.NewProcessWithMPool(m)
+
+	def, meta, _, _, _ := mockZMTestContexts()
+
+	type testCase struct {
+		expr   *plan.Expr
+		expect []bool
+	}
+
+	cases := []testCase{
+		// a > b
+		{
+			expect: []bool{false, false, true, true, true, true},
+			expr: makeFunctionExprForTest(">", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
+			}),
+		},
+	}
+
+	for _, tc := range cases {
+		colMap, cols, maxCol := plan2.GetColumnsByExpr(tc.expr, def)
+		sels := filterExprOnObject(
+			context.Background(),
+			meta,
+			tc.expr,
+			def,
+			colMap,
+			cols,
+			maxCol,
+			proc,
+		)
+		require.Equal(t, tc.expect, vector.MustFixedCol[bool](sels))
+		sels.Free(m)
+	}
+	t.Log(m.Report())
+	require.Zero(t, m.CurrNB())
 }
 
 // func TestNeedRead(t *testing.T) {
