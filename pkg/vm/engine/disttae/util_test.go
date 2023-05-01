@@ -237,6 +237,14 @@ var testCases = []testCase{
 		}),
 		desc: "abs(a) >= 1",
 	},
+	{
+		expect: []bool{false, false, false, false, true, true},
+		expr: makeFunctionExprForTest("=", []*plan.Expr{
+			makeColExprForTest(2, types.T_varchar),
+			plan2.MakePlan2StringConstExprWithType("5"),
+		}),
+		desc: "c = \"5\"",
+	},
 }
 
 func TestEvalFilterExpr1(t *testing.T) {
@@ -289,7 +297,7 @@ func mockZMTestContexts() (def *plan.TableDef, meta objectio.ObjectMeta, vs0, vs
 			&plan.ColDef{
 				ColId: 2,
 				Name:  "c",
-				Typ:   &plan.Type{Id: int32(types.T_char)},
+				Typ:   &plan.Type{Id: int32(types.T_varchar)},
 			},
 		},
 	}
@@ -309,7 +317,7 @@ func mockZMTestContexts() (def *plan.TableDef, meta objectio.ObjectMeta, vs0, vs
 		zm1 := index.NewZM(types.T_int64)
 		zm1.Update(vs1[i*2])
 		zm1.Update(vs1[i*2+1])
-		zm2 := index.NewZM(types.T_char)
+		zm2 := index.NewZM(types.T_varchar)
 		zm2.Update(vs2[i*2])
 		zm2.Update(vs2[i*2+1])
 		meta.GetColumnMeta(uint32(i), 0).SetZoneMap(*zm0)
