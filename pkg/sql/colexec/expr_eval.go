@@ -323,6 +323,82 @@ func JoinFilterEvalExpr(r, s *batch.Batch, rRow int, proc *process.Process, expr
 	}
 }
 
+func EvalFilterExpr2(
+	ctx context.Context,
+	expr *plan.Expr,
+	input *batch.Batch,
+	proc *process.Process,
+) (outVec *vector.Vector, stopped bool) {
+	if stopped {
+		return
+	}
+	var err error
+	switch t := expr.Expr.(type) {
+	case *plan.Expr_C:
+		if outVec, err = getConstVec(ctx, proc, expr, input.Length()); err != nil {
+			stopped = true
+		}
+		return
+	case *plan.Expr_Col:
+		outVec = input.Vecs[t.Col.ColPos]
+		return
+	case *plan.Expr_F:
+		f, err := function.GetFunctionByID(ctx, t.F.GetFunc().GetObj())
+		if err != nil {
+			stopped = true
+			return
+		}
+		vecs := make([]*vector.Vector, len(t.F.Args))
+		for i := range vecs {
+			if vecs[i], stopped = EvalFilterExpr2(ctx, t.F.Args[i], input, proc); stopped {
+				break
+			}
+		}
+		if stopped {
+			cleanVectorsExceptList(proc, vecs, input.Vecs)
+			return
+		}
+
+		var compType uint8
+		switch t.F.Func.ObjName {
+		case ">":
+			outVec = vector.NewVec(types.T_bool.ToType())
+			compType = 0
+		case "<":
+			outVec = vector.NewVec(types.T_bool.ToType())
+			compType = 1
+		case ">=":
+			outVec = vector.NewVec(types.T_bool.ToType())
+			compType = 2
+		case "<=":
+			outVec = vector.NewVec(types.T_bool.ToType())
+			compType = 3
+		case "=":
+			outVec = vector.NewVec(types.T_bool.ToType())
+			compType = 4
+		}
+		if outVec != nil {
+			if err = vector.CompareWithMinMax(vecs[0], vecs[1], outVec, compType, proc.Mp()); err != nil {
+				outVec.Free(proc.Mp())
+				outVec = nil
+				stopped = true
+				return
+			}
+		} else {
+			outVec, err = evalFunction(proc, f, vecs, len(input.Zs))
+			if err != nil {
+				// TODO: outVec maybe leak
+				cleanVectorsExceptList(proc, append(vecs, outVec), input.Vecs)
+				stopped = true
+			} else {
+				cleanVectorsExceptList(proc, vecs, append(input.Vecs, outVec))
+			}
+			return
+		}
+	}
+	return
+}
+
 func EvalExprByZonemapBat(ctx context.Context, bat *batch.Batch, proc *process.Process, expr *plan.Expr) (*vector.Vector, error) {
 	length := len(bat.Zs)
 	if length == 0 {

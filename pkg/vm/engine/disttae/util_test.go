@@ -22,12 +22,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 )
 
 func makeColExprForTest(idx int32, typ types.T) *plan.Expr {
@@ -65,28 +68,6 @@ func makeFunctionExprForTest(name string, args []*plan.Expr) *plan.Expr {
 				},
 				Args: args,
 			},
-		},
-	}
-}
-
-func makeZonemapForTest(typ types.T, min any, max any) [64]byte {
-	zm := index.NewZoneMap(typ.ToType())
-	_ = zm.Update(min)
-	_ = zm.Update(max)
-	buf, _ := zm.Marshal()
-
-	var zmBuf [64]byte
-	copy(zmBuf[:], buf[:])
-	return zmBuf
-}
-
-func makeBlockMetaForTest() BlockMeta {
-	return BlockMeta{
-		Zonemap: []Zonemap{
-			makeZonemapForTest(types.T_int64, int64(10), int64(100)),
-			makeZonemapForTest(types.T_int64, int64(20), int64(200)),
-			makeZonemapForTest(types.T_int64, int64(30), int64(300)),
-			makeZonemapForTest(types.T_int64, int64(1), int64(8)),
 		},
 	}
 }
@@ -132,9 +113,78 @@ func TestCheckExprIsMonotonic(t *testing.T) {
 	})
 }
 
-// delete this if TestNeedRead is not skipped anymore
-func TestMakeBlockMeta(t *testing.T) {
-	_ = makeBlockMetaForTest()
+func TestEvalFilterExpr1(t *testing.T) {
+	tag := "TestEvalFilterExpr"
+	m := mpool.MustNewNoFixed(tag)
+	proc := testutil.NewProcessWithMPool(m)
+	attrs := []string{"a", "b"}
+	bat := batch.NewWithSize(len(attrs))
+
+	vecA := vector.NewVec(types.T_int32.ToType())
+	vector.AppendFixedList[int32](vecA,
+		[]int32{1, 3, 4, 7, 7, 10},
+		nil, m)
+	bat.SetVector(0, vecA)
+
+	vecB := vector.NewVec(types.T_int32.ToType())
+	vector.AppendFixedList[int32](vecB,
+		[]int32{3, 7, 1, 4, 2, 6},
+		nil, m)
+	bat.SetVector(1, vecB)
+	bat.SetZs(vecA.Length(), m)
+
+	type testCase struct {
+		expr   *plan.Expr
+		expect []bool
+	}
+
+	cases := []testCase{
+		{
+			expect: []bool{false, false, true, true, true, true},
+			expr: makeFunctionExprForTest(">", []*plan.Expr{
+				makeColExprForTest(0, types.T_int32),
+				makeColExprForTest(1, types.T_int32),
+			}),
+		},
+		{
+			expect: []bool{true, true, false, false, false, false},
+			expr: makeFunctionExprForTest("<", []*plan.Expr{
+				makeColExprForTest(0, types.T_int32),
+				makeColExprForTest(1, types.T_int32),
+			}),
+		},
+		{
+			expect: []bool{true, true, true, true, true, true},
+			expr: makeFunctionExprForTest(">=", []*plan.Expr{
+				makeColExprForTest(0, types.T_int32),
+				makeColExprForTest(1, types.T_int32),
+			}),
+		},
+		{
+			expect: []bool{true, true, true, true, false, false},
+			expr: makeFunctionExprForTest("<=", []*plan.Expr{
+				makeColExprForTest(0, types.T_int32),
+				makeColExprForTest(1, types.T_int32),
+			}),
+		},
+		{
+			expect: []bool{true, true, true, true, false, false},
+			expr: makeFunctionExprForTest("=", []*plan.Expr{
+				makeColExprForTest(0, types.T_int32),
+				makeColExprForTest(1, types.T_int32),
+			}),
+		},
+	}
+
+	for _, tcase := range cases {
+		outVec, stopped := colexec.EvalFilterExpr2(context.Background(), tcase.expr, bat, proc)
+		require.False(t, stopped)
+		require.Equal(t, tcase.expect, vector.MustFixedCol[bool](outVec))
+		outVec.Free(m)
+	}
+	bat.Clean(m)
+	t.Log(m.Report())
+	require.Equal(t, int64(0), m.CurrNB())
 }
 
 // func TestNeedRead(t *testing.T) {
