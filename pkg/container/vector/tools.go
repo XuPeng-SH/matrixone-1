@@ -653,27 +653,23 @@ func genericCompareMinMax[T any](
 	comp func(T, T, T, T) bool,
 	m *mpool.MPool,
 ) (err error) {
-	var v1Minv, v1Maxv, v2Minv, v2Maxv T
+	var v1_0, v1_1, v2_0, v2_1 T
 	for i := 0; i < len(col1); i += 2 {
 		var v bool
 		if nsp1.Contains(uint64(i)) || nsp2.Contains(uint64(i)) {
 			v = true
 		} else {
 			if isV1Const {
-				v1Minv = col1[0]
-				v1Maxv = v1Minv
+				v1_0, v1_1 = col1[0], col1[0]
 			} else {
-				v1Minv = col1[i]
-				v1Maxv = col1[i+1]
+				v1_0, v1_1 = col1[i], col1[i+1]
 			}
 			if isV2Const {
-				v2Minv = col2[0]
-				v2Maxv = v2Minv
+				v2_0, v2_1 = col2[i], col2[i+1]
 			} else {
-				v2Minv = col2[i]
-				v2Maxv = col2[i+1]
+				v2_0, v2_1 = col2[i], col2[i+1]
 			}
-			v = comp(v1Minv, v1Maxv, v2Minv, v2Maxv)
+			v = comp(v1_0, v1_1, v2_0, v2_1)
 		}
 		if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
 			return
@@ -757,23 +753,50 @@ func compareFixeSizedMinMax[T types.FixedSizeT](
 	var comp func(T, T, T, T) bool
 	switch compType {
 	case 0: /* '>'  */
-		comp = func(_, v1Maxv, v2Minv, _ T) bool {
-			return elemComp(v1Maxv, v2Minv) > 0
+		comp = func(v1_0, v1_1, v2_0, v2_1 T) bool {
+			return elemComp(v1_1, v2_0) > 0 ||
+				elemComp(v1_1, v2_1) > 0 ||
+				elemComp(v1_0, v2_1) > 0 ||
+				elemComp(v1_0, v2_0) > 0
 		}
 	case 1: /* '<'  */
-		comp = func(v1Minv, _, _, v2Maxv T) bool {
-			return elemComp(v1Minv, v2Maxv) < 0
+		comp = func(v1_0, v1_1, v2_0, v2_1 T) bool {
+			return elemComp(v1_0, v2_1) < 0 ||
+				elemComp(v1_0, v2_0) < 0 ||
+				elemComp(v1_1, v2_0) < 0 ||
+				elemComp(v1_1, v2_1) < 0
 		}
 	case 2: /* '>=' */
-		comp = func(_, v1Maxv, v2Minv, _ T) bool {
-			return elemComp(v1Maxv, v2Minv) >= 0
+		comp = func(v1_0, v1_1, v2_0, v2_1 T) bool {
+			return elemComp(v1_1, v2_0) >= 0 ||
+				elemComp(v1_1, v2_1) >= 0 ||
+				elemComp(v1_0, v2_1) >= 0 ||
+				elemComp(v1_0, v2_0) >= 0
 		}
 	case 3: /* '<=' */
-		comp = func(v1Minv, _, _, v2Maxv T) bool {
-			return elemComp(v1Minv, v2Maxv) <= 0
+		comp = func(v1_0, v1_1, v2_0, v2_1 T) bool {
+			return elemComp(v1_0, v2_1) <= 0 ||
+				elemComp(v1_0, v2_0) <= 0 ||
+				elemComp(v1_1, v2_0) <= 0 ||
+				elemComp(v1_1, v2_1) <= 0
 		}
 	case 4: /* '==' */
-		comp = func(v1Minv, v1Maxv, v2Minv, v2Maxv T) bool {
+		comp = func(v1_0, v1_1, v2_0, v2_1 T) bool {
+			var v1Minv, v1Maxv, v2Minv, v2Maxv T
+			if elemComp(v1_0, v1_1) > 0 {
+				v1Minv = v1_1
+				v1Maxv = v1_0
+			} else {
+				v1Minv = v1_0
+				v1Maxv = v1_1
+			}
+			if elemComp(v2_0, v2_1) > 0 {
+				v2Minv = v2_1
+				v2Maxv = v2_0
+			} else {
+				v2Minv = v2_0
+				v2Maxv = v2_1
+			}
 			return elemComp(v1Maxv, v2Minv) >= 0 && elemComp(v1Minv, v2Maxv) <= 0
 		}
 	default:
@@ -798,32 +821,25 @@ func compareOrderedMinMax[T types.OrderedT](
 	col2 := MustFixedCol[T](v2)
 
 	var (
-		v1GetMin, v1GetMax, v2GetMin, v2GetMax func([]T, int) T
+		getV1 func(int) (T, T)
+		getV2 func(int) (T, T)
 	)
 	if v1.IsConst() {
-		v1GetMin = func(vs []T, _ int) T {
-			return vs[0]
+		getV1 = func(_ int) (T, T) {
+			return col1[0], col1[0]
 		}
-		v1GetMax = v1GetMin
 	} else {
-		v1GetMin = func(vs []T, i int) T {
-			return vs[i]
-		}
-		v1GetMax = func(vs []T, i int) T {
-			return vs[i+1]
+		getV1 = func(i int) (T, T) {
+			return col1[i], col1[i+1]
 		}
 	}
 	if v2.IsConst() {
-		v2GetMin = func(vs []T, _ int) T {
-			return vs[0]
+		getV2 = func(_ int) (T, T) {
+			return col2[0], col2[0]
 		}
-		v2GetMax = v2GetMin
 	} else {
-		v2GetMin = func(vs []T, i int) T {
-			return vs[i]
-		}
-		v2GetMax = func(vs []T, i int) T {
-			return vs[i+1]
+		getV2 = func(i int) (T, T) {
+			return col2[i], col2[i+1]
 		}
 	}
 	switch compType {
@@ -833,9 +849,9 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Maxv := v1GetMax(col1, i)
-				v2Minv := v2GetMin(col2, i)
-				v = v1Maxv > v2Minv
+				v1_0, v1_1 := getV1(i)
+				v2_0, v2_1 := getV2(i)
+				v = v1_1 > v2_0 || v1_1 > v2_1 || v1_0 > v2_1 || v1_0 > v2_0
 			}
 			if err = AppendFixedList[bool](result, []bool{v, v}, nil, m); err != nil {
 				return
@@ -847,9 +863,9 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Minv := v1GetMin(col1, i)
-				v2Maxv := v2GetMax(col2, i)
-				v = v1Minv < v2Maxv
+				v1_0, v1_1 := getV1(i)
+				v2_0, v2_1 := getV2(i)
+				v = v1_0 < v2_1 || v1_0 < v2_0 || v1_1 < v2_0 || v1_1 < v2_1
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
@@ -861,9 +877,9 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Maxv := v1GetMax(col1, i)
-				v2Minv := v2GetMin(col2, i)
-				v = v1Maxv >= v2Minv
+				v1_0, v1_1 := getV1(i)
+				v2_0, v2_1 := getV2(i)
+				v = v1_1 >= v2_0 || v1_1 >= v2_1 || v1_0 >= v2_1 || v1_0 >= v2_0
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
@@ -875,22 +891,37 @@ func compareOrderedMinMax[T types.OrderedT](
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Minv := v1GetMin(col1, i)
-				v2Maxv := v2GetMax(col2, i)
-				v = v1Minv <= v2Maxv
+				v1_0, v1_1 := getV1(i)
+				v2_0, v2_1 := getV2(i)
+				v = v1_0 <= v2_1 || v1_0 <= v2_0 || v1_1 <= v2_0 || v1_1 <= v2_1
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
 				return
 			}
 		}
-	case 4: /* '==' */
+	case 4: /* '=' */
 		for i := 0; i < v1.Length(); i += 2 {
 			var v bool
 			if v1.nsp.Contains(uint64(i)) || v2.nsp.Contains(uint64(i)) {
 				v = true
 			} else {
-				v1Minv, v1Maxv := v1GetMin(col1, i), v1GetMax(col1, i)
-				v2Minv, v2Maxv := v2GetMin(col2, i), v2GetMax(col2, i)
+				var v1Minv, v1Maxv, v2Minv, v2Maxv T
+				v1_0, v1_1 := getV1(i)
+				v2_0, v2_1 := getV2(i)
+				if v1_0 > v1_1 {
+					v1Minv = v1_1
+					v1Maxv = v1_0
+				} else {
+					v1Minv = v1_0
+					v1Maxv = v1_1
+				}
+				if v2_0 > v2_1 {
+					v2Minv = v2_1
+					v2Maxv = v2_0
+				} else {
+					v2Minv = v2_0
+					v2Maxv = v2_1
+				}
 				v = v1Maxv >= v2Minv && v1Minv <= v2Maxv
 			}
 			if err = AppendFixedList(result, []bool{v, v}, nil, m); err != nil {
@@ -903,23 +934,24 @@ func compareOrderedMinMax[T types.OrderedT](
 	return
 }
 
-// Two consecutive rows are pairs of data, where even rows are min
-// and odd rows are max
+// Two consecutive rows are pairs of data of min and max
 //
-// [minv1,maxv1,minv2,maxv2,...,minvn,maxvn]
+// [v1-0,v1-1,v2-0,v2-1,...,vn-0,vn-1]
 //
 // CompType: compType
 // 0 - '>'
 // 1 - '<'
 // 2 - '>='
 // 3 - '<='
-// 4 - '=='
+// 4 - '='
 //
 // Compare Operators: v1,v2
-// v1 >  v2:  v1.maxv >  v2.minv
-// v1 <  v2:  v1.minv <  v2.maxv
-// v1 >= v2:  v1.maxv >= v2.minv
-// v1 <= v2:  v1.minv <= v2.maxv
+// v1 >  v2:  v1[1]>v2[0]  || v1[0]>v2[0]  || v1[0]>v2[1]  || v1[1]>v2[1]
+// v1 <  v2:  v1[0]<v2[1]  || v1[0]<v2[0]  || v1[1]<v2[0]  || v1[1]<v2[1]
+// v1 >= v2:  v1[1]>=v2[0] || v1[0]>=v2[0] || v1[0]>=v2[1] || v1[1]>=v2[1]
+// v1 <= v2:  v1[0]<=v2[1] || v1[0]<=v2[0] || v1[1]<=v2[0] || v1[1]<=v2[1]
+// v1 =  v2:  v1[0]<=v2[1] || v1[0]<=v2[0] || v1[1]<=v2[0] || v1[1]<=v2[1]
+//
 // v1 == v2:  v1.maxv >= v2.minv && v1.minv <= v2.maxv
 //
 // Result: result

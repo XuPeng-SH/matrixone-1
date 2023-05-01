@@ -121,13 +121,13 @@ func TestEvalFilterExpr1(t *testing.T) {
 
 	vecA := vector.NewVec(types.T_int64.ToType())
 	vector.AppendFixedList[int64](vecA,
-		[]int64{-1, 3, 4, 7, 7, 10},
+		[]int64{-6, -3, 4, 7, 7, 10},
 		nil, m)
 	bat.SetVector(0, vecA)
 
 	vecB := vector.NewVec(types.T_int64.ToType())
 	vector.AppendFixedList[int64](vecB,
-		[]int64{3, 7, 1, 4, 2, 6},
+		[]int64{-3, 7, 1, 4, 2, 6},
 		nil, m)
 	bat.SetVector(1, vecB)
 	bat.SetZs(vecA.Length(), m)
@@ -197,7 +197,7 @@ func TestEvalFilterExpr1(t *testing.T) {
 		},
 		// abs(a)
 		{
-			expect64: []int64{1, 3, 4, 7, 7, 10},
+			expect64: []int64{6, 3, 4, 7, 7, 10},
 			expr: makeFunctionExprForTest("abs", []*plan.Expr{
 				makeColExprForTest(0, types.T_int64),
 			}),
@@ -239,6 +239,16 @@ func TestEvalFilterExpr1(t *testing.T) {
 					makeColExprForTest(1, types.T_int64),
 				}),
 				plan2.MakePlan2Int64ConstExprWithType(10),
+			}),
+		},
+		// abs(a) >= 1
+		{
+			expect: []bool{true, true, true, true, true, true},
+			expr: makeFunctionExprForTest(">=", []*plan.Expr{
+				makeFunctionExprForTest("abs", []*plan.Expr{
+					makeColExprForTest(0, types.T_int64),
+				}),
+				plan2.MakePlan2Int64ConstExprWithType(5),
 			}),
 		},
 	}

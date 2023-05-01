@@ -20,6 +20,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 func TestLength(t *testing.T) {
@@ -1290,7 +1291,7 @@ func TestCompareWithMinMax2(t *testing.T) {
 	require.False(t, GetFixedAt[bool](result, 9))
 }
 
-func BenchmarkCompareWithMinMax(b *testing.B) {
+func BenchmarkCompareWithMinMax1(b *testing.B) {
 	m := mpool.MustNewZero()
 	v1 := NewVec(types.T_char.ToType())
 	defer v1.Free(m)
@@ -1320,6 +1321,29 @@ func BenchmarkCompareWithMinMax(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			CompareWithMinMax(v1, v2, result, 4 /*==*/, m)
+		}
+	})
+}
+
+func BenchmarkCompareWithMinMax2(b *testing.B) {
+	m := mpool.MustNewZero()
+	v1 := NewVec(types.T_int64.ToType())
+	defer v1.Free(m)
+	for i := 0; i < 10000; i++ {
+		_ = AppendFixed(v1, rand.Int63n(100000000), false, m)
+	}
+	v2 := NewVec(types.T_int64.ToType())
+	defer v1.Free(m)
+	for i := 0; i < 10000; i++ {
+		_ = AppendFixed(v2, rand.Int63n(100000000), false, m)
+	}
+
+	result := NewVec(types.T_bool.ToType())
+	b.Run("compare-i64-min-max", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			result.Reset(*result.GetType())
+			CompareWithMinMax(v1, v2, result, 1 /*=*/, m)
 		}
 	})
 }
