@@ -323,7 +323,7 @@ func JoinFilterEvalExpr(r, s *batch.Batch, rRow int, proc *process.Process, expr
 	}
 }
 
-func EvalFilterExpr2(
+func EvalFilterExprWithMinMax(
 	ctx context.Context,
 	expr *plan.Expr,
 	input *batch.Batch,
@@ -350,7 +350,7 @@ func EvalFilterExpr2(
 		}
 		vecs := make([]*vector.Vector, len(t.F.Args))
 		for i := range vecs {
-			if vecs[i], stopped = EvalFilterExpr2(ctx, t.F.Args[i], input, proc); stopped {
+			if vecs[i], stopped = EvalFilterExprWithMinMax(ctx, t.F.Args[i], input, proc); stopped {
 				break
 			}
 		}

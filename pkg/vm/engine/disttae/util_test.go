@@ -244,7 +244,7 @@ func TestEvalFilterExpr1(t *testing.T) {
 	}
 
 	for _, tcase := range cases {
-		outVec, stopped := colexec.EvalFilterExpr2(context.Background(), tcase.expr, bat, proc)
+		outVec, stopped := colexec.EvalFilterExprWithMinMax(context.Background(), tcase.expr, bat, proc)
 		require.False(t, stopped)
 		if outVec.GetType().Oid == types.T_bool {
 			require.Equal(t, tcase.expect, vector.MustFixedCol[bool](outVec))
