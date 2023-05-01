@@ -447,7 +447,7 @@ func needRead(
 		return ifNeed
 	}
 
-	buildVectors, err := buildColumnsZMVectors(meta, int(blkInfo.MetaLocation().ID()), columns, tableDef, proc.Mp())
+	buildVectors, err := buildOneBlockZMVectors(meta, int(blkInfo.MetaLocation().ID()), columns, tableDef, proc.Mp())
 	if err != nil || len(buildVectors) == 0 {
 		return true
 	}

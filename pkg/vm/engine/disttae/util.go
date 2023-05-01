@@ -57,7 +57,7 @@ func loadObjectMeta(
 	return reader.LoadObjectMeta(ctx, m)
 }
 
-func buildColumnZMVector(
+func buildOneBlockOneColumnZMVector(
 	zm objectio.ZoneMap,
 	mp *mpool.MPool,
 ) (vec *vector.Vector, err error) {
@@ -76,7 +76,7 @@ func buildColumnZMVector(
 	return
 }
 
-func buildColumnsZMVectors(
+func buildOneBlockZMVectors(
 	meta objectio.ObjectMeta,
 	blknum int,
 	cols []int,
@@ -106,7 +106,7 @@ func buildColumnsZMVectors(
 			toClean = true
 			return
 		}
-		if vec, err = buildColumnZMVector(zm, mp); err != nil {
+		if vec, err = buildOneBlockOneColumnZMVector(zm, mp); err != nil {
 			toClean = true
 			return
 		}
