@@ -115,6 +115,130 @@ func TestCheckExprIsMonotonic(t *testing.T) {
 	})
 }
 
+type testCase struct {
+	expr      *plan.Expr
+	expect    []bool
+	expect64  []int64
+	desc      string
+	selectAll bool
+}
+
+var testCases = []testCase{
+	{
+		expect: []bool{false, false, true, true, true, true},
+		expr: makeFunctionExprForTest(">", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			makeColExprForTest(1, types.T_int64),
+		}),
+		desc: "a > b",
+	},
+	{
+		expect: []bool{true, true, false, false, false, false},
+		expr: makeFunctionExprForTest("<", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			makeColExprForTest(1, types.T_int64),
+		}),
+		desc: "a < b",
+	},
+	{
+		expect: []bool{true, true, true, true, true, true},
+		expr: makeFunctionExprForTest(">=", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			makeColExprForTest(1, types.T_int64),
+		}),
+		desc: "a >= b",
+	},
+	{
+		expect: []bool{true, true, true, true, false, false},
+		expr: makeFunctionExprForTest("<=", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			makeColExprForTest(1, types.T_int64),
+		}),
+		desc: "a <= b",
+	},
+	{
+		expect: []bool{true, true, true, true, false, false},
+		expr: makeFunctionExprForTest("=", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			makeColExprForTest(1, types.T_int64),
+		}),
+		desc: "a = b",
+	},
+	{
+		expect: []bool{false, false, true, true, true, true},
+		expr: makeFunctionExprForTest(">=", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			plan2.MakePlan2Int64ConstExprWithType(6),
+		}),
+		desc: "a >= 6",
+	},
+	{
+		expect: []bool{false, false, false, false, false, false},
+		expr: makeFunctionExprForTest(">=", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+			plan2.MakePlan2Int64ConstExprWithType(100),
+		}),
+		desc: "a >= 100",
+	},
+	{
+		expect64: []int64{6, 3, 4, 7, 7, 10},
+		expr: makeFunctionExprForTest("abs", []*plan.Expr{
+			makeColExprForTest(0, types.T_int64),
+		}),
+		selectAll: true,
+		desc:      "abs(a)",
+	},
+	{
+		expect: []bool{true, true, false, false, true, true},
+		expr: makeFunctionExprForTest("or", []*plan.Expr{
+			makeFunctionExprForTest(">", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+				plan2.MakePlan2Int64ConstExprWithType(10000),
+			}),
+			makeFunctionExprForTest(">", []*plan.Expr{
+				makeColExprForTest(1, types.T_int64),
+				plan2.MakePlan2Int64ConstExprWithType(5),
+			}),
+		}),
+		desc: "a > 10000 or b > 5",
+	},
+	{
+		expect: []bool{true, true, false, false, false, false},
+		expr: makeFunctionExprForTest("and", []*plan.Expr{
+			makeFunctionExprForTest("<", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+				plan2.MakePlan2Int64ConstExprWithType(5),
+			}),
+			makeFunctionExprForTest(">", []*plan.Expr{
+				makeColExprForTest(1, types.T_int64),
+				plan2.MakePlan2Int64ConstExprWithType(5),
+			}),
+		}),
+		desc: "a < 5 and b > 5",
+	},
+	{
+		expect: []bool{false, false, true, true, true, true},
+		expr: makeFunctionExprForTest(">", []*plan.Expr{
+			makeFunctionExprForTest("+", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+				makeColExprForTest(1, types.T_int64),
+			}),
+			plan2.MakePlan2Int64ConstExprWithType(10),
+		}),
+		desc: "a + b > 10",
+	},
+	{
+		expect: []bool{true, true, true, true, true, true},
+		expr: makeFunctionExprForTest(">=", []*plan.Expr{
+			makeFunctionExprForTest("abs", []*plan.Expr{
+				makeColExprForTest(0, types.T_int64),
+			}),
+			plan2.MakePlan2Int64ConstExprWithType(5),
+		}),
+		desc: "abs(a) >= 1",
+	},
+}
+
 func TestEvalFilterExpr1(t *testing.T) {
 	m := mpool.MustNewNoFixed(t.Name())
 	proc := testutil.NewProcessWithMPool(m)
@@ -134,128 +258,7 @@ func TestEvalFilterExpr1(t *testing.T) {
 	bat.SetVector(1, vecB)
 	bat.SetZs(vecA.Length(), m)
 
-	type testCase struct {
-		expr     *plan.Expr
-		expect   []bool
-		expect64 []int64
-	}
-
-	cases := []testCase{
-		// a > b
-		{
-			expect: []bool{false, false, true, true, true, true},
-			expr: makeFunctionExprForTest(">", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				makeColExprForTest(1, types.T_int64),
-			}),
-		},
-		// a < b
-		{
-			expect: []bool{true, true, false, false, false, false},
-			expr: makeFunctionExprForTest("<", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				makeColExprForTest(1, types.T_int64),
-			}),
-		},
-		// a >= b
-		{
-			expect: []bool{true, true, true, true, true, true},
-			expr: makeFunctionExprForTest(">=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				makeColExprForTest(1, types.T_int64),
-			}),
-		},
-		// a <= b
-		{
-			expect: []bool{true, true, true, true, false, false},
-			expr: makeFunctionExprForTest("<=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				makeColExprForTest(1, types.T_int64),
-			}),
-		},
-		// a = b
-		{
-			expect: []bool{true, true, true, true, false, false},
-			expr: makeFunctionExprForTest("=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				makeColExprForTest(1, types.T_int64),
-			}),
-		},
-		// a >= 6
-		{
-			expect: []bool{false, false, true, true, true, true},
-			expr: makeFunctionExprForTest(">=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				plan2.MakePlan2Int64ConstExprWithType(6),
-			}),
-		},
-		// a >= 100
-		{
-			expect: []bool{false, false, false, false, false, false},
-			expr: makeFunctionExprForTest(">=", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				plan2.MakePlan2Int64ConstExprWithType(100),
-			}),
-		},
-		// abs(a)
-		{
-			expect64: []int64{6, 3, 4, 7, 7, 10},
-			expr: makeFunctionExprForTest("abs", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-			}),
-		},
-		// a > 10000 or b > 5
-		{
-			expect: []bool{true, true, false, false, true, true},
-			expr: makeFunctionExprForTest("or", []*plan.Expr{
-				makeFunctionExprForTest(">", []*plan.Expr{
-					makeColExprForTest(0, types.T_int64),
-					plan2.MakePlan2Int64ConstExprWithType(10000),
-				}),
-				makeFunctionExprForTest(">", []*plan.Expr{
-					makeColExprForTest(1, types.T_int64),
-					plan2.MakePlan2Int64ConstExprWithType(5),
-				}),
-			}),
-		},
-		// a < 5 and b > 5
-		{
-			expect: []bool{true, true, false, false, false, false},
-			expr: makeFunctionExprForTest("and", []*plan.Expr{
-				makeFunctionExprForTest("<", []*plan.Expr{
-					makeColExprForTest(0, types.T_int64),
-					plan2.MakePlan2Int64ConstExprWithType(5),
-				}),
-				makeFunctionExprForTest(">", []*plan.Expr{
-					makeColExprForTest(1, types.T_int64),
-					plan2.MakePlan2Int64ConstExprWithType(5),
-				}),
-			}),
-		},
-		// a + b > 10
-		{
-			expect: []bool{false, false, true, true, true, true},
-			expr: makeFunctionExprForTest(">", []*plan.Expr{
-				makeFunctionExprForTest("+", []*plan.Expr{
-					makeColExprForTest(0, types.T_int64),
-					makeColExprForTest(1, types.T_int64),
-				}),
-				plan2.MakePlan2Int64ConstExprWithType(10),
-			}),
-		},
-		// abs(a) >= 1
-		{
-			expect: []bool{true, true, true, true, true, true},
-			expr: makeFunctionExprForTest(">=", []*plan.Expr{
-				makeFunctionExprForTest("abs", []*plan.Expr{
-					makeColExprForTest(0, types.T_int64),
-				}),
-				plan2.MakePlan2Int64ConstExprWithType(5),
-			}),
-		},
-	}
-
-	for _, tcase := range cases {
+	for _, tcase := range testCases {
 		outVec, stopped := colexec.EvalFilterExprWithMinMax(context.Background(), tcase.expr, bat, proc)
 		require.False(t, stopped)
 		if outVec.GetType().Oid == types.T_bool {
@@ -334,23 +337,7 @@ func TestEvalFilterOnObject(t *testing.T) {
 
 	def, meta, _, _, _ := mockZMTestContexts()
 
-	type testCase struct {
-		expr   *plan.Expr
-		expect []bool
-	}
-
-	cases := []testCase{
-		// a > b
-		{
-			expect: []bool{false, false, true, true, true, true},
-			expr: makeFunctionExprForTest(">", []*plan.Expr{
-				makeColExprForTest(0, types.T_int64),
-				makeColExprForTest(1, types.T_int64),
-			}),
-		},
-	}
-
-	for _, tc := range cases {
+	for _, tc := range testCases {
 		colMap, cols, maxCol := plan2.GetColumnsByExpr(tc.expr, def)
 		sels := filterExprOnObject(
 			context.Background(),
@@ -362,77 +349,17 @@ func TestEvalFilterOnObject(t *testing.T) {
 			maxCol,
 			proc,
 		)
-		require.Equal(t, tc.expect, vector.MustFixedCol[bool](sels))
+		if tc.selectAll {
+			require.True(t, sels.IsConst(), tc.desc)
+			require.True(t, vector.GetFixedAt[bool](sels, 0))
+		} else {
+			require.Equal(t, tc.expect, vector.MustFixedCol[bool](sels), tc.desc)
+		}
 		sels.Free(m)
 	}
 	t.Log(m.Report())
 	require.Zero(t, m.CurrNB())
 }
-
-// func TestNeedRead(t *testing.T) {
-// 	t.Skip("NeedRead always returns true fot start cn-dn with flushing")
-// 	type asserts = struct {
-// 		result  bool
-// 		columns []string
-// 		expr    *plan.Expr
-// 	}
-// 	blockMeta := makeBlockMetaForTest()
-//
-// 	testCases := []asserts{
-// 		{true, []string{"a"}, makeFunctionExprForTest(">", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 			plan2.MakePlan2Int64ConstExprWithType(20),
-// 		})},
-// 		{false, []string{"a"}, makeFunctionExprForTest("<", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 			plan2.MakePlan2Int64ConstExprWithType(-1),
-// 		})},
-// 		{false, []string{"a"}, makeFunctionExprForTest(">", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 			plan2.MakePlan2Int64ConstExprWithType(3000000),
-// 		})},
-// 		{false, []string{"a", "d"}, makeFunctionExprForTest("<", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 			makeColExprForTest(1, types.T_int64),
-// 		})},
-// 		{true, []string{"a", "d"}, makeFunctionExprForTest(">", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 			makeColExprForTest(1, types.T_int64),
-// 		})},
-// 		// c > (a + d) => true
-// 		{true, []string{"c", "a", "d"}, makeFunctionExprForTest(">", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 			makeFunctionExprForTest("+", []*plan.Expr{
-// 				makeColExprForTest(1, types.T_int64),
-// 				makeColExprForTest(2, types.T_int64),
-// 			}),
-// 		})},
-// 		// (a > b) and (c > d) => true
-// 		{true, []string{"a", "b", "c", "d"}, makeFunctionExprForTest("and", []*plan.Expr{
-// 			makeFunctionExprForTest(">", []*plan.Expr{
-// 				makeColExprForTest(0, types.T_int64),
-// 				makeColExprForTest(1, types.T_int64),
-// 			}),
-// 			makeFunctionExprForTest(">", []*plan.Expr{
-// 				makeColExprForTest(2, types.T_int64),
-// 				makeColExprForTest(3, types.T_int64),
-// 			}),
-// 		})},
-// 		{true, []string{"a"}, makeFunctionExprForTest("abs", []*plan.Expr{
-// 			makeColExprForTest(0, types.T_int64),
-// 		})},
-// 	}
-//
-// 	t.Run("test needRead", func(t *testing.T) {
-// 		for i, testCase := range testCases {
-// 			columnMap, columns, maxCol := plan2.GetColumnsByExpr(testCase.expr, makeTableDefForTest(testCase.columns))
-// 			result := needRead(context.Background(), testCase.expr, blockMeta, makeTableDefForTest(testCase.columns), columnMap, columns, maxCol, testutil.NewProc())
-// 			if result != testCase.result {
-// 				t.Fatalf("test needRead at cases[%d], get result is different with expected", i)
-// 			}
-// 		}
-// 	})
-// }
 
 func TestGetNonIntPkValueByExpr(t *testing.T) {
 	type asserts = struct {
