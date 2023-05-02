@@ -15,13 +15,16 @@
 package index
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"strings"
 
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/compute"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 )
@@ -29,6 +32,12 @@ import (
 const (
 	ZMSize = 64
 )
+
+var bytesMaxValue []byte
+
+func init() {
+	bytesMaxValue = bytes.Repeat([]byte{0xff}, 31)
+}
 
 // [0,...29, 30, 31,...60, 61, 62, 63]
 //
@@ -911,4 +920,73 @@ func BoolToZM(v bool) ZM {
 	buf := types.EncodeBool(&v)
 	UpdateZM(zm, buf)
 	return *zm
+}
+
+func MustZMToVector(zm *ZM, m *mpool.MPool) (vec *vector.Vector) {
+	var err error
+	if vec, err = ZMToVector(zm, m); err != nil {
+		t := zm.GetType().ToType()
+		// TODO: decimal
+		vec = vector.NewConstNull(t, 2, m)
+	}
+	return vec
+}
+
+// if zm is not initialized, return a const null vector
+// if zm is of type varlen and truncated, the max value is null
+func ZMToVector(zm *ZM, m *mpool.MPool) (vec *vector.Vector, err error) {
+	t := zm.GetType().ToType()
+	// TODO: decimal to handle scale
+	if !zm.IsInited() {
+		vec = vector.NewConstNull(t, 2, m)
+		return
+	}
+
+	vec = vector.NewVec(t)
+	appendFn := vector.MakeAppendBytesFunc(vec)
+	if err = appendFn(zm.GetMinBuf(), false, m); err != nil {
+		vec.Free(m)
+		vec = nil
+		return
+	}
+
+	null := false
+	if t.IsVarlen() && zm.MaxTruncated() {
+		null = true
+	}
+	if err = appendFn(zm.GetMaxBuf(), null, m); err != nil {
+		vec.Free(m)
+		vec = nil
+	}
+	return
+}
+
+// if zm is not of length 2, return not initilized zm
+func VectorToZM(vec *vector.Vector) (zm *ZM) {
+	t := vec.GetType()
+	zm = NewZM(t.Oid)
+	if vec.Length() != 2 {
+		return
+	}
+	if vec.IsConstNull() || vec.GetNulls().Count() == 2 {
+		return
+	}
+	if t.IsVarlen() {
+		UpdateZM(zm, vec.GetBytesAt(0))
+		nsp := vec.GetNulls()
+		if nsp.Contains(1) {
+			zm.updateMaxString(bytesMaxValue)
+		} else {
+			UpdateZM(zm, vec.GetBytesAt(1))
+		}
+	} else {
+		data := vec.UnsafeGetRawData()
+		if vec.IsConst() {
+			UpdateZM(zm, data)
+		} else {
+			UpdateZM(zm, data[:len(data)/2])
+			UpdateZM(zm, data[len(data)/2:])
+		}
+	}
+	return
 }

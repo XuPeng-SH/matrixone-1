@@ -18,7 +18,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/stretchr/testify/require"
 )
@@ -140,6 +142,73 @@ func TestZMOp(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestVectorZM(t *testing.T) {
+	m := mpool.MustNewNoFixed(t.Name())
+	zm := NewZM(types.T_uint32)
+	zm.Update(uint32(12))
+	zm.Update(uint32(22))
+
+	vec, err := ZMToVector(zm, m)
+	require.NoError(t, err)
+	require.Equal(t, 2, vec.Length())
+	require.False(t, vec.IsConst())
+	require.False(t, vec.GetNulls().Any())
+	require.Equal(t, uint32(12), vector.GetFixedAt[uint32](vec, 0))
+	require.Equal(t, uint32(22), vector.GetFixedAt[uint32](vec, 1))
+
+	zm2 := VectorToZM(vec)
+	require.Equal(t, zm, zm2)
+	vec.Free(m)
+
+	zm = NewZM(types.T_char)
+	zm.Update([]byte("abc"))
+	zm.Update([]byte("xyz"))
+
+	vec, err = ZMToVector(zm, m)
+	require.NoError(t, err)
+	require.Equal(t, 2, vec.Length())
+	require.False(t, vec.IsConst())
+	require.False(t, vec.GetNulls().Any())
+	require.Equal(t, []byte("abc"), vec.GetBytesAt(0))
+	require.Equal(t, []byte("xyz"), vec.GetBytesAt(1))
+
+	zm2 = VectorToZM(vec)
+	require.Equal(t, zm, zm2)
+	vec.Free(m)
+
+	zm.Update(bytesMaxValue)
+	require.True(t, zm.MaxTruncated())
+
+	vec, err = ZMToVector(zm, m)
+	require.NoError(t, err)
+	require.Equal(t, 2, vec.Length())
+	require.False(t, vec.IsConst())
+	require.False(t, vec.GetNulls().Contains(0))
+	require.True(t, vec.GetNulls().Contains(1))
+	require.Equal(t, []byte("abc"), vec.GetBytesAt(0))
+
+	zm2 = VectorToZM(vec)
+	require.True(t, zm2.MaxTruncated())
+	require.Equal(t, []byte("abc"), zm2.GetMinBuf())
+	require.Equal(t, zm, zm2)
+
+	vec.Free(m)
+
+	zm = NewZM(types.T_uint16)
+	vec, err = ZMToVector(zm, m)
+
+	require.NoError(t, err)
+	require.Equal(t, 2, vec.Length())
+	require.True(t, vec.IsConstNull())
+
+	zm2 = VectorToZM(vec)
+	require.False(t, zm2.IsInited())
+
+	vec.Free(m)
+
+	require.Zero(t, m.CurrNB())
 }
 
 func TestZMNull(t *testing.T) {
