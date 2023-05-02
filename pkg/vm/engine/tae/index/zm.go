@@ -33,10 +33,10 @@ const (
 	ZMSize = 64
 )
 
-var bytesMaxValue []byte
+var MaxBytesValue []byte
 
 func init() {
-	bytesMaxValue = bytes.Repeat([]byte{0xff}, 31)
+	MaxBytesValue = bytes.Repeat([]byte{0xff}, 31)
 }
 
 // [0,...29, 30, 31,...60, 61, 62, 63]
@@ -975,7 +975,7 @@ func VectorToZM(vec *vector.Vector) (zm *ZM) {
 		UpdateZM(zm, vec.GetBytesAt(0))
 		nsp := vec.GetNulls()
 		if nsp.Contains(1) {
-			zm.updateMaxString(bytesMaxValue)
+			zm.updateMaxString(MaxBytesValue)
 		} else {
 			UpdateZM(zm, vec.GetBytesAt(1))
 		}

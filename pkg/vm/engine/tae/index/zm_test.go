@@ -178,7 +178,7 @@ func TestVectorZM(t *testing.T) {
 	require.Equal(t, zm, zm2)
 	vec.Free(m)
 
-	zm.Update(bytesMaxValue)
+	zm.Update(MaxBytesValue)
 	require.True(t, zm.MaxTruncated())
 
 	vec, err = ZMToVector(zm, m)

@@ -425,6 +425,187 @@ func TestGetNonIntPkValueByExpr(t *testing.T) {
 	})
 }
 
+func TestEvalZonemapFilter(t *testing.T) {
+	m := mpool.MustNewNoFixed(t.Name())
+	proc := testutil.NewProcessWithMPool(m)
+	type myCase = struct {
+		exprs  []*plan.Expr
+		meta   objectio.BlockObject
+		desc   []string
+		expect []objectio.ZoneMap
+	}
+
+	zm0 := index.NewZM(types.T_float64)
+	zm0.Update(float64(-10))
+	zm0.Update(float64(20))
+	zm1 := index.NewZM(types.T_float64)
+	zm1.Update(float64(5))
+	zm1.Update(float64(25))
+	zm2 := index.NewZM(types.T_varchar)
+	zm2.Update([]byte("abc"))
+	zm2.Update([]byte("opq"))
+	zm3 := index.NewZM(types.T_varchar)
+	zm3.Update([]byte("efg"))
+	zm3.Update(index.MaxBytesValue)
+	cases := []myCase{
+		{
+			desc: []string{
+				"a>10", "a>30", "a<=-10", "a<-10", "a+b>60", "a+b<-5", "a-b<-34", "a-b<-35", "a-b<=-35", "a>b",
+				"a>b+15", "a>=b+15", "a>100 or b>10", "a>100 and b<0", "d>xyz", "d<=efg", "d<efg", "c>d", "c<d",
+			},
+			exprs: []*plan.Expr{
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					plan2.MakePlan2Float64ConstExprWithType(10),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					plan2.MakePlan2Float64ConstExprWithType(30),
+				}),
+				makeFunctionExprForTest("<=", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					plan2.MakePlan2Float64ConstExprWithType(-10),
+				}),
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					plan2.MakePlan2Float64ConstExprWithType(-10),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeFunctionExprForTest("+", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						makeColExprForTest(1, types.T_float64),
+					}),
+					plan2.MakePlan2Float64ConstExprWithType(60),
+				}),
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeFunctionExprForTest("+", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						makeColExprForTest(1, types.T_float64),
+					}),
+					plan2.MakePlan2Float64ConstExprWithType(-5),
+				}),
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeFunctionExprForTest("-", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						makeColExprForTest(1, types.T_float64),
+					}),
+					plan2.MakePlan2Float64ConstExprWithType(-34),
+				}),
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeFunctionExprForTest("-", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						makeColExprForTest(1, types.T_float64),
+					}),
+					plan2.MakePlan2Float64ConstExprWithType(-35),
+				}),
+				makeFunctionExprForTest("<=", []*plan.Expr{
+					makeFunctionExprForTest("-", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						makeColExprForTest(1, types.T_float64),
+					}),
+					plan2.MakePlan2Float64ConstExprWithType(-35),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					makeColExprForTest(1, types.T_float64),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					makeFunctionExprForTest("+", []*plan.Expr{
+						makeColExprForTest(1, types.T_float64),
+						plan2.MakePlan2Float64ConstExprWithType(15),
+					}),
+				}),
+				makeFunctionExprForTest(">=", []*plan.Expr{
+					makeColExprForTest(0, types.T_float64),
+					makeFunctionExprForTest("+", []*plan.Expr{
+						makeColExprForTest(1, types.T_float64),
+						plan2.MakePlan2Float64ConstExprWithType(15),
+					}),
+				}),
+				makeFunctionExprForTest("or", []*plan.Expr{
+					makeFunctionExprForTest(">", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						plan2.MakePlan2Float64ConstExprWithType(100),
+					}),
+					makeFunctionExprForTest(">", []*plan.Expr{
+						makeColExprForTest(1, types.T_float64),
+						plan2.MakePlan2Float64ConstExprWithType(10),
+					}),
+				}),
+				makeFunctionExprForTest("and", []*plan.Expr{
+					makeFunctionExprForTest(">", []*plan.Expr{
+						makeColExprForTest(0, types.T_float64),
+						plan2.MakePlan2Float64ConstExprWithType(100),
+					}),
+					makeFunctionExprForTest("<", []*plan.Expr{
+						makeColExprForTest(1, types.T_float64),
+						plan2.MakePlan2Float64ConstExprWithType(0),
+					}),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(3, types.T_varchar),
+					plan2.MakePlan2StringConstExprWithType("xyz"),
+				}),
+				makeFunctionExprForTest("<=", []*plan.Expr{
+					makeColExprForTest(3, types.T_varchar),
+					plan2.MakePlan2StringConstExprWithType("efg"),
+				}),
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeColExprForTest(3, types.T_varchar),
+					plan2.MakePlan2StringConstExprWithType("efg"),
+				}),
+				makeFunctionExprForTest(">", []*plan.Expr{
+					makeColExprForTest(2, types.T_varchar),
+					makeColExprForTest(3, types.T_varchar),
+				}),
+				makeFunctionExprForTest("<", []*plan.Expr{
+					makeColExprForTest(2, types.T_varchar),
+					makeColExprForTest(3, types.T_varchar),
+				}),
+			},
+			meta: func() objectio.BlockObject {
+				objMeta := objectio.BuildMetaData(1, 4)
+				meta := objMeta.GetBlockMeta(0)
+				meta.MustGetColumn(0).SetZoneMap(*zm0)
+				meta.MustGetColumn(1).SetZoneMap(*zm1)
+				meta.MustGetColumn(2).SetZoneMap(*zm2)
+				meta.MustGetColumn(3).SetZoneMap(*zm3)
+				return meta
+			}(),
+			expect: []objectio.ZoneMap{
+				index.BoolToZM(true),
+				index.BoolToZM(false),
+				index.BoolToZM(true),
+				index.BoolToZM(false),
+				index.BoolToZM(false),
+				index.BoolToZM(false),
+				index.BoolToZM(true),
+				index.BoolToZM(false),
+				index.BoolToZM(true),
+				index.BoolToZM(true),
+				index.BoolToZM(false),
+				index.BoolToZM(true),
+				index.BoolToZM(true),
+				index.BoolToZM(false),
+				index.BoolToZM(true),
+				index.BoolToZM(true),
+				index.BoolToZM(false),
+				index.BoolToZM(true),
+				index.BoolToZM(true),
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		for i, expr := range tc.exprs {
+			zm := colexec.EvalFilterByZonemap(context.Background(), tc.meta, expr, proc)
+			require.Equal(t, tc.expect[i], zm, tc.desc[i])
+		}
+	}
+	require.Zero(t, m.CurrNB())
+}
+
 func TestComputeRangeByNonIntPk(t *testing.T) {
 	type asserts = struct {
 		result bool
