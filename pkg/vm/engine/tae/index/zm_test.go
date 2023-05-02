@@ -23,6 +23,125 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testArithRes struct {
+	zm ZM
+	ok bool
+}
+
+type testCase struct {
+	v1 ZM
+	v2 ZM
+
+	// gt,lt,ge,le,inter,and,or,
+	expects [][2]bool
+	// +,-,*
+	arithExpects []*testArithRes
+	idx          int
+}
+
+var testCases = []*testCase{
+	&testCase{
+		v1: makeZM(types.T_int64, int64(-10), int64(10)),
+		v2: makeZM(types.T_int32, int32(-10), int32(-10)),
+		expects: [][2]bool{
+			{false, false}, {false, false}, {false, false}, {false, false},
+			{false, false}, {false, false}, {false, false},
+		},
+		arithExpects: []*testArithRes{
+			{ZM{}, false}, {ZM{}, false}, {ZM{}, false},
+		},
+		idx: 0,
+	},
+	&testCase{
+		v1: makeZM(types.T_int32, int32(-10), int32(10)),
+		v2: makeZM(types.T_int32, int32(5), int32(20)),
+		expects: [][2]bool{
+			{true, true}, {true, true}, {true, true}, {true, true},
+			{true, true}, {false, false}, {false, false},
+		},
+		arithExpects: []*testArithRes{
+			{makeZM(types.T_int32, int32(-5), int32(30)), true},
+			{makeZM(types.T_int32, int32(-30), int32(5)), true},
+			{makeZM(types.T_int32, int32(-200), int32(200)), true},
+		},
+		idx: 1,
+	},
+	&testCase{
+		v1: makeZM(types.T_int16, int16(-10), int16(10)),
+		v2: makeZM(types.T_int16, int16(10), int16(20)),
+		expects: [][2]bool{
+			{false, true}, {true, true}, {true, true}, {true, true},
+			{true, true}, {false, false}, {false, false},
+		},
+		arithExpects: []*testArithRes{
+			{makeZM(types.T_int16, int16(0), int16(30)), true},
+			{makeZM(types.T_int16, int16(-30), int16(0)), true},
+			{makeZM(types.T_int16, int16(-200), int16(200)), true},
+		},
+		idx: 2,
+	},
+}
+
+func makeZM(t types.T, minv, maxv any) ZM {
+	zm := NewZM(t)
+	zm.Update(minv)
+	zm.Update(maxv)
+	return *zm
+}
+
+func runCompare(tc *testCase) [][2]bool {
+	r := make([][2]bool, 0)
+
+	res, ok := tc.v1.AnyGT(tc.v2)
+	r = append(r, [2]bool{res, ok})
+	res, ok = tc.v1.AnyLT(tc.v2)
+	r = append(r, [2]bool{res, ok})
+	res, ok = tc.v1.AnyGE(tc.v2)
+	r = append(r, [2]bool{res, ok})
+	res, ok = tc.v1.AnyLE(tc.v2)
+	r = append(r, [2]bool{res, ok})
+	res, ok = tc.v1.Intersect(tc.v2)
+	r = append(r, [2]bool{res, ok})
+	res, ok = tc.v1.And(tc.v2)
+	r = append(r, [2]bool{res, ok})
+	res, ok = tc.v1.Or(tc.v2)
+	r = append(r, [2]bool{res, ok})
+
+	return r
+}
+
+func runArith(tc *testCase) []*testArithRes {
+	r := make([]*testArithRes, 0)
+	res, ok := ZMPlus(tc.v1, tc.v2)
+	r = append(r, &testArithRes{res, ok})
+	res, ok = ZMMinus(tc.v1, tc.v2)
+	r = append(r, &testArithRes{res, ok})
+	res, ok = ZMMulti(tc.v1, tc.v2)
+	r = append(r, &testArithRes{res, ok})
+	return r
+}
+
+func TestZMOp(t *testing.T) {
+	for _, tc := range testCases[2:3] {
+		res1 := runCompare(tc)
+		for i := range tc.expects {
+			require.Equalf(t, tc.expects[i], res1[i], "[%d]compare-%d", tc.idx, i)
+		}
+		res2 := runArith(tc)
+		for i := range tc.arithExpects {
+			expect, actual := tc.arithExpects[i], res2[i]
+			if expect.ok {
+				require.Truef(t, actual.ok, "[%d]arith-%d", tc.idx, i)
+				t.Log(expect.zm.String())
+				t.Log(actual.zm.String())
+				require.Equalf(t, expect.zm, actual.zm, "[%d]arith-%d", tc.idx, i)
+			} else {
+				require.Falsef(t, actual.ok, "[%d]arith-%d", tc.idx, i)
+			}
+		}
+	}
+}
+
 func TestZMNull(t *testing.T) {
 	zm := NewZM(types.T_int64)
 	x := zm.GetMin()
