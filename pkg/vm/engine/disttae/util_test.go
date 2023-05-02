@@ -432,7 +432,7 @@ func TestEvalZonemapFilter(t *testing.T) {
 		exprs  []*plan.Expr
 		meta   objectio.BlockObject
 		desc   []string
-		expect []objectio.ZoneMap
+		expect []bool
 	}
 
 	zm0 := index.NewZM(types.T_float64)
@@ -573,33 +573,16 @@ func TestEvalZonemapFilter(t *testing.T) {
 				meta.MustGetColumn(3).SetZoneMap(*zm3)
 				return meta
 			}(),
-			expect: []objectio.ZoneMap{
-				index.BoolToZM(true),
-				index.BoolToZM(false),
-				index.BoolToZM(true),
-				index.BoolToZM(false),
-				index.BoolToZM(false),
-				index.BoolToZM(false),
-				index.BoolToZM(true),
-				index.BoolToZM(false),
-				index.BoolToZM(true),
-				index.BoolToZM(true),
-				index.BoolToZM(false),
-				index.BoolToZM(true),
-				index.BoolToZM(true),
-				index.BoolToZM(false),
-				index.BoolToZM(true),
-				index.BoolToZM(true),
-				index.BoolToZM(false),
-				index.BoolToZM(true),
-				index.BoolToZM(true),
+			expect: []bool{
+				true, false, true, false, false, false, true, false, true, true,
+				false, true, true, false, true, true, false, true, true,
 			},
 		},
 	}
 
 	for _, tc := range cases {
 		for i, expr := range tc.exprs {
-			zm := colexec.EvalFilterByZonemap(context.Background(), tc.meta, expr, proc)
+			zm := filterExprOnBlock(context.Background(), tc.meta, expr, 4, proc)
 			require.Equal(t, tc.expect[i], zm, tc.desc[i])
 		}
 	}

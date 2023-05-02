@@ -461,6 +461,31 @@ func filterExprOnObject(
 	return
 }
 
+func filterExprOnBlock(
+	ctx context.Context,
+	meta objectio.BlockObject,
+	expr *plan.Expr,
+	colCnt int,
+	proc *process.Process,
+) (sel bool) {
+	if expr == nil {
+		sel = true
+		return
+	}
+	errCtx := errutil.ContextWithNoReport(ctx, true)
+	if colCnt == 0 {
+		sel = evalNoColumnFilterExpr(errCtx, expr, proc)
+		return
+	}
+	zm := colexec.EvalFilterByZonemap(errCtx, meta, expr, proc)
+	if !zm.IsInited() || zm.GetType() != types.T_bool {
+		sel = true
+	} else {
+		sel = types.DecodeBool(zm.GetMaxBuf())
+	}
+	return
+}
+
 // needRead determine if a block needs to be read
 func needRead(
 	ctx context.Context,
