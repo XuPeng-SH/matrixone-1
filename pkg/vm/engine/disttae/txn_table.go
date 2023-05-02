@@ -308,40 +308,93 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 		}
 
 		exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
+		columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 
-		var (
-			columnMap map[int]int
-			columns   []int
-			maxCol    int
-		)
-
-		// do not collect columns used by non-mono expr
-		if exprMono {
-			columnMap, columns, maxCol = plan2.GetColumnsByExpr(expr, tbl.getTableDef())
-		}
-
-		var meta objectio.ObjectMeta
-		for _, blk := range blks {
-			tbl.skipBlocks[blk.BlockID] = 0
-			ok := true
-			// 1. no need to filter non-mono expr
-			if exprMono {
-				// 2. no need to load object meta if no column is used in the expr
-				if len(columns) > 0 {
-					location := blk.MetaLocation()
-					if !objectio.IsSameObjectLocVsMeta(location, meta) {
-						if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
-							return
-						}
-					}
-				}
-				ok = needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
-			}
-
-			if ok {
+		if !exprMono {
+			for _, blk := range blks {
+				tbl.skipBlocks[blk.BlockID] = 0
 				ranges = append(ranges, blockInfoMarshal(blk))
 			}
+		} else if len(columns) == 0 {
+			if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
+				for _, blk := range blks {
+					tbl.skipBlocks[blk.BlockID] = 0
+					ranges = append(ranges, blockInfoMarshal(blk))
+				}
+			} else {
+				for _, blk := range blks {
+					tbl.skipBlocks[blk.BlockID] = 0
+				}
+			}
+		} else {
+			var meta objectio.ObjectMeta
+			for _, blk := range blks {
+				tbl.skipBlocks[blk.BlockID] = 0
+				location := blk.MetaLocation()
+				if !objectio.IsSameObjectLocVsMeta(location, meta) {
+					if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
+						return
+					}
+				}
+				ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
+
+				if ok {
+					ranges = append(ranges, blockInfoMarshal(blk))
+				}
+			}
 		}
+
+		// always scan all blocks with non-mono expr
+		// if !exprMono {
+		// 	for _, blk := range blks {
+		// 		tbl.skipBlocks[blk.BlockID] = 0
+		// 		ranges = append(ranges, blockInfoMarshal(blk))
+		// 	}
+		// } else if len(columns) == 0 {
+		// 	// true to scan all blocks
+		// 	// false to skip all blocks
+		// 	if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
+		// 		for _, blk := range blks {
+		// 			tbl.skipBlocks[blk.BlockID] = 0
+		// 			ranges = append(ranges, blockInfoMarshal(blk))
+		// 		}
+		// 	} else {
+		// 		for _, blk := range blks {
+		// 			tbl.skipBlocks[blk.BlockID] = 0
+		// 		}
+		// 	}
+		// } else {
+		// 	var (
+		// 		meta objectio.ObjectMeta
+		// 		sels *vector.Vector
+		// 	)
+
+		// 	for _, blk := range blks {
+		// 		tbl.skipBlocks[blk.BlockID] = 0
+		// 		location := blk.MetaLocation()
+		// 		if !objectio.IsSameObjectLocVsMeta(location, meta) {
+		// 			if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
+		// 				return
+		// 			}
+		// 			if sels != nil {
+		// 				sels.Free(tbl.db.txn.proc.Mp())
+		// 			}
+		// 			sels = filterExprOnObject(
+		// 				ctx,
+		// 				meta,
+		// 				expr,
+		// 				tbl.getTableDef(),
+		// 				columnMap,
+		// 				columns,
+		// 				maxCol,
+		// 				tbl.db.txn.proc)
+		// 		}
+		// 		if vector.GetFixedAt[bool](sels, int(2*location.ID())) {
+		// 			ranges = append(ranges, blockInfoMarshal(blk))
+		// 		}
+		// 	}
+		// }
+
 		var mblks []ModifyBlockMeta
 		if mblks, err = genModifedBlocks(
 			ctx,

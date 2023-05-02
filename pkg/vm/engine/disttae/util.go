@@ -22,6 +22,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/txn"
+	"github.com/matrixorigin/matrixone/pkg/util/errutil"
 	"go.uber.org/zap"
 	"golang.org/x/exp/constraints"
 
@@ -170,6 +171,21 @@ func buildOneBlockZMVectors(
 			return
 		}
 		vecs[i] = vec
+	}
+	return
+}
+
+func evalNoColumnFilterExpr(
+	ctx context.Context,
+	expr *plan.Expr,
+	proc *process.Process,
+) (sel bool) {
+	errCtx := errutil.ContextWithNoReport(ctx, true)
+	bat := batch.NewWithSize(0)
+	defer bat.Clean(proc.Mp())
+	var err error
+	if sel, err = plan2.EvalFilterExpr(errCtx, expr, bat, proc); err != nil {
+		sel = true
 	}
 	return
 }
