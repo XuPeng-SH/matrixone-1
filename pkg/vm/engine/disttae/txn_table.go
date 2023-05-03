@@ -351,7 +351,7 @@ func (tbl *txnTable) filterExprOnObjects(
 	if !exprMono {
 		for _, blk := range blks {
 			tbl.skipBlocks[blk.BlockID] = 0
-			*ranges = append(*ranges, blockInfoMarshal(blk))
+			*ranges = append(*ranges, catalog.EncodeBlockInfo(&blk))
 		}
 	} else if len(columnMap) == 0 {
 		// true to scan all blocks
@@ -359,7 +359,7 @@ func (tbl *txnTable) filterExprOnObjects(
 		if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
 			for _, blk := range blks {
 				tbl.skipBlocks[blk.BlockID] = 0
-				*ranges = append(*ranges, blockInfoMarshal(blk))
+				*ranges = append(*ranges, catalog.EncodeBlockInfo(&blk))
 			}
 		} else {
 			for _, blk := range blks {
@@ -394,7 +394,7 @@ func (tbl *txnTable) filterExprOnObjects(
 					tbl.db.txn.proc)
 			}
 			if vector.GetFixedAt[bool](sels, int(2*location.ID())) {
-				*ranges = append(*ranges, blockInfoMarshal(blk))
+				*ranges = append(*ranges, catalog.EncodeBlockInfo(&blk))
 			}
 		}
 	}
@@ -415,7 +415,7 @@ func (tbl *txnTable) filterExprOnBlocks(
 		// 1. always scan all blocks when expr is not mono
 		for _, blk := range blks {
 			tbl.skipBlocks[blk.BlockID] = 0
-			*ranges = append(*ranges, blockInfoMarshal(blk))
+			*ranges = append(*ranges, catalog.EncodeBlockInfo(&blk))
 		}
 	} else if len(columnMap) == 0 {
 		// 2. no column is ued in the expr, just eval the expr and use the result
@@ -425,7 +425,7 @@ func (tbl *txnTable) filterExprOnBlocks(
 
 			for _, blk := range blks {
 				tbl.skipBlocks[blk.BlockID] = 0
-				*ranges = append(*ranges, blockInfoMarshal(blk))
+				*ranges = append(*ranges, catalog.EncodeBlockInfo(&blk))
 			}
 		} else {
 			// 2.2 expr is eval as false and skip all blocks
@@ -471,7 +471,7 @@ func (tbl *txnTable) filterExprOnBlocks(
 			ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), defCols, exprCols, maxCol, tbl.db.txn.proc)
 
 			if ok {
-				*ranges = append(*ranges, blockInfoMarshal(blk))
+				*ranges = append(*ranges, catalog.EncodeBlockInfo(&blk))
 			}
 		}
 		// logutil.Infof("Scan-Rate[%d/%d], FilterCnt=%d, %s", len(*ranges), objectCnt, time.Since(now))
@@ -963,7 +963,7 @@ func (tbl *txnTable) newBlockReader(ctx context.Context, num int, expr *plan.Exp
 	rds := make([]engine.Reader, num)
 	blks := make([]*catalog.BlockInfo, len(ranges))
 	for i := range ranges {
-		blks[i] = BlockInfoUnmarshal(ranges[i])
+		blks[i] = catalog.DecodeBlockInfo(ranges[i])
 	}
 	ts := tbl.db.txn.meta.SnapshotTS
 	tableDef := tbl.getTableDef()

@@ -248,6 +248,10 @@ const (
 	BLOCKMETA_SEGID_IDX      = 6
 )
 
+const (
+	BlockInfoSize = unsafe.Sizeof(BlockInfo{})
+)
+
 type ObjectLocation [objectio.LocationLen]byte
 
 // ProtoSize is used by gogoproto.
@@ -313,6 +317,14 @@ func (b *BlockInfo) DeltaLocation() objectio.Location {
 
 func (b *BlockInfo) SetDeltaLocation(deltaLoc objectio.Location) {
 	b.DeltaLoc = *(*[objectio.LocationLen]byte)(unsafe.Pointer(&deltaLoc[0]))
+}
+
+func EncodeBlockInfo(info *BlockInfo) []byte {
+	return unsafe.Slice((*byte)(unsafe.Pointer(info)), BlockInfoSize)
+}
+
+func DecodeBlockInfo(buf []byte) *BlockInfo {
+	return (*BlockInfo)(unsafe.Pointer(&buf[0]))
 }
 
 // used for memengine and tae
