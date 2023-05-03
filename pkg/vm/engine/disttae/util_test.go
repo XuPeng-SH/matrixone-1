@@ -250,7 +250,7 @@ var testCases = []testCase{
 func TestEvalFilterExpr1(t *testing.T) {
 	m := mpool.MustNewNoFixed(t.Name())
 	proc := testutil.NewProcessWithMPool(m)
-	attrs := []string{"a", "b"}
+	attrs := []string{"a", "b", "c"}
 	bat := batch.NewWithSize(len(attrs))
 
 	vecA := vector.NewVec(types.T_int64.ToType())
@@ -265,6 +265,13 @@ func TestEvalFilterExpr1(t *testing.T) {
 		nil, m)
 	bat.SetVector(1, vecB)
 	bat.SetZs(vecA.Length(), m)
+
+	vecC := vector.NewVec(types.T_varchar.ToType())
+	vector.AppendBytesList(vecC,
+		[][]byte{[]byte("1"), []byte("2"), []byte("3"), []byte("4"), []byte("5"), []byte("6")},
+		nil, m)
+	bat.SetVector(2, vecC)
+	bat.SetZs(vecC.Length(), m)
 
 	for _, tcase := range testCases {
 		outVec, stopped := colexec.EvalFilterExprWithMinMax(context.Background(), tcase.expr, bat, proc)
