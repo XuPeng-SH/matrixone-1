@@ -71,3 +71,19 @@ func BenchmarkCheckSame(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkCompareName(b *testing.B) {
+	meta := BuildMetaData(10, 10)
+	name := BuildObjectName(NewSegmentid(), 0)
+	loc := MockLocation(name)
+	sid := name.SegmentId()
+	bid := NewBlockid(&sid, 0, 0)
+	meta.BlockHeader().SetBlockID(&bid)
+
+	b.Run("compare-name", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			IsSameObjectLocVsMeta(loc, meta)
+		}
+	})
+}

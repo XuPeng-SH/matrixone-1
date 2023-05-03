@@ -314,7 +314,7 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 		if err = tbl.filterExprOnBlocks(ctx, expr, blks, &ranges); err != nil {
 			return
 		}
-		// TODO: enable me later
+		// TODO: apply filter on objects. it is more efficient
 		// if err = tbl.filterExprOnObjects(ctx, expr, blks, &ranges); err != nil {
 		// 	return
 		// }
@@ -407,40 +407,72 @@ func (tbl *txnTable) filterExprOnBlocks(
 	ranges *[][]byte,
 ) (err error) {
 	exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
-	columnMap := plan2.GetExprColumnMap(expr, tbl.getTableDef())
+	// columnMap := plan2.GetExprColumnMap(expr, tbl.getTableDef())
+	columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
+
 	if !exprMono {
+		// 1. always scan all blocks when expr is not mono
 		for _, blk := range blks {
 			tbl.skipBlocks[blk.BlockID] = 0
 			*ranges = append(*ranges, blockInfoMarshal(blk))
 		}
 	} else if len(columnMap) == 0 {
+		// 2. no column is ued in the expr, just eval the expr and use the result
+
 		if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
+			// 2.1 expr is eval as true and scan all blocks
+
 			for _, blk := range blks {
 				tbl.skipBlocks[blk.BlockID] = 0
 				*ranges = append(*ranges, blockInfoMarshal(blk))
 			}
 		} else {
+			// 2.2 expr is eval as false and skip all blocks
+
 			for _, blk := range blks {
 				tbl.skipBlocks[blk.BlockID] = 0
 			}
 		}
 	} else {
-		var meta objectio.ObjectMeta
+		// 3. there are some columns used in the expr, loop each block and eval the expr block by block.
+		//    Skip any block with expr as false
+
+		var (
+			meta           objectio.ObjectMeta
+			skipThisObject bool
+		)
 		for _, blk := range blks {
+			// why skipBlocks is needed? It is very slow in a tight loop
 			tbl.skipBlocks[blk.BlockID] = 0
+
 			location := blk.MetaLocation()
+
+			// check whether the block belongs to a new object
+			// yes:
+			//     1. load object meta
+			//     2. eval expr on object meta
+			//     3. if the expr is false, skip eval expr on the blocks of the same object
+			// no:
+			//     1. check whether the object is skipped
+			//     2. if skipped, skip this block
+			//     3. if not skipped, eval expr on the block
 			if !objectio.IsSameObjectLocVsMeta(location, meta) {
 				if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
 					return
 				}
+				// skipThisObject = !filterExprOnBlock(ctx, meta, expr, columnMap, tbl.db.txn.proc)
 			}
-			ok := filterExprOnBlock(ctx, meta.GetBlockMeta(uint32(location.ID())), expr, columnMap, tbl.db.txn.proc)
-			// ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
+			if skipThisObject {
+				continue
+			}
+			// ok := filterExprOnBlock(ctx, meta.GetBlockMeta(uint32(location.ID())), expr, columnMap, tbl.db.txn.proc)
+			ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
 
 			if ok {
 				*ranges = append(*ranges, blockInfoMarshal(blk))
 			}
 		}
+		// logutil.Infof("Scan-Rate[%d/%d], FilterCnt=%d, %s", len(*ranges), objectCnt, time.Since(now))
 	}
 	return
 }

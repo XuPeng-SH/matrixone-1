@@ -47,6 +47,10 @@ type ReadBlockOptions struct {
 	Idxes map[uint16]bool
 }
 
+type ColumnMetaFetcher interface {
+	MustGetColumn(idx uint16) ColumnMeta
+}
+
 // Writer is to virtualize batches into multiple blocks
 // and write them into filefservice at one time
 type Writer interface {

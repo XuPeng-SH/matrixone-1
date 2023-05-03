@@ -463,7 +463,7 @@ func filterExprOnObject(
 
 func filterExprOnBlock(
 	ctx context.Context,
-	meta objectio.BlockObject,
+	meta objectio.ColumnMetaFetcher,
 	expr *plan.Expr,
 	columnMap map[int]int,
 	proc *process.Process,
