@@ -461,13 +461,14 @@ func (tbl *txnTable) filterExprOnBlocks(
 				if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
 					return
 				}
+				// TODO: enable me later
 				// skipThisObject = !filterExprOnBlock(ctx, meta, expr, columnMap, tbl.db.txn.proc)
 			}
 			if skipThisObject {
 				continue
 			}
 			// ok := filterExprOnBlock(ctx, meta.GetBlockMeta(uint32(location.ID())), expr, columnMap, tbl.db.txn.proc)
-			ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, defCols, exprCols, maxCol, tbl.db.txn.proc)
+			ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), defCols, exprCols, maxCol, tbl.db.txn.proc)
 
 			if ok {
 				*ranges = append(*ranges, blockInfoMarshal(blk))

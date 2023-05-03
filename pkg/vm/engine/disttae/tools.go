@@ -1095,7 +1095,7 @@ func genModifedBlocks(ctx context.Context, deletes map[types.Blockid][]int, orgs
 						}
 					}
 				}
-				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, defCols, exprCols, maxCol, proc)
+				ok = needRead(ctx, expr, meta, blk, tableDef, defCols, exprCols, maxCol, proc)
 			}
 			if ok {
 				blks = append(blks, ModifyBlockMeta{

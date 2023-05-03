@@ -136,7 +136,7 @@ func CalcStats(ctx context.Context, blocks [][]catalog.BlockInfo, expr *plan.Exp
 						}
 					}
 				}
-				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, defCols, exprCols, maxCol, proc)
+				ok = needRead(ctx, expr, meta, blk, tableDef, defCols, exprCols, maxCol, proc)
 			}
 			if ok {
 				cost += int64(location.Rows())

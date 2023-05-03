@@ -493,7 +493,6 @@ func needRead(
 	meta objectio.ObjectMeta,
 	blkInfo catalog.BlockInfo,
 	tableDef *plan.TableDef,
-	columnMap map[int]int,
 	defCols, exprCols []int,
 	maxCol int,
 	proc *process.Process,
@@ -505,7 +504,7 @@ func needRead(
 	notReportErrCtx := errutil.ContextWithNoReport(ctx, true)
 
 	// if expr match no columns, just eval expr
-	if len(columnMap) == 0 {
+	if len(defCols) == 0 {
 		bat := batch.NewWithSize(0)
 		defer bat.Clean(proc.Mp())
 		ifNeed, err := plan2.EvalFilterExpr(notReportErrCtx, expr, bat, proc)
