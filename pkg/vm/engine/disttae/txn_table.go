@@ -18,12 +18,14 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/api"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
@@ -308,14 +310,17 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 		}
 
 		exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
-		columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 
+		now := time.Now()
+
+		// /*
+		columnMap := plan2.GetExprColumnMap(expr, tbl.getTableDef())
 		if !exprMono {
 			for _, blk := range blks {
 				tbl.skipBlocks[blk.BlockID] = 0
 				ranges = append(ranges, blockInfoMarshal(blk))
 			}
-		} else if len(columns) == 0 {
+		} else if len(columnMap) == 0 {
 			if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
 				for _, blk := range blks {
 					tbl.skipBlocks[blk.BlockID] = 0
@@ -336,64 +341,71 @@ func (tbl *txnTable) Ranges(ctx context.Context, expr *plan.Expr) (ranges [][]by
 						return
 					}
 				}
-				ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
+				ok := filterExprOnBlock(ctx, meta.GetBlockMeta(uint32(location.ID())), expr, columnMap, tbl.db.txn.proc)
+				// ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
 
 				if ok {
 					ranges = append(ranges, blockInfoMarshal(blk))
 				}
 			}
 		}
+		// */
 
-		// always scan all blocks with non-mono expr
-		// if !exprMono {
-		// 	for _, blk := range blks {
-		// 		tbl.skipBlocks[blk.BlockID] = 0
-		// 		ranges = append(ranges, blockInfoMarshal(blk))
-		// 	}
-		// } else if len(columns) == 0 {
-		// 	// true to scan all blocks
-		// 	// false to skip all blocks
-		// 	if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
-		// 		for _, blk := range blks {
-		// 			tbl.skipBlocks[blk.BlockID] = 0
-		// 			ranges = append(ranges, blockInfoMarshal(blk))
-		// 		}
-		// 	} else {
-		// 		for _, blk := range blks {
-		// 			tbl.skipBlocks[blk.BlockID] = 0
-		// 		}
-		// 	}
-		// } else {
-		// 	var (
-		// 		meta objectio.ObjectMeta
-		// 		sels *vector.Vector
-		// 	)
+		/*
+			columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
+			// always scan all blocks with non-mono expr
+			if !exprMono {
+				for _, blk := range blks {
+					tbl.skipBlocks[blk.BlockID] = 0
+					ranges = append(ranges, blockInfoMarshal(blk))
+				}
+			} else if len(columns) == 0 {
+				// true to scan all blocks
+				// false to skip all blocks
+				if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
+					for _, blk := range blks {
+						tbl.skipBlocks[blk.BlockID] = 0
+						ranges = append(ranges, blockInfoMarshal(blk))
+					}
+				} else {
+					for _, blk := range blks {
+						tbl.skipBlocks[blk.BlockID] = 0
+					}
+				}
+			} else {
+				var (
+					meta objectio.ObjectMeta
+					sels *vector.Vector
+				)
 
-		// 	for _, blk := range blks {
-		// 		tbl.skipBlocks[blk.BlockID] = 0
-		// 		location := blk.MetaLocation()
-		// 		if !objectio.IsSameObjectLocVsMeta(location, meta) {
-		// 			if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
-		// 				return
-		// 			}
-		// 			if sels != nil {
-		// 				sels.Free(tbl.db.txn.proc.Mp())
-		// 			}
-		// 			sels = filterExprOnObject(
-		// 				ctx,
-		// 				meta,
-		// 				expr,
-		// 				tbl.getTableDef(),
-		// 				columnMap,
-		// 				columns,
-		// 				maxCol,
-		// 				tbl.db.txn.proc)
-		// 		}
-		// 		if vector.GetFixedAt[bool](sels, int(2*location.ID())) {
-		// 			ranges = append(ranges, blockInfoMarshal(blk))
-		// 		}
-		// 	}
-		// }
+				for _, blk := range blks {
+					tbl.skipBlocks[blk.BlockID] = 0
+					location := blk.MetaLocation()
+					if !objectio.IsSameObjectLocVsMeta(location, meta) {
+						if meta, err = loadObjectMeta(ctx, location, tbl.db.txn.proc.FileService, tbl.db.txn.proc.Mp()); err != nil {
+							return
+						}
+						if sels != nil {
+							sels.Free(tbl.db.txn.proc.Mp())
+						}
+						sels = filterExprOnObject(
+							ctx,
+							meta,
+							expr,
+							tbl.getTableDef(),
+							columnMap,
+							columns,
+							maxCol,
+							tbl.db.txn.proc)
+					}
+					if vector.GetFixedAt[bool](sels, int(2*location.ID())) {
+						ranges = append(ranges, blockInfoMarshal(blk))
+					}
+				}
+			}
+		*/
+
+		logutil.Infof("Table-%s Ranges[%d] Takes: %s", tbl.tableName, len(ranges), time.Since(now))
 
 		var mblks []ModifyBlockMeta
 		if mblks, err = genModifedBlocks(

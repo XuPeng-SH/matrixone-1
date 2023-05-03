@@ -580,9 +580,11 @@ func TestEvalZonemapFilter(t *testing.T) {
 		},
 	}
 
+	columnMap := map[int]int{0: 0, 1: 1, 2: 2, 3: 3}
+
 	for _, tc := range cases {
 		for i, expr := range tc.exprs {
-			zm := filterExprOnBlock(context.Background(), tc.meta, expr, 4, proc)
+			zm := filterExprOnBlock(context.Background(), tc.meta, expr, columnMap, proc)
 			require.Equal(t, tc.expect[i], zm, tc.desc[i])
 		}
 	}

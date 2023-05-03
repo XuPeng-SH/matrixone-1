@@ -79,10 +79,18 @@ func (zm ZM) doInit(v []byte) {
 
 func (zm ZM) String() string {
 	var b strings.Builder
-	_, _ = b.WriteString(fmt.Sprintf("ZM(%s)[%v,%v]",
-		zm.GetType().String(), zm.GetMin(), zm.GetMax()))
+	if zm.IsString() {
+		_, _ = b.WriteString(fmt.Sprintf("ZM(%s)[%v,%v]",
+			zm.GetType().String(), string(zm.GetMinBuf()), string(zm.GetMaxBuf())))
+	} else {
+		_, _ = b.WriteString(fmt.Sprintf("ZM(%s)[%v,%v]",
+			zm.GetType().String(), zm.GetMin(), zm.GetMax()))
+	}
 	if zm.MaxTruncated() {
 		_ = b.WriteByte('+')
+	}
+	if !zm.IsInited() {
+		_, _ = b.WriteString("--")
 	}
 	return b.String()
 }
@@ -360,7 +368,7 @@ func (zm ZM) compareCheck(o ZM) (ok bool) {
 	if !zm.IsInited() || !o.IsInited() {
 		return false
 	}
-	return zm.GetType() == o.GetType()
+	return zm.GetType() == o.GetType() || (zm.IsString() && o.IsString())
 }
 
 func (zm ZM) AnyGT(o ZM) (res bool, ok bool) {
@@ -433,10 +441,10 @@ func (zm ZM) And(o ZM) (res bool, ok bool) {
 		return
 	}
 	ok = true
-	if types.DecodeBool(zm.GetMaxBuf()) {
+	if !types.DecodeBool(zm.GetMinBuf()) {
 		return
 	}
-	res = types.DecodeBool(o.GetMaxBuf())
+	res = types.DecodeBool(o.GetMinBuf())
 	return
 }
 

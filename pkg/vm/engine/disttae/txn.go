@@ -465,7 +465,7 @@ func filterExprOnBlock(
 	ctx context.Context,
 	meta objectio.BlockObject,
 	expr *plan.Expr,
-	colCnt int,
+	columnMap map[int]int,
 	proc *process.Process,
 ) (sel bool) {
 	if expr == nil {
@@ -473,11 +473,11 @@ func filterExprOnBlock(
 		return
 	}
 	errCtx := errutil.ContextWithNoReport(ctx, true)
-	if colCnt == 0 {
+	if len(columnMap) == 0 {
 		sel = evalNoColumnFilterExpr(errCtx, expr, proc)
 		return
 	}
-	zm := colexec.EvalFilterByZonemap(errCtx, meta, expr, proc)
+	zm := colexec.EvalFilterByZonemap(errCtx, meta, expr, columnMap, proc)
 	if !zm.IsInited() || zm.GetType() != types.T_bool {
 		sel = true
 	} else {

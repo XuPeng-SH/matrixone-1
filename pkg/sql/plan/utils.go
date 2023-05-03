@@ -778,6 +778,25 @@ func containsParamRef(expr *plan.Expr) bool {
 	return ret
 }
 
+func getExprColumnMap(expr *plan.Expr, tableDef *plan.TableDef, columnMap *map[int]int) {
+	if expr == nil {
+		return
+	}
+	switch exprImpl := expr.Expr.(type) {
+	case *plan.Expr_F:
+		for _, arg := range exprImpl.F.Args {
+			getExprColumnMap(arg, tableDef, columnMap)
+		}
+
+	case *plan.Expr_Col:
+		idx := exprImpl.Col.ColPos
+		colName := exprImpl.Col.Name
+		dotIdx := strings.Index(colName, ".")
+		colName = colName[dotIdx+1:]
+		colIdx := tableDef.Name2ColIndex[colName]
+		(*columnMap)[int(idx)] = int(colIdx)
+	}
+}
 func getColumnMapByExpr(expr *plan.Expr, tableDef *plan.TableDef, columnMap *map[int]int) {
 	if expr == nil {
 		return
@@ -796,6 +815,13 @@ func getColumnMapByExpr(expr *plan.Expr, tableDef *plan.TableDef, columnMap *map
 		colIdx := tableDef.Name2ColIndex[colName]
 		(*columnMap)[int(colIdx)] = int(idx)
 	}
+}
+
+func GetExprColumnMap(expr *plan.Expr, tableDef *plan.TableDef) map[int]int {
+	columnMap := make(map[int]int)
+	// key = expr's ColPos,  value = tableDef's ColPos
+	getExprColumnMap(expr, tableDef, &columnMap)
+	return columnMap
 }
 
 func GetColumnsByExpr(expr *plan.Expr, tableDef *plan.TableDef) (map[int]int, []int, int) {

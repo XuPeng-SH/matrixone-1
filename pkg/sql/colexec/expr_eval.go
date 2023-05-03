@@ -154,74 +154,95 @@ func getConstZM(
 	proc *process.Process,
 ) (zm index.ZM, err error) {
 	c := expr.Expr.(*plan.Expr_C)
-	zm = *index.NewZM(types.T(expr.Typ.Id))
 	if c.C.GetIsnull() {
+		zm = *index.NewZM(types.T(expr.Typ.Id))
 		return
 	}
 	switch c.C.GetValue().(type) {
 	case *plan.Const_Bval:
+		zm = *index.NewZM(constBType.Oid)
 		v := c.C.GetBval()
 		index.UpdateZM(&zm, types.EncodeBool(&v))
 	case *plan.Const_I8Val:
+		zm = *index.NewZM(constI8Type.Oid)
 		v := int8(c.C.GetI8Val())
 		index.UpdateZM(&zm, types.EncodeInt8(&v))
 	case *plan.Const_I16Val:
+		zm = *index.NewZM(constI16Type.Oid)
 		v := int16(c.C.GetI16Val())
 		index.UpdateZM(&zm, types.EncodeInt16(&v))
 	case *plan.Const_I32Val:
+		zm = *index.NewZM(constI32Type.Oid)
 		v := c.C.GetI32Val()
 		index.UpdateZM(&zm, types.EncodeInt32(&v))
 	case *plan.Const_I64Val:
+		zm = *index.NewZM(constI64Type.Oid)
 		v := c.C.GetI64Val()
 		index.UpdateZM(&zm, types.EncodeInt64(&v))
 	case *plan.Const_U8Val:
+		zm = *index.NewZM(constU8Type.Oid)
 		v := uint8(c.C.GetU8Val())
 		index.UpdateZM(&zm, types.EncodeUint8(&v))
 	case *plan.Const_U16Val:
+		zm = *index.NewZM(constU16Type.Oid)
 		v := uint16(c.C.GetU16Val())
 		index.UpdateZM(&zm, types.EncodeUint16(&v))
 	case *plan.Const_U32Val:
+		zm = *index.NewZM(constU32Type.Oid)
 		v := c.C.GetU32Val()
 		index.UpdateZM(&zm, types.EncodeUint32(&v))
 	case *plan.Const_U64Val:
+		zm = *index.NewZM(constU64Type.Oid)
 		v := c.C.GetU64Val()
 		index.UpdateZM(&zm, types.EncodeUint64(&v))
 	case *plan.Const_Fval:
+		zm = *index.NewZM(constFType.Oid)
 		v := c.C.GetFval()
 		index.UpdateZM(&zm, types.EncodeFloat32(&v))
 	case *plan.Const_Dval:
+		zm = *index.NewZM(constDType.Oid)
 		v := c.C.GetDval()
 		index.UpdateZM(&zm, types.EncodeFloat64(&v))
 	case *plan.Const_Dateval:
+		zm = *index.NewZM(constDateType.Oid)
 		v := c.C.GetDateval()
 		index.UpdateZM(&zm, types.EncodeInt32(&v))
 	case *plan.Const_Timeval:
+		zm = *index.NewZM(constTimeType.Oid)
 		v := c.C.GetTimeval()
 		index.UpdateZM(&zm, types.EncodeInt64(&v))
 	case *plan.Const_Datetimeval:
+		zm = *index.NewZM(constDatetimeType.Oid)
 		v := c.C.GetDatetimeval()
 		index.UpdateZM(&zm, types.EncodeInt64(&v))
 	case *plan.Const_Decimal64Val:
+		// TODO: scale
+		zm = *index.NewZM(types.T_decimal64)
 		v := c.C.GetDecimal64Val()
 		d64 := types.Decimal64(v.A)
 		index.UpdateZM(&zm, types.EncodeDecimal64(&d64))
 	case *plan.Const_Decimal128Val:
+		// TODO: scale
+		zm = *index.NewZM(types.T_decimal128)
 		v := c.C.GetDecimal128Val()
 		d128 := types.Decimal128{B0_63: uint64(v.A), B64_127: uint64(v.B)}
 		index.UpdateZM(&zm, types.EncodeDecimal128(&d128))
 	case *plan.Const_Timestampval:
-		// TODO: scale in zm
 		v := c.C.GetTimestampval()
 		scale := expr.Typ.Scale
 		if scale < 0 || scale > 6 {
 			err = moerr.NewInternalError(proc.Ctx, "invalid timestamp scale")
 			return
 		}
+		// TODO: scale
+		zm = *index.NewZM(constTimestampTypes[0].Oid)
 		index.UpdateZM(&zm, types.EncodeInt64(&v))
 	case *plan.Const_Sval:
+		zm = *index.NewZM(constSType.Oid)
 		v := c.C.GetSval()
 		index.UpdateZM(&zm, []byte(v))
 	case *plan.Const_Defaultval:
+		zm = *index.NewZM(constBType.Oid)
 		v := c.C.GetDefaultval()
 		index.UpdateZM(&zm, types.EncodeBool(&v))
 	default:
@@ -488,6 +509,7 @@ func EvalFilterByZonemap(
 	ctx context.Context,
 	meta objectio.BlockObject,
 	expr *plan.Expr,
+	columnMap map[int]int,
 	proc *process.Process,
 ) (v objectio.ZoneMap) {
 	var err error
@@ -498,7 +520,7 @@ func EvalFilterByZonemap(
 		}
 		return
 	case *plan.Expr_Col:
-		v = meta.MustGetColumn(uint16(t.Col.ColPos)).ZoneMap()
+		v = meta.MustGetColumn(uint16(columnMap[int(t.Col.ColPos)])).ZoneMap()
 		return
 	case *plan.Expr_F:
 		var (
@@ -512,7 +534,7 @@ func EvalFilterByZonemap(
 		}
 		params := make([]objectio.ZoneMap, len(t.F.Args))
 		for i := range params {
-			params[i] = EvalFilterByZonemap(ctx, meta, t.F.Args[i], proc)
+			params[i] = EvalFilterByZonemap(ctx, meta, t.F.Args[i], columnMap, proc)
 			if !params[i].IsInited() {
 				return params[i]
 			}
