@@ -18,18 +18,20 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"io"
+	"strings"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
 	"github.com/matrixorigin/matrixone/pkg/util/trace"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
-	"io"
-	"strings"
 )
 
 var (
@@ -173,6 +175,7 @@ func getExternalStats(node *plan.Node, builder *QueryBuilder) *Stats {
 	}
 
 	//read one line
+	logutil.Infof("XXXX-%s", param.Filepath)
 	fs, readPath, err := GetForETLWithType(param, param.Filepath)
 	if err != nil {
 		return DefaultHugeStats()

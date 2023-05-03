@@ -1074,12 +1074,12 @@ func genModifedBlocks(ctx context.Context, deletes map[types.Blockid][]int, orgs
 
 	exprMono := plantool.CheckExprIsMonotonic(ctx, expr)
 	var (
-		columnMap map[int]int
-		columns   []int
-		maxCol    int
+		columnMap         map[int]int
+		defCols, exprCols []int
+		maxCol            int
 	)
 	if exprMono {
-		columnMap, columns, maxCol = plantool.GetColumnsByExpr(expr, tableDef)
+		columnMap, defCols, exprCols, maxCol = plantool.GetColumnsByExpr(expr, tableDef)
 	}
 	var meta objectio.ObjectMeta
 	for i, blk := range orgs {
@@ -1088,14 +1088,14 @@ func genModifedBlocks(ctx context.Context, deletes map[types.Blockid][]int, orgs
 			ok := true
 			if exprMono {
 				// do not read object meta when no column is used in the expr
-				if len(columns) > 0 {
+				if len(columnMap) > 0 {
 					if !objectio.IsSameObjectLocVsMeta(location, meta) {
 						if meta, err = loadObjectMeta(ctx, location, proc.FileService, proc.Mp()); err != nil {
 							return
 						}
 					}
 				}
-				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, columns, maxCol, proc)
+				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, defCols, exprCols, maxCol, proc)
 			}
 			if ok {
 				blks = append(blks, ModifyBlockMeta{

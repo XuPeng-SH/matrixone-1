@@ -424,7 +424,7 @@ func filterExprOnObject(
 	expr *plan.Expr,
 	def *plan.TableDef,
 	columnMap map[int]int,
-	columns []int,
+	defCols, exprCols []int,
 	maxCol int,
 	proc *process.Process,
 ) (sels *vector.Vector) {
@@ -439,12 +439,12 @@ func filterExprOnObject(
 	}
 	errCtx := errutil.ContextWithNoReport(ctx, true)
 
-	if len(columns) == 0 {
+	if len(columnMap) == 0 {
 		sels = plan2.EvalFilterExpr2(errCtx, expr, nil, proc)
 		return
 	}
 
-	vecs, err := buildObjectZMVectors(meta, columns, def, proc.Mp())
+	vecs, err := buildObjectZMVectors(meta, defCols, def, proc.Mp())
 	if err != nil || len(vecs) == 0 {
 		sels = vector.NewConstFixed[bool](types.T_bool.ToType(), true, 1, proc.Mp())
 		return
@@ -452,8 +452,8 @@ func filterExprOnObject(
 
 	bat := batch.NewWithSize(maxCol + 1)
 	defer bat.Clean(proc.Mp())
-	for i, colDefIdx := range columns {
-		bat.SetVector(int32(columnMap[colDefIdx]), vecs[i])
+	for i := range defCols {
+		bat.SetVector(int32(exprCols[i]), vecs[i])
 	}
 	bat.SetZs(vecs[0].Length(), proc.Mp())
 
@@ -494,7 +494,7 @@ func needRead(
 	blkInfo catalog.BlockInfo,
 	tableDef *plan.TableDef,
 	columnMap map[int]int,
-	columns []int,
+	defCols, exprCols []int,
 	maxCol int,
 	proc *process.Process,
 ) bool {
@@ -505,7 +505,7 @@ func needRead(
 	notReportErrCtx := errutil.ContextWithNoReport(ctx, true)
 
 	// if expr match no columns, just eval expr
-	if len(columns) == 0 {
+	if len(columnMap) == 0 {
 		bat := batch.NewWithSize(0)
 		defer bat.Clean(proc.Mp())
 		ifNeed, err := plan2.EvalFilterExpr(notReportErrCtx, expr, bat, proc)
@@ -515,14 +515,14 @@ func needRead(
 		return ifNeed
 	}
 
-	buildVectors, err := buildOneBlockZMVectors(meta, int(blkInfo.MetaLocation().ID()), columns, tableDef, proc.Mp())
+	buildVectors, err := buildOneBlockZMVectors(meta, int(blkInfo.MetaLocation().ID()), defCols, tableDef, proc.Mp())
 	if err != nil || len(buildVectors) == 0 {
 		return true
 	}
 	bat := batch.NewWithSize(maxCol + 1)
 	defer bat.Clean(proc.Mp())
-	for i, colDefIdx := range columns {
-		bat.SetVector(int32(columnMap[colDefIdx]), buildVectors[i])
+	for i := range defCols {
+		bat.SetVector(int32(exprCols[i]), buildVectors[i])
 	}
 	bat.SetZs(buildVectors[0].Length(), proc.Mp())
 

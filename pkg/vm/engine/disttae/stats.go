@@ -110,7 +110,8 @@ func CalcStats(ctx context.Context, blocks [][]catalog.BlockInfo, expr *plan.Exp
 
 	var (
 		columnMap                   map[int]int
-		columns                     []int
+		defCols                     []int
+		exprCols                    []int
 		maxCol                      int
 		blockNumNeed, blockNumTotal int
 		tableCnt, cost              int64
@@ -118,7 +119,7 @@ func CalcStats(ctx context.Context, blocks [][]catalog.BlockInfo, expr *plan.Exp
 	)
 
 	if exprMono {
-		columnMap, columns, maxCol = plan2.GetColumnsByExpr(expr, tableDef)
+		columnMap, defCols, exprCols, maxCol = plan2.GetColumnsByExpr(expr, tableDef)
 	}
 	for i := range blocks {
 		for _, blk := range blocks[i] {
@@ -128,14 +129,14 @@ func CalcStats(ctx context.Context, blocks [][]catalog.BlockInfo, expr *plan.Exp
 			ok := true
 			if exprMono {
 				// do not read object meta when no column is used in the expr
-				if len(columns) > 0 {
+				if len(columnMap) > 0 {
 					if !objectio.IsSameObjectLocVsMeta(location, meta) {
 						if meta, err = loadObjectMeta(ctx, location, proc.FileService, proc.Mp()); err != nil {
 							return
 						}
 					}
 				}
-				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, columns, maxCol, proc)
+				ok = needRead(ctx, expr, meta, blk, tableDef, columnMap, defCols, exprCols, maxCol, proc)
 			}
 			if ok {
 				cost += int64(location.Rows())
@@ -149,7 +150,7 @@ func CalcStats(ctx context.Context, blocks [][]catalog.BlockInfo, expr *plan.Exp
 	stats.TableCnt = float64(tableCnt)
 	stats.Cost = float64(cost)
 
-	columns = plan2.MakeAllColumns(tableDef)
+	columns := plan2.MakeAllColumns(tableDef)
 	if s.NeedUpdate(blockNumTotal) {
 		info, err := getInfoFromZoneMap(ctx, columns, blocks, blockNumTotal, tableDef, proc)
 		if err != nil {

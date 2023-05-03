@@ -353,14 +353,15 @@ func TestEvalFilterOnObject(t *testing.T) {
 	def, meta, _, _, _ := mockZMTestContexts()
 
 	for _, tc := range testCases {
-		colMap, cols, maxCol := plan2.GetColumnsByExpr(tc.expr, def)
+		colMap, defCols, exprCols, maxCol := plan2.GetColumnsByExpr(tc.expr, def)
 		sels := filterExprOnObject(
 			context.Background(),
 			meta,
 			tc.expr,
 			def,
 			colMap,
-			cols,
+			defCols,
+			exprCols,
 			maxCol,
 			proc,
 		)

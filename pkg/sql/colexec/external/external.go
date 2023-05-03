@@ -115,12 +115,13 @@ func Prepare(proc *process.Process, arg any) error {
 		Name2ColIndex: name2ColIndex,
 	}
 	var columns []int
-	param.Filter.columnMap, columns, param.Filter.maxCol = plan2.GetColumnsByExpr(param.Filter.FilterExpr, param.tableDef)
+	param.Filter.columnMap, columns, _, param.Filter.maxCol = plan2.GetColumnsByExpr(param.Filter.FilterExpr, param.tableDef)
 	param.Filter.columns = make([]uint16, len(columns))
 	param.Filter.defColumns = make([]uint16, len(columns))
-	for i, colIdx := range columns {
-		param.Filter.columns[i] = uint16(colIdx)
-		param.Filter.defColumns[i] = uint16(colIdx)
+	for i := 0; i < len(columns); i++ {
+		col := param.Cols[columns[i]]
+		param.Filter.columns[i] = uint16(param.Name2ColIndex[col.Name])
+		param.Filter.defColumns[i] = uint16(columns[i])
 	}
 
 	param.Filter.exprMono = plan2.CheckExprIsMonotonic(proc.Ctx, param.Filter.FilterExpr)
@@ -736,8 +737,13 @@ func needRead(ctx context.Context, param *ExternalParam, proc *process.Process, 
 	buildVectors := plan2.BuildVectorsByData(datas, dataTypes, proc.Mp())
 	bat := batch.NewWithSize(param.Filter.maxCol + 1)
 	defer bat.Clean(proc.Mp())
-	for i, colDefIdx := range param.Filter.columns {
-		bat.SetVector(int32(param.Filter.columnMap[int(colDefIdx)]), buildVectors[i])
+	for k, v := range param.Filter.columnMap {
+		for i, realIdx := range param.Filter.defColumns {
+			if int(realIdx) == v {
+				bat.SetVector(int32(k), buildVectors[i])
+				break
+			}
+		}
 	}
 	bat.SetZs(buildVectors[0].Length(), proc.Mp())
 

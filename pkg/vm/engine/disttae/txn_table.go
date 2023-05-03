@@ -346,14 +346,14 @@ func (tbl *txnTable) filterExprOnObjects(
 	ranges *[][]byte,
 ) (err error) {
 	exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
-	columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
+	columnMap, defCols, exprCols, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 	// always scan all blocks with non-mono expr
 	if !exprMono {
 		for _, blk := range blks {
 			tbl.skipBlocks[blk.BlockID] = 0
 			*ranges = append(*ranges, blockInfoMarshal(blk))
 		}
-	} else if len(columns) == 0 {
+	} else if len(columnMap) == 0 {
 		// true to scan all blocks
 		// false to skip all blocks
 		if evalNoColumnFilterExpr(ctx, expr, tbl.db.txn.proc) {
@@ -388,7 +388,8 @@ func (tbl *txnTable) filterExprOnObjects(
 					expr,
 					tbl.getTableDef(),
 					columnMap,
-					columns,
+					defCols,
+					exprCols,
 					maxCol,
 					tbl.db.txn.proc)
 			}
@@ -408,7 +409,7 @@ func (tbl *txnTable) filterExprOnBlocks(
 ) (err error) {
 	exprMono := plan2.CheckExprIsMonotonic(tbl.db.txn.proc.Ctx, expr)
 	// columnMap := plan2.GetExprColumnMap(expr, tbl.getTableDef())
-	columnMap, columns, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
+	columnMap, defCols, exprCols, maxCol := plan2.GetColumnsByExpr(expr, tbl.getTableDef())
 
 	if !exprMono {
 		// 1. always scan all blocks when expr is not mono
@@ -466,7 +467,7 @@ func (tbl *txnTable) filterExprOnBlocks(
 				continue
 			}
 			// ok := filterExprOnBlock(ctx, meta.GetBlockMeta(uint32(location.ID())), expr, columnMap, tbl.db.txn.proc)
-			ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, columns, maxCol, tbl.db.txn.proc)
+			ok := needRead(ctx, expr, meta, blk, tbl.getTableDef(), columnMap, defCols, exprCols, maxCol, tbl.db.txn.proc)
 
 			if ok {
 				*ranges = append(*ranges, blockInfoMarshal(blk))
