@@ -34,6 +34,7 @@ const (
 )
 
 var MaxBytesValue []byte
+var emptyZM ZoneMap
 
 func init() {
 	MaxBytesValue = bytes.Repeat([]byte{0xff}, 31)
@@ -47,6 +48,11 @@ func init() {
 //	                       reserved |
 //	                              type
 type ZM []byte
+type ZoneMap [ZMSize]byte
+
+func (zm ZoneMap) ToZM() ZM {
+	return ZM(zm[:])
+}
 
 func NewZM(t types.T, scale int32) ZM {
 	zm := ZM(make([]byte, ZMSize))
@@ -55,11 +61,28 @@ func NewZM(t types.T, scale int32) ZM {
 	return zm
 }
 
+func NewEmptyZM() ZM {
+	return ZM(make([]byte, ZMSize))
+}
+
 func BuildZM(t types.T, v []byte) ZM {
 	zm := ZM(make([]byte, ZMSize))
 	zm.SetType(t)
 	zm.doInit(v)
 	return zm
+}
+
+func (zm ZM) Clear() {
+	copy(zm[:], emptyZM[:])
+}
+
+func (zm ZM) Reset(t types.T, scale int32) {
+	copy(zm[:], emptyZM[:])
+	zm.SetType(t)
+	if scale == 0 {
+		return
+	}
+	zm.SetScale(scale)
 }
 
 func (zm ZM) doInit(v []byte) {
@@ -71,6 +94,10 @@ func (zm ZM) doInit(v []byte) {
 		zm.updateMaxFixed(v)
 	}
 	zm.setInited()
+}
+
+func (zm ZM) Copy(o ZM) {
+	copy(zm[:], o[:])
 }
 
 func (zm ZM) String() string {
@@ -476,40 +503,40 @@ func (zm ZM) Or(o ZM) (res bool, ok bool) {
 
 // max = v1.max+v2.max
 // min = v1.min+v2.min
-func ZMPlus(v1, v2 ZM) (res ZM, ok bool) {
+func ZMPlus(v1, v2, output ZM) (ok bool) {
 	if !v1.compareCheck(v2) {
 		ok = false
 		return
 	}
 	// check supported type
-	res = NewZM(v1.GetType(), v1.GetScale())
-	ok = applyArithmetic(v1, v2, res, '+', v1.GetScale(), v2.GetScale())
+	output.Reset(v1.GetType(), v1.GetScale())
+	ok = applyArithmetic(v1, v2, output, '+', v1.GetScale(), v2.GetScale())
 	return
 }
 
 // max = v1.max-v2.min
 // min = v1.max-v2.min
-func ZMMinus(v1, v2 ZM) (res ZM, ok bool) {
+func ZMMinus(v1, v2, output ZM) (ok bool) {
 	if !v1.compareCheck(v2) {
 		ok = false
 		return
 	}
 	// check supported type
-	res = NewZM(v1.GetType(), v1.GetScale())
-	ok = applyArithmetic(v1, v2, res, '-', v1.GetScale(), v2.GetScale())
+	output.Reset(v1.GetType(), v1.GetScale())
+	ok = applyArithmetic(v1, v2, output, '-', v1.GetScale(), v2.GetScale())
 	return
 }
 
 // v1 product v2 => p[r0,r1,r2,r3]
 // min,max = Min(p),Max(p)
-func ZMMulti(v1, v2 ZM) (res ZM, ok bool) {
+func ZMMulti(v1, v2, output ZM) (ok bool) {
 	if !v1.compareCheck(v2) {
 		ok = false
 		return
 	}
 	// check supported type
-	res = NewZM(v1.GetType(), v2.GetScale())
-	ok = applyArithmetic(v1, v2, res, '*', v1.GetScale(), v2.GetScale())
+	output.Reset(v1.GetType(), v2.GetScale())
+	ok = applyArithmetic(v1, v2, output, '*', v1.GetScale(), v2.GetScale())
 	return
 }
 
@@ -934,6 +961,12 @@ func BoolToZM(v bool) ZM {
 	return zm
 }
 
+func ResetBoolZM(zm ZM, v bool) {
+	zm.Reset(types.T_bool, 0)
+	buf := types.EncodeBool(&v)
+	UpdateZM(zm, buf)
+}
+
 func MustZMToVector(zm ZM, m *mpool.MPool) (vec *vector.Vector) {
 	var err error
 	if vec, err = ZMToVector(zm, m); err != nil {
@@ -973,10 +1006,10 @@ func ZMToVector(zm ZM, m *mpool.MPool) (vec *vector.Vector, err error) {
 	return
 }
 
-// if zm is not of length 2, return not initilized zm
-func VectorToZM(vec *vector.Vector) (zm ZM) {
+// if vector is not of length 2, output will not be initialized
+func VectorToZM(vec *vector.Vector, output ZM) {
 	t := vec.GetType()
-	zm = NewZM(t.Oid, t.Scale)
+	output.Reset(t.Oid, t.Scale)
 	if vec.Length() != 2 {
 		return
 	}
@@ -984,21 +1017,20 @@ func VectorToZM(vec *vector.Vector) (zm ZM) {
 		return
 	}
 	if t.IsVarlen() {
-		UpdateZM(zm, vec.GetBytesAt(0))
+		UpdateZM(output, vec.GetBytesAt(0))
 		nsp := vec.GetNulls()
 		if nsp.Contains(1) {
-			zm.updateMaxString(MaxBytesValue)
+			output.updateMaxString(MaxBytesValue)
 		} else {
-			UpdateZM(zm, vec.GetBytesAt(1))
+			UpdateZM(output, vec.GetBytesAt(1))
 		}
 	} else {
 		data := vec.UnsafeGetRawData()
 		if vec.IsConst() {
-			UpdateZM(zm, data)
+			UpdateZM(output, data)
 		} else {
-			UpdateZM(zm, data[:len(data)/2])
-			UpdateZM(zm, data[len(data)/2:])
+			UpdateZM(output, data[:len(data)/2])
+			UpdateZM(output, data[len(data)/2:])
 		}
 	}
-	return
 }

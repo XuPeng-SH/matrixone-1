@@ -328,80 +328,81 @@ func JoinFilterEvalExpr(r, s *batch.Batch, rRow int, proc *process.Process, expr
 func getConstZM(
 	ctx context.Context,
 	expr *plan.Expr,
+	output index.ZM,
 	proc *process.Process,
-) (zm index.ZM, err error) {
+) (err error) {
 	c := expr.Expr.(*plan.Expr_C)
 	if c.C.GetIsnull() {
-		zm = index.NewZM(types.T(expr.Typ.Id), expr.Typ.Scale)
+		output.Reset(types.T(expr.Typ.Id), expr.Typ.Scale)
 		return
 	}
 	switch c.C.GetValue().(type) {
 	case *plan.Const_Bval:
-		zm = index.NewZM(constBType.Oid, 0)
+		output.Reset(constBType.Oid, 0)
 		v := c.C.GetBval()
-		index.UpdateZM(zm, types.EncodeBool(&v))
+		index.UpdateZM(output, types.EncodeBool(&v))
 	case *plan.Const_I8Val:
-		zm = index.NewZM(constI8Type.Oid, 0)
+		output.Reset(constI8Type.Oid, 0)
 		v := int8(c.C.GetI8Val())
-		index.UpdateZM(zm, types.EncodeInt8(&v))
+		index.UpdateZM(output, types.EncodeInt8(&v))
 	case *plan.Const_I16Val:
-		zm = index.NewZM(constI16Type.Oid, 0)
+		output.Reset(constI16Type.Oid, 0)
 		v := int16(c.C.GetI16Val())
-		index.UpdateZM(zm, types.EncodeInt16(&v))
+		index.UpdateZM(output, types.EncodeInt16(&v))
 	case *plan.Const_I32Val:
-		zm = index.NewZM(constI32Type.Oid, 0)
+		output.Reset(constI32Type.Oid, 0)
 		v := c.C.GetI32Val()
-		index.UpdateZM(zm, types.EncodeInt32(&v))
+		index.UpdateZM(output, types.EncodeInt32(&v))
 	case *plan.Const_I64Val:
-		zm = index.NewZM(constI64Type.Oid, 0)
+		output.Reset(constI64Type.Oid, 0)
 		v := c.C.GetI64Val()
-		index.UpdateZM(zm, types.EncodeInt64(&v))
+		index.UpdateZM(output, types.EncodeInt64(&v))
 	case *plan.Const_U8Val:
-		zm = index.NewZM(constU8Type.Oid, 0)
+		output.Reset(constU8Type.Oid, 0)
 		v := uint8(c.C.GetU8Val())
-		index.UpdateZM(zm, types.EncodeUint8(&v))
+		index.UpdateZM(output, types.EncodeUint8(&v))
 	case *plan.Const_U16Val:
-		zm = index.NewZM(constU16Type.Oid, 0)
+		output.Reset(constU16Type.Oid, 0)
 		v := uint16(c.C.GetU16Val())
-		index.UpdateZM(zm, types.EncodeUint16(&v))
+		index.UpdateZM(output, types.EncodeUint16(&v))
 	case *plan.Const_U32Val:
-		zm = index.NewZM(constU32Type.Oid, 0)
+		output.Reset(constU32Type.Oid, 0)
 		v := c.C.GetU32Val()
-		index.UpdateZM(zm, types.EncodeUint32(&v))
+		index.UpdateZM(output, types.EncodeUint32(&v))
 	case *plan.Const_U64Val:
-		zm = index.NewZM(constU64Type.Oid, 0)
+		output.Reset(constU64Type.Oid, 0)
 		v := c.C.GetU64Val()
-		index.UpdateZM(zm, types.EncodeUint64(&v))
+		index.UpdateZM(output, types.EncodeUint64(&v))
 	case *plan.Const_Fval:
-		zm = index.NewZM(constFType.Oid, 0)
+		output.Reset(constFType.Oid, 0)
 		v := c.C.GetFval()
-		index.UpdateZM(zm, types.EncodeFloat32(&v))
+		index.UpdateZM(output, types.EncodeFloat32(&v))
 	case *plan.Const_Dval:
-		zm = index.NewZM(constDType.Oid, 0)
+		output.Reset(constDType.Oid, 0)
 		v := c.C.GetDval()
-		index.UpdateZM(zm, types.EncodeFloat64(&v))
+		index.UpdateZM(output, types.EncodeFloat64(&v))
 	case *plan.Const_Dateval:
-		zm = index.NewZM(constDateType.Oid, 0)
+		output.Reset(constDateType.Oid, 0)
 		v := c.C.GetDateval()
-		index.UpdateZM(zm, types.EncodeInt32(&v))
+		index.UpdateZM(output, types.EncodeInt32(&v))
 	case *plan.Const_Timeval:
-		zm = index.NewZM(constTimeType.Oid, 0)
+		output.Reset(constTimeType.Oid, 0)
 		v := c.C.GetTimeval()
-		index.UpdateZM(zm, types.EncodeInt64(&v))
+		index.UpdateZM(output, types.EncodeInt64(&v))
 	case *plan.Const_Datetimeval:
-		zm = index.NewZM(constDatetimeType.Oid, 0)
+		output.Reset(constDatetimeType.Oid, 0)
 		v := c.C.GetDatetimeval()
-		index.UpdateZM(zm, types.EncodeInt64(&v))
+		index.UpdateZM(output, types.EncodeInt64(&v))
 	case *plan.Const_Decimal64Val:
 		v := c.C.GetDecimal64Val()
-		zm = index.NewZM(types.T_decimal64, expr.Typ.Scale)
+		output.Reset(types.T_decimal64, expr.Typ.Scale)
 		d64 := types.Decimal64(v.A)
-		index.UpdateZM(zm, types.EncodeDecimal64(&d64))
+		index.UpdateZM(output, types.EncodeDecimal64(&d64))
 	case *plan.Const_Decimal128Val:
 		v := c.C.GetDecimal128Val()
-		zm = index.NewZM(types.T_decimal128, expr.Typ.Scale)
+		output.Reset(types.T_decimal128, expr.Typ.Scale)
 		d128 := types.Decimal128{B0_63: uint64(v.A), B64_127: uint64(v.B)}
-		index.UpdateZM(zm, types.EncodeDecimal128(&d128))
+		index.UpdateZM(output, types.EncodeDecimal128(&d128))
 	case *plan.Const_Timestampval:
 		v := c.C.GetTimestampval()
 		scale := expr.Typ.Scale
@@ -409,16 +410,16 @@ func getConstZM(
 			err = moerr.NewInternalError(proc.Ctx, "invalid timestamp scale")
 			return
 		}
-		zm = index.NewZM(constTimestampTypes[0].Oid, scale)
-		index.UpdateZM(zm, types.EncodeInt64(&v))
+		output.Reset(constTimestampTypes[0].Oid, scale)
+		index.UpdateZM(output, types.EncodeInt64(&v))
 	case *plan.Const_Sval:
-		zm = index.NewZM(constSType.Oid, 0)
+		output.Reset(constSType.Oid, 0)
 		v := c.C.GetSval()
-		index.UpdateZM(zm, []byte(v))
+		index.UpdateZM(output, []byte(v))
 	case *plan.Const_Defaultval:
-		zm = index.NewZM(constBType.Oid, 0)
+		output.Reset(constBType.Oid, 0)
 		v := c.C.GetDefaultval()
-		index.UpdateZM(zm, types.EncodeBool(&v))
+		index.UpdateZM(output, types.EncodeBool(&v))
 	default:
 		err = moerr.NewNYI(ctx, fmt.Sprintf("const expression %v", c.C.GetValue()))
 	}
@@ -430,17 +431,18 @@ func EvalFilterByZonemap(
 	meta objectio.ColumnMetaFetcher,
 	expr *plan.Expr,
 	columnMap map[int]int,
+	output index.ZM,
 	proc *process.Process,
-) (v objectio.ZoneMap) {
+) {
 	var err error
 	switch t := expr.Expr.(type) {
 	case *plan.Expr_C:
-		if v, err = getConstZM(ctx, expr, proc); err != nil {
-			v = objectio.NewZM(types.T_bool, 0)
+		if err = getConstZM(ctx, expr, output, proc); err != nil {
+			output.Reset(types.T_bool, 0)
 		}
 		return
 	case *plan.Expr_Col:
-		v = meta.MustGetColumn(uint16(columnMap[int(t.Col.ColPos)])).ZoneMap()
+		output.Copy(meta.MustGetColumn(uint16(columnMap[int(t.Col.ColPos)])).ZoneMap())
 		return
 	case *plan.Expr_F:
 		var (
@@ -449,80 +451,83 @@ func EvalFilterByZonemap(
 		)
 		id := t.F.GetFunc().GetObj()
 		if f, err = function.GetFunctionByID(proc.Ctx, id); err != nil {
-			v = objectio.NewZM(types.T_bool, 0)
+			output.Reset(types.T_bool, 0)
 			return
 		}
 		params := make([]objectio.ZoneMap, len(t.F.Args))
 		for i := range params {
-			params[i] = EvalFilterByZonemap(ctx, meta, t.F.Args[i], columnMap, proc)
+			var zm index.ZoneMap
+			params[i] = zm.ToZM()
+			EvalFilterByZonemap(ctx, meta, t.F.Args[i], columnMap, params[i], proc)
 			if !params[i].IsInited() {
-				return params[i]
+				output.Reset(types.T_bool, 0)
+				return
 			}
 		}
 		var res, ok bool
 		switch t.F.Func.ObjName {
 		case ">":
 			if res, ok = params[0].AnyGT(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case "<":
 			if res, ok = params[0].AnyLT(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case ">=":
 			if res, ok = params[0].AnyGE(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case "<=":
 			if res, ok = params[0].AnyLE(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case "=":
 			if res, ok = params[0].Intersect(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case "and":
 			if res, ok = params[0].And(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case "or":
 			if res, ok = params[0].Or(params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 			} else {
-				v = index.BoolToZM(res)
+				index.ResetBoolZM(output, res)
 			}
 			return
 		case "+":
-			if v, ok = index.ZMPlus(params[0], params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+			if ok = index.ZMPlus(params[0], params[1], output); !ok {
+				output.Reset(types.T_bool, 0)
 			}
 			return
 		case "-":
-			if v, ok = index.ZMMinus(params[0], params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+			if ok = index.ZMMinus(params[0], params[1], output); !ok {
+				output.Reset(types.T_bool, 0)
 			}
 			return
 		case "*":
-			if v, ok = index.ZMMulti(params[0], params[1]); !ok {
-				v = objectio.NewZM(types.T_bool, 0)
+			if ok = index.ZMMulti(params[0], params[1], output); !ok {
+				output.Reset(types.T_bool, 0)
 			}
 			return
 		}
@@ -538,18 +543,17 @@ func EvalFilterByZonemap(
 		}()
 		for i := range vecParams {
 			if vecParams[i], err = index.ZMToVector(params[i], proc.Mp()); err != nil {
-				v = objectio.NewZM(types.T_bool, 0)
+				output.Reset(types.T_bool, 0)
 				return
 			}
 		}
 		if vec, err = evalFunction(proc, f, vecParams, 2); err != nil {
-			v = objectio.NewZM(types.T_bool, 0)
+			output.Reset(types.T_bool, 0)
 			return
 		}
 		defer vec.Free(proc.Mp())
-		v = index.VectorToZM(vec)
+		index.VectorToZM(vec, output)
 	}
-	return
 }
 
 func EvalExprByZonemapBat(ctx context.Context, bat *batch.Batch, proc *process.Process, expr *plan.Expr) (*vector.Vector, error) {

@@ -29,6 +29,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -436,11 +437,13 @@ func evalFilterExprWithZonemap(
 		selected = evalNoColumnFilterExpr(ctx, expr, proc)
 		return
 	}
-	zm := colexec.EvalFilterByZonemap(ctx, meta, expr, columnMap, proc)
-	if !zm.IsInited() || zm.GetType() != types.T_bool {
+	var zm index.ZoneMap
+	result := zm.ToZM()
+	colexec.EvalFilterByZonemap(ctx, meta, expr, columnMap, result, proc)
+	if !result.IsInited() || result.GetType() != types.T_bool {
 		selected = true
 	} else {
-		selected = types.DecodeBool(zm.GetMaxBuf())
+		selected = types.DecodeBool(result.GetMaxBuf())
 	}
 	return
 }

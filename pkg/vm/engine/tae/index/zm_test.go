@@ -142,11 +142,14 @@ func runCompare(tc *testCase) [][2]bool {
 
 func runArith(tc *testCase) []*testArithRes {
 	r := make([]*testArithRes, 0)
-	res, ok := ZMPlus(tc.v1, tc.v2)
+	res := NewEmptyZM()
+	ok := ZMPlus(tc.v1, tc.v2, res)
 	r = append(r, &testArithRes{res, ok})
-	res, ok = ZMMinus(tc.v1, tc.v2)
+	res = NewEmptyZM()
+	ok = ZMMinus(tc.v1, tc.v2, res)
 	r = append(r, &testArithRes{res, ok})
-	res, ok = ZMMulti(tc.v1, tc.v2)
+	res = NewEmptyZM()
+	ok = ZMMulti(tc.v1, tc.v2, res)
 	r = append(r, &testArithRes{res, ok})
 	return r
 }
@@ -186,7 +189,9 @@ func TestVectorZM(t *testing.T) {
 	require.Equal(t, uint32(12), vector.GetFixedAt[uint32](vec, 0))
 	require.Equal(t, uint32(22), vector.GetFixedAt[uint32](vec, 1))
 
-	zm2 := VectorToZM(vec)
+	var zonemap ZoneMap
+	zm2 := zonemap.ToZM()
+	VectorToZM(vec, zm2)
 	require.Equal(t, zm, zm2)
 	vec.Free(m)
 
@@ -202,7 +207,7 @@ func TestVectorZM(t *testing.T) {
 	require.Equal(t, []byte("abc"), vec.GetBytesAt(0))
 	require.Equal(t, []byte("xyz"), vec.GetBytesAt(1))
 
-	zm2 = VectorToZM(vec)
+	VectorToZM(vec, zm2)
 	require.Equal(t, zm, zm2)
 	vec.Free(m)
 
@@ -217,7 +222,7 @@ func TestVectorZM(t *testing.T) {
 	require.True(t, vec.GetNulls().Contains(1))
 	require.Equal(t, []byte("abc"), vec.GetBytesAt(0))
 
-	zm2 = VectorToZM(vec)
+	VectorToZM(vec, zm2)
 	require.True(t, zm2.MaxTruncated())
 	require.Equal(t, []byte("abc"), zm2.GetMinBuf())
 	require.Equal(t, zm, zm2)
@@ -231,7 +236,7 @@ func TestVectorZM(t *testing.T) {
 	require.Equal(t, 2, vec.Length())
 	require.True(t, vec.IsConstNull())
 
-	zm2 = VectorToZM(vec)
+	VectorToZM(vec, zm2)
 	require.False(t, zm2.IsInited())
 
 	vec.Free(m)
