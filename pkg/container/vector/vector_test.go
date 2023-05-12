@@ -728,9 +728,20 @@ func TestCloneWindow2(t *testing.T) {
 	require.True(t, vec2.GetNulls().Contains(uint64(0)))
 	require.Equal(t, GetFixedAt[int32](vec1, 2), GetFixedAt[int32](vec3, 1))
 
+	vec4 := NewConstNull(types.T_int16.ToType(), 10, mp)
+
+	cap1 := vec1.Allocated()
+	err = vec4.CloneWindowTo(2, 6, vec1, mp)
+	require.NoError(t, err)
+	require.Equal(t, cap1, vec1.Allocated())
+	require.True(t, vec1.IsConstNull())
+	require.Equal(t, 4, vec1.Length())
+	require.False(t, vec1.NeedDup())
+
 	vec1.Free(mp)
 	vec2.Free(mp)
 	vec3.Free(mp)
+	vec4.Free(mp)
 	require.Equal(t, int64(0), mp.CurrNB())
 }
 
