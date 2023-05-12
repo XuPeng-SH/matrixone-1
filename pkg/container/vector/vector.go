@@ -2423,10 +2423,29 @@ func vecToString[T types.FixedSizeT](v *Vector) string {
 // It selects a half-open range (i.e.[start, end)).
 // The returned object is NOT allowed to be modified (
 // TODO: Nulls are deep copied.
-func (v *Vector) Window(start, end int) (*Vector, error) {
-	w := NewVec(v.typ)
+func (v *Vector) Window(start, end int) (w *Vector, err error) {
+	w = NewVec(v.typ)
+	w.cantFreeArea = true
+	w.cantFreeData = true
+	if err = v.WindowTo(start, end, w); err != nil {
+		w = nil
+	}
+	return
+}
+
+// w should not be allocated by any pool.
+func (v *Vector) WindowTo(start, end int, w *Vector) (err error) {
+	if start < 0 || end > v.Length() || start > end {
+		err = moerr.NewInternalErrorNoCtx("bad WindowTo params: %d, %d", start, end)
+		return
+	}
+	if !w.NeedDup() {
+		err = moerr.NewInternalErrorNoCtx("WindowTo vector should be cantFreeArea")
+		return
+	}
 	if start == end {
-		return w, nil
+		w.ToEmptyConst(v.typ)
+		return
 	}
 	w.nsp = nulls.Range(v.nsp, uint64(start), uint64(end), uint64(start), w.nsp)
 	w.data = v.data[start*v.typ.TypeSize() : end*v.typ.TypeSize()]
@@ -2435,9 +2454,7 @@ func (v *Vector) Window(start, end int) (*Vector, error) {
 	if v.typ.IsVarlen() {
 		w.area = v.area
 	}
-	w.cantFreeData = true
-	w.cantFreeArea = true
-	return w, nil
+	return
 }
 
 // CloneWindow Deep copies the content from start to end into another vector.
