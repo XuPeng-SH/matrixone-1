@@ -698,6 +698,42 @@ func TestCloneWindowWithMpNil(t *testing.T) {
 	require.True(t, vec4.GetNulls().Contains(uint64(1)))
 }
 
+func TestCloneWindow2(t *testing.T) {
+	mp := mpool.MustNewNoFixed(t.Name())
+
+	vec1 := NewVec(types.T_int32.ToType())
+	AppendFixed(vec1, int32(1), false, mp)
+	AppendFixed(vec1, int32(2), true, mp)
+	AppendFixed(vec1, int32(3), false, mp)
+
+	vec2 := NewVec(types.T_varchar.ToType())
+	AppendBytes(vec2, []byte("hhhhhhh"), false, mp)
+	AppendBytes(vec2, []byte("xxxxxxxxxxxx"), false, mp)
+	AppendBytes(vec2, bytes.Repeat([]byte("y"), 30), false, mp)
+	cap2 := vec2.Allocated()
+	t.Logf("cap2=%d", cap2)
+
+	usage := mp.CurrNB()
+	err := vec1.CloneWindowTo(1, 3, vec2, mp)
+	require.NoError(t, err)
+	require.Equal(t, cap2, vec2.Allocated())
+	require.Equal(t, usage, mp.CurrNB())
+
+	require.True(t, vec2.GetNulls().Contains(uint64(0)))
+	require.Equal(t, GetFixedAt[int32](vec1, 2), GetFixedAt[int32](vec2, 1))
+
+	vec3 := NewConstNull(types.T_any.ToType(), 3, mp)
+	err = vec1.CloneWindowTo(1, 3, vec3, mp)
+	require.NoError(t, err)
+	require.True(t, vec2.GetNulls().Contains(uint64(0)))
+	require.Equal(t, GetFixedAt[int32](vec1, 2), GetFixedAt[int32](vec3, 1))
+
+	vec1.Free(mp)
+	vec2.Free(mp)
+	vec3.Free(mp)
+	require.Equal(t, int64(0), mp.CurrNB())
+}
+
 /*
 func TestUnionOne(t *testing.T) {
 	mp := mpool.MustNewZero()

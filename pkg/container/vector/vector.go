@@ -80,6 +80,13 @@ func (v *Vector) Length() int {
 	return v.length
 }
 
+func (v *Vector) Allocated() int {
+	if v.NeedDup() {
+		return 0
+	}
+	return cap(v.area) + cap(v.data)
+}
+
 func (v *Vector) Capacity() int {
 	return v.capacity
 }
@@ -456,7 +463,11 @@ func (v *Vector) UnmarshalBinaryWithCopy(data []byte, mp *mpool.MPool) error {
 func (v *Vector) ToEmptyConst(typ types.Type) {
 	v.Clear()
 	v.class = CONSTANT
+	otyp := v.typ
 	v.typ = typ
+	if otyp.Oid != typ.Oid && typ.Oid != types.T_any {
+		v.setupColFromData()
+	}
 }
 
 func (v *Vector) ToConstNull(typ types.Type, length int) {
@@ -510,6 +521,7 @@ func (v *Vector) PreExtend(rows int, mp *mpool.MPool) error {
 // Clone clones the vector
 func (v *Vector) Clone(mp *mpool.MPool) (w *Vector, err error) {
 	w = new(Vector)
+	w.typ = v.typ
 	err = v.CloneTo(w, mp)
 	if err != nil {
 		w = nil
@@ -2428,12 +2440,32 @@ func (v *Vector) Window(start, end int) (*Vector, error) {
 	return w, nil
 }
 
-// CloneWindow Deep copies the content from start to end into another vector. Afterwise it's safe to destroy the original one.
+// CloneWindow Deep copies the content from start to end into another vector.
+// Afterwise it's safe to destroy the original one.
 func (v *Vector) CloneWindow(start, end int, mp *mpool.MPool) (*Vector, error) {
-	w := NewVec(v.typ)
-	if start == end {
-		return w, nil
+	if start == 0 && end == v.Length() && mp != nil {
+		return v.Clone(mp)
 	}
+	w := NewVec(v.typ)
+	if err := v.CloneWindowTo(start, end, w, mp); err != nil {
+		return nil, err
+	}
+	return w, nil
+}
+
+func (v *Vector) CloneWindowTo(start, end int, w *Vector, mp *mpool.MPool) (err error) {
+	if start > end || end > v.Length() || w.NeedDup() {
+		panic(fmt.Sprintf("bad CloneWindowTo params: %d, %d, %v", start, end, w.NeedDup()))
+	}
+	if start == end {
+		return
+	}
+	if v.IsConstNull() {
+		w.ToConstNull(v.typ, end-start)
+		return
+	}
+	w.ToEmptyConst(v.typ)
+	w.class = v.class
 	w.nsp = nulls.Range(v.nsp, uint64(start), uint64(end), uint64(start), w.nsp)
 	length := (end - start) * v.typ.TypeSize()
 	if mp == nil {
@@ -2448,9 +2480,8 @@ func (v *Vector) CloneWindow(start, end int, mp *mpool.MPool) (*Vector, error) {
 		w.cantFreeData = true
 		w.cantFreeArea = true
 	} else {
-		err := w.PreExtend(end-start, mp)
-		if err != nil {
-			return nil, err
+		if err = w.PreExtend(end-start, mp); err != nil {
+			return
 		}
 		w.length = end - start
 		if v.GetType().IsVarlen() {
@@ -2460,9 +2491,10 @@ func (v *Vector) CloneWindow(start, end int, mp *mpool.MPool) (*Vector, error) {
 			for i := start; i < end; i++ {
 				if !nulls.Contains(v.nsp, uint64(i)) {
 					bs := vCol[i].GetByteSlice(v.area)
-					va, w.area, err = types.BuildVarlena(bs, w.area, mp)
-					if err != nil {
-						return nil, err
+					if va, w.area, err = types.BuildVarlena(bs, w.area, mp); err != nil {
+						w.Free(mp)
+						return
+
 					}
 					wCol[i-start] = va
 				}
@@ -2473,5 +2505,5 @@ func (v *Vector) CloneWindow(start, end int, mp *mpool.MPool) (*Vector, error) {
 		}
 	}
 
-	return w, nil
+	return
 }
