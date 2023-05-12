@@ -137,7 +137,7 @@ func (v *Vector) GetBytesAt(i int) []byte {
 	return bs[i].GetByteSlice(v.area)
 }
 
-func (v *Vector) CleanOnlyData() {
+func (v *Vector) Clear() {
 	if v.data != nil {
 		v.length = 0
 	}

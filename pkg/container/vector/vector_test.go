@@ -15,6 +15,7 @@
 package vector
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -1104,4 +1105,19 @@ func TestWindowWith(t *testing.T) {
 	require.Equal(t, "uuu", string(vec3.GetBytesAt(2)))
 	require.True(t, vec3.GetNulls().Contains(uint64(1)))
 	vec3.Free(mp)
+}
+
+func BenchmarkAppendBytes(b *testing.B) {
+	mp := mpool.MustNewZero()
+	v := bytes.Repeat([]byte{'x'}, 40)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		vec := NewVec(types.T_text.ToType())
+		vec.PreExtend(1, mp)
+		for j := 0; j < 1; j++ {
+			// continue
+			AppendBytes(vec, v, false, mp)
+		}
+		vec.Free(mp)
+	}
 }

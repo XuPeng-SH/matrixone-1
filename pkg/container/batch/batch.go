@@ -245,7 +245,7 @@ func (bat *Batch) Clean(m *mpool.MPool) {
 func (bat *Batch) CleanOnlyData() {
 	for _, vec := range bat.Vecs {
 		if vec != nil {
-			vec.CleanOnlyData()
+			vec.Clear()
 		}
 	}
 	if len(bat.Zs) != 0 {
