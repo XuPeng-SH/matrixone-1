@@ -1119,7 +1119,7 @@ func TestToEmptyConst(t *testing.T) {
 	require.Equal(t, 3, v.Length())
 	capacity := v.Capacity()
 
-	v.ToEmptyConst()
+	v.ToEmptyConst(v.typ)
 	require.False(t, v.NeedDup())
 	require.True(t, v.IsConst())
 	require.Equal(t, 0, v.Length())
@@ -1140,7 +1140,7 @@ func TestToEmptyConst(t *testing.T) {
 	require.False(t, v.IsConst())
 	require.Equal(t, 3, v.Length())
 	capacity = v.Capacity()
-	v.ToEmptyConst()
+	v.ToEmptyConst(v.typ)
 	require.False(t, v.NeedDup())
 	require.True(t, v.IsConst())
 	require.Equal(t, 0, v.Length())

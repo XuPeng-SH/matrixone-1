@@ -453,9 +453,18 @@ func (v *Vector) UnmarshalBinaryWithCopy(data []byte, mp *mpool.MPool) error {
 // IsConst() will return true after this method is called
 // Length() will return 0 after this method is called
 // Note: this method will not free the data and area of the vector
-func (v *Vector) ToEmptyConst() {
+func (v *Vector) ToEmptyConst(typ types.Type) {
 	v.Clear()
 	v.class = CONSTANT
+	v.typ = typ
+}
+
+func (v *Vector) ToConstNull(typ types.Type, length int) {
+	v.ToEmptyConst(typ)
+	if v.data != nil {
+		v.data = v.data[:0]
+	}
+	v.length = length
 }
 
 // this function is used to make a new const vector from a vector
@@ -499,28 +508,33 @@ func (v *Vector) PreExtend(rows int, mp *mpool.MPool) error {
 }
 
 // Clone clones the vector
-func (v *Vector) Clone(mp *mpool.MPool) (*Vector, error) {
+func (v *Vector) Clone(mp *mpool.MPool) (w *Vector, err error) {
+	w = new(Vector)
+	err = v.CloneTo(w, mp)
+	if err != nil {
+		w = nil
+	}
+	return
+}
+
+func (v *Vector) CloneTo(w *Vector, mp *mpool.MPool) (err error) {
 	if v.IsConstNull() {
-		return NewConstNull(v.typ, v.Length(), mp), nil
+		w.ToConstNull(v.typ, v.Length())
+		return
 	}
-
-	var err error
-
-	w := &Vector{
-		class:  v.class,
-		typ:    v.typ,
-		nsp:    v.nsp.Clone(),
-		length: v.length,
-	}
+	w.ToEmptyConst(v.typ)
+	w.nsp = v.nsp.Clone()
+	w.length = v.length
+	w.class = v.class
 
 	dataLen := v.typ.TypeSize()
 	if v.IsConst() {
-		if err := extend(w, 1, mp); err != nil {
-			return nil, err
+		if err = extend(w, 1, mp); err != nil {
+			return
 		}
 	} else {
-		if err := extend(w, v.length, mp); err != nil {
-			return nil, err
+		if err = extend(w, v.length, mp); err != nil {
+			return
 		}
 		dataLen *= v.length
 	}
@@ -528,11 +542,11 @@ func (v *Vector) Clone(mp *mpool.MPool) (*Vector, error) {
 
 	if len(v.area) > 0 {
 		if w.area, err = mp.Alloc(len(v.area)); err != nil {
-			return nil, err
+			return
 		}
 		copy(w.area, v.area)
 	}
-	return w, nil
+	return
 }
 
 // Shrink use to shrink vectors, sels must be guaranteed to be ordered
