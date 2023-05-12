@@ -449,7 +449,16 @@ func (v *Vector) UnmarshalBinaryWithCopy(data []byte, mp *mpool.MPool) error {
 	return nil
 }
 
-func (v *Vector) ToConst(row, length int, mp *mpool.MPool) *Vector {
+// this function is used to make a new const vector from a vector
+// which may share the same data with the original vector.
+// row: the row of the original vector to be fetched to fill the new vector
+// length: the length of the new const vector
+// For example:
+// if the original vector vec=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+// vec.ToConstRef(1, 5) returns [2, 2, 2, 2, 2]
+// Note:
+// for varlena vector, the data and area is shared with the original vector.
+func (v *Vector) ToConstRef(row, length int, mp *mpool.MPool) *Vector {
 	w := NewConstNull(v.typ, length, mp)
 	if v.IsConstNull() || nulls.Contains(v.nsp, uint64(row)) {
 		return w

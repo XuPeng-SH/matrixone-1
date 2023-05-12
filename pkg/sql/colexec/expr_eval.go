@@ -287,7 +287,7 @@ func JoinFilterEvalExpr(r, s *batch.Batch, rRow int, proc *process.Process, expr
 		return vector.NewConstNull(types.New(types.T(t.T.Typ.GetId()), t.T.Typ.GetWidth(), t.T.Typ.GetScale()), length, proc.Mp()), nil
 	case *plan.Expr_Col:
 		if t.Col.RelPos == 0 {
-			return r.Vecs[t.Col.ColPos].ToConst(rRow, length, proc.Mp()), nil
+			return r.Vecs[t.Col.ColPos].ToConstRef(rRow, length, proc.Mp()), nil
 		}
 		return s.Vecs[t.Col.ColPos], nil
 	case *plan.Expr_List:
@@ -672,9 +672,9 @@ func JoinFilterEvalExprInBucket(r, s *batch.Batch, rRow, sRow int, proc *process
 		return vector.NewConstNull(types.New(types.T(t.T.Typ.GetId()), t.T.Typ.GetWidth(), t.T.Typ.GetScale()), 1, proc.Mp()), nil
 	case *plan.Expr_Col:
 		if t.Col.RelPos == 0 {
-			return r.Vecs[t.Col.ColPos].ToConst(rRow, 1, proc.Mp()), nil
+			return r.Vecs[t.Col.ColPos].ToConstRef(rRow, 1, proc.Mp()), nil
 		}
-		return s.Vecs[t.Col.ColPos].ToConst(sRow, 1, proc.Mp()), nil
+		return s.Vecs[t.Col.ColPos].ToConstRef(sRow, 1, proc.Mp()), nil
 	case *plan.Expr_F:
 		var result *vector.Vector
 
