@@ -530,10 +530,12 @@ func (v *Vector) CloneTo(w *Vector, mp *mpool.MPool) (err error) {
 	dataLen := v.typ.TypeSize()
 	if v.IsConst() {
 		if err = extend(w, 1, mp); err != nil {
+			w.Free(mp)
 			return
 		}
 	} else {
 		if err = extend(w, v.length, mp); err != nil {
+			w.Free(mp)
 			return
 		}
 		dataLen *= v.length
@@ -542,6 +544,7 @@ func (v *Vector) CloneTo(w *Vector, mp *mpool.MPool) (err error) {
 
 	if len(v.area) > 0 {
 		if w.area, err = mp.Alloc(len(v.area)); err != nil {
+			w.Free(mp)
 			return
 		}
 		copy(w.area, v.area)
