@@ -162,7 +162,7 @@ func (p *PartitionReader) Read(ctx context.Context, colNames []string, expr *pla
 			}
 			rbat := bat
 			for i, vec := range rbat.Vecs {
-				rbat.Vecs[i], err = vec.Dup(p.procMPool)
+				rbat.Vecs[i], err = vec.Clone(p.procMPool)
 				if err != nil {
 					return nil, err
 				}

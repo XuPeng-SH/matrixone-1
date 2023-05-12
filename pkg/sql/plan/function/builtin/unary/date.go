@@ -22,7 +22,7 @@ import (
 )
 
 func DateToDate(ivecs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-	return ivecs[0].Dup(proc.Mp())
+	return ivecs[0].Clone(proc.Mp())
 }
 
 func DatetimeToDate(ivecs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {

@@ -3256,7 +3256,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_uint8},
 				ReturnTyp: types.T_uint8,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3264,7 +3264,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_uint16},
 				ReturnTyp: types.T_uint16,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3272,7 +3272,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_uint32},
 				ReturnTyp: types.T_uint32,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3280,7 +3280,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_uint64},
 				ReturnTyp: types.T_uint64,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3288,7 +3288,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_int8},
 				ReturnTyp: types.T_int8,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3296,7 +3296,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_int16},
 				ReturnTyp: types.T_int16,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3304,7 +3304,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_int32},
 				ReturnTyp: types.T_int32,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3312,7 +3312,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_int64},
 				ReturnTyp: types.T_int64,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3320,7 +3320,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_float32},
 				ReturnTyp: types.T_float32,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3328,7 +3328,7 @@ var operators = map[int]Functions{
 				Args:      []types.T{types.T_float64},
 				ReturnTyp: types.T_float64,
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3338,7 +3338,7 @@ var operators = map[int]Functions{
 					return types.New(types.T_decimal64, 18, parameters[0].Scale)
 				},
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 			{
@@ -3348,7 +3348,7 @@ var operators = map[int]Functions{
 					return types.New(types.T_decimal128, 38, parameters[0].Scale)
 				},
 				Fn: func(vs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-					return vs[0].Dup(proc.Mp())
+					return vs[0].Clone(proc.Mp())
 				},
 			},
 		},

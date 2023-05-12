@@ -481,7 +481,7 @@ func (v *Vector) PreExtend(rows int, mp *mpool.MPool) error {
 }
 
 // Dup use to copy an identical vector
-func (v *Vector) Dup(mp *mpool.MPool) (*Vector, error) {
+func (v *Vector) Clone(mp *mpool.MPool) (*Vector, error) {
 	if v.IsConstNull() {
 		return NewConstNull(v.typ, v.Length(), mp), nil
 	}

@@ -71,7 +71,7 @@ func metaScanCall(_ int, proc *process.Process, arg *Argument) (bool, error) {
 	metaVecs := make([]*vector.Vector, len(bats[0].Vecs))
 	for i, vec := range bats[0].Vecs {
 		if vec.NeedDup() {
-			metaVecs[i], err = vec.Dup(proc.Mp())
+			metaVecs[i], err = vec.Clone(proc.Mp())
 			if err != nil {
 				return false, err
 			}

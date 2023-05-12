@@ -269,7 +269,7 @@ func (vec *vector[T]) tryCoW() {
 		return
 	}
 
-	newCnVector, err := vec.downstreamVector.Dup(vec.mpool)
+	newCnVector, err := vec.downstreamVector.Clone(vec.mpool)
 	if err != nil {
 		panic(err)
 	}

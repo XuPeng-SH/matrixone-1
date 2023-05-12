@@ -850,7 +850,7 @@ func (ses *Session) AppendResultBatch(bat *batch.Batch) error {
 	copy(copied.Attrs, bat.Attrs)
 	copy(copied.Zs, bat.Zs)
 	for i := range copied.Vecs {
-		copied.Vecs[i], err = bat.Vecs[i].Dup(ses.mp)
+		copied.Vecs[i], err = bat.Vecs[i].Clone(ses.mp)
 		if err != nil {
 			return err
 		}

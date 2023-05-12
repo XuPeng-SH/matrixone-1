@@ -65,7 +65,7 @@ func DatetimeToTimestamp(ivecs []*vector.Vector, proc *process.Process) (*vector
 }
 
 func TimestampToTimestamp(ivecs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {
-	return ivecs[0].Dup(proc.Mp())
+	return ivecs[0].Clone(proc.Mp())
 }
 
 func DateStringToTimestamp(ivecs []*vector.Vector, proc *process.Process) (*vector.Vector, error) {

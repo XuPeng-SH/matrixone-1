@@ -1475,7 +1475,7 @@ func decodeBatch(mp *mpool.MPool, data []byte) (*batch.Batch, error) {
 	// allocated memory of vec from mPool.
 	for i := range bat.Vecs {
 		oldVec := bat.Vecs[i]
-		vec, err1 := oldVec.Dup(mp)
+		vec, err1 := oldVec.Clone(mp)
 		if err1 != nil {
 			for j := 0; j < i; j++ {
 				bat.Vecs[j].Free(mp)

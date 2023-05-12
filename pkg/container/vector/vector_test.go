@@ -143,7 +143,7 @@ func TestDup(t *testing.T) {
 	v := NewVec(types.T_int8.ToType())
 	err := AppendFixedList(v, []int8{0, 1, 2}, nil, mp)
 	require.NoError(t, err)
-	w, err := v.Dup(mp)
+	w, err := v.Clone(mp)
 	require.NoError(t, err)
 	vs := MustFixedCol[int8](v)
 	ws := MustFixedCol[int8](w)
