@@ -449,16 +449,25 @@ func (v *Vector) UnmarshalBinaryWithCopy(data []byte, mp *mpool.MPool) error {
 	return nil
 }
 
+// this method is used to convert a vector to a empty const vector
+// IsConst() will return true after this method is called
+// Length() will return 0 after this method is called
+// Note: this method will not free the data and area of the vector
+func (v *Vector) ToEmptyConst() {
+	v.Clear()
+	v.class = CONSTANT
+}
+
 // this function is used to make a new const vector from a vector
 // which may share the same data with the original vector.
 // row: the row of the original vector to be fetched to fill the new vector
 // length: the length of the new const vector
 // For example:
 // if the original vector vec=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-// vec.ToConstRef(1, 5) returns [2, 2, 2, 2, 2]
+// vec.MakeConstRef(1, 5) returns [2, 2, 2, 2, 2]
 // Note:
 // for varlena vector, the data and area is shared with the original vector.
-func (v *Vector) ToConstRef(row, length int, mp *mpool.MPool) *Vector {
+func (v *Vector) MakeConstRef(row, length int, mp *mpool.MPool) *Vector {
 	w := NewConstNull(v.typ, length, mp)
 	if v.IsConstNull() || nulls.Contains(v.nsp, uint64(row)) {
 		return w
@@ -489,7 +498,7 @@ func (v *Vector) PreExtend(rows int, mp *mpool.MPool) error {
 	return extend(v, rows, mp)
 }
 
-// Dup use to copy an identical vector
+// Clone clones the vector
 func (v *Vector) Clone(mp *mpool.MPool) (*Vector, error) {
 	if v.IsConstNull() {
 		return NewConstNull(v.typ, v.Length(), mp), nil

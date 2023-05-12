@@ -1107,6 +1107,46 @@ func TestWindowWith(t *testing.T) {
 	vec3.Free(mp)
 }
 
+func TestToEmptyConst(t *testing.T) {
+	mp := mpool.MustNewZero()
+	v := NewVec(types.T_int32.ToType())
+	defer v.Free(mp)
+	AppendFixed(v, int32(1), false, mp)
+	AppendFixed(v, int32(2), true, mp)
+	AppendFixed(v, int32(3), false, mp)
+	require.False(t, v.NeedDup())
+	require.False(t, v.IsConst())
+	require.Equal(t, 3, v.Length())
+	capacity := v.Capacity()
+
+	v.ToEmptyConst()
+	require.False(t, v.NeedDup())
+	require.True(t, v.IsConst())
+	require.Equal(t, 0, v.Length())
+	require.Equal(t, capacity, v.Capacity())
+
+	v = NewVec(types.T_varchar.ToType())
+	defer v.Free(mp)
+	val1 := bytes.Repeat([]byte{'x'}, 10)
+	val2 := bytes.Repeat([]byte{'y'}, 30)
+	err := AppendBytes(v, val1, false, mp)
+	require.NoError(t, err)
+	err = AppendBytes(v, val1, true, mp)
+	require.NoError(t, err)
+	err = AppendBytes(v, val2, false, mp)
+	require.NoError(t, err)
+
+	require.False(t, v.NeedDup())
+	require.False(t, v.IsConst())
+	require.Equal(t, 3, v.Length())
+	capacity = v.Capacity()
+	v.ToEmptyConst()
+	require.False(t, v.NeedDup())
+	require.True(t, v.IsConst())
+	require.Equal(t, 0, v.Length())
+	require.Equal(t, capacity, v.Capacity())
+}
+
 func BenchmarkAppendBytes(b *testing.B) {
 	mp := mpool.MustNewZero()
 	v := bytes.Repeat([]byte{'x'}, 40)
