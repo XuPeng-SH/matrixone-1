@@ -53,7 +53,8 @@ func BlockRead(
 		logutil.Debugf("read block %s, seqnums %v, typs %v", info.BlockID.String(), seqnums, colTypes)
 	}
 	columnBatch, err := BlockReadInner(
-		ctx, info, deletes, seqnums, colTypes,
+		ctx, &info.BlockID, info.MetaLocation(), info.DeltaLocation(),
+		!info.EntryState, deletes, seqnums, colTypes,
 		types.TimestampToTS(ts), filter, fs, mp, vp,
 	)
 	if err != nil {
@@ -106,7 +107,10 @@ func BlockCompactionRead(
 
 func BlockReadInner(
 	ctx context.Context,
-	info *pkgcatalog.BlockInfo,
+	id *objectio.Blockid,
+	location objectio.Location,
+	deltaLoc objectio.Location,
+	sorted bool,
 	inputDeleteRows []int64,
 	seqnums []uint16,
 	colTypes []types.Type,
@@ -126,16 +130,17 @@ func BlockReadInner(
 
 	// read block data from storage specified by meta location
 	if loaded, rowidPos, deleteMask, err = readBlockData(
-		ctx, seqnums, colTypes, info, ts, fs, mp, vp,
+		ctx, location, sorted,
+		seqnums, colTypes, ts, fs, mp, vp,
 	); err != nil {
 		return
 	}
 
 	// read deletes from storage specified by delta location
-	if !info.DeltaLocation().IsEmpty() {
+	if !deltaLoc.IsEmpty() {
 		var deletes *batch.Batch
 		// load from storage
-		if deletes, err = readBlockDelete(ctx, info.DeltaLocation(), fs); err != nil {
+		if deletes, err = readBlockDelete(ctx, deltaLoc, fs); err != nil {
 			return
 		}
 
@@ -148,7 +153,7 @@ func BlockReadInner(
 		if logutil.GetSkip1Logger().Core().Enabled(zap.DebugLevel) {
 			logutil.Debugf(
 				"blockread %s read delete %d: base %s filter out %v\n",
-				info.BlockID.String(), deletes.Length(), ts.ToString(), deleteMask.Count())
+				location.String(), deletes.Length(), ts.ToString(), deleteMask.Count())
 		}
 	}
 
@@ -163,7 +168,7 @@ func BlockReadInner(
 
 	// if there is a filter and the block is sorted,
 	// apply the filter to select rows
-	if filter != nil && info.Sorted {
+	if filter != nil && sorted {
 		// select rows by filter
 		selectRows = filter(loaded.Vecs)
 
@@ -210,7 +215,7 @@ func BlockReadInner(
 		// build rowid column if needed
 		if rowidPos >= 0 {
 			if loaded.Vecs[rowidPos], err = buildRowidColumn(
-				info, selectRows, mp, vp,
+				id, location, selectRows, mp, vp,
 			); err != nil {
 				return
 			}
@@ -248,7 +253,7 @@ func BlockReadInner(
 		// build rowid column if needed
 		if rowidPos >= 0 {
 			if loaded.Vecs[rowidPos], err = buildRowidColumn(
-				info, nil, mp, vp,
+				id, location, nil, mp, vp,
 			); err != nil {
 				return
 			}
@@ -314,7 +319,8 @@ func getRowsIdIndex(colIndexes []uint16, colTypes []types.Type) (int, []uint16, 
 }
 
 func buildRowidColumn(
-	info *pkgcatalog.BlockInfo,
+	id *objectio.Blockid,
+	location objectio.Location,
 	sels []int32,
 	m *mpool.MPool,
 	vp engine.VectorPool,
@@ -327,15 +333,15 @@ func buildRowidColumn(
 	if len(sels) == 0 {
 		err = objectio.ConstructRowidColumnTo(
 			col,
-			&info.BlockID,
+			id,
 			0,
-			info.MetaLocation().Rows(),
+			location.Rows(),
 			m,
 		)
 	} else {
 		err = objectio.ConstructRowidColumnToWithSels(
 			col,
-			&info.BlockID,
+			id,
 			sels,
 			m,
 		)
@@ -349,9 +355,10 @@ func buildRowidColumn(
 
 func readBlockData(
 	ctx context.Context,
+	location objectio.Location,
+	sorted bool,
 	colIndexes []uint16,
 	colTypes []types.Type,
-	info *pkgcatalog.BlockInfo,
 	ts types.TS,
 	fs fileservice.FileService,
 	m *mpool.MPool,
@@ -367,7 +374,7 @@ func readBlockData(
 			return
 		}
 
-		if loaded, err = LoadColumns(ctx, cols, typs, fs, info.MetaLocation(), m); err != nil {
+		if loaded, err = LoadColumns(ctx, cols, typs, fs, location, m); err != nil {
 			return
 		}
 
@@ -402,20 +409,22 @@ func readBlockData(
 		}
 		logutil.Debugf(
 			"blockread %s scan filter cost %v: base %s filter out %v\n ",
-			info.BlockID.String(), time.Since(t0), ts.ToString(), deletes.Count())
+			location.String(), time.Since(t0), ts.ToString(), deletes.Count())
 		return
 	}
 
-	if info.EntryState {
-		bat, deleteMask, err = readABlkColumns(idxes)
-	} else {
+	if sorted {
 		bat, _, err = readColumns(idxes)
+	} else {
+		bat, deleteMask, err = readABlkColumns(idxes)
 	}
 
 	return
 }
 
-func readBlockDelete(ctx context.Context, deltaloc objectio.Location, fs fileservice.FileService) (*batch.Batch, error) {
+func readBlockDelete(
+	ctx context.Context, deltaloc objectio.Location, fs fileservice.FileService,
+) (*batch.Batch, error) {
 	bat, err := LoadColumns(ctx, []uint16{0, 1, 2, 3}, nil, fs, deltaloc, nil)
 	if err != nil {
 		return nil, err
