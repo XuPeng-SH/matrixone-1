@@ -15,6 +15,8 @@
 package dbutils
 
 import (
+	"time"
+
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
@@ -68,7 +70,7 @@ func WithRuntimeOptions(opts *options.Options) RuntimeOption {
 
 func WithRuntimeThrottle(t *Throttle) RuntimeOption {
 	return func(r *Runtime) {
-		r.Throttle = t
+		r.Compaction.Throttle = t
 	}
 }
 
@@ -82,7 +84,11 @@ type Runtime struct {
 		FilterIndex model.LRUCache
 	}
 
-	Throttle *Throttle
+	Compaction struct {
+		Throttle       *Throttle
+		BlockTracer    *BlockTracer
+		HealthCheckTTL time.Duration
+	}
 
 	Fs *objectio.ObjectFS
 
@@ -108,7 +114,13 @@ func (r *Runtime) fillDefaults() {
 	if r.VectorPool.Transient == nil {
 		r.VectorPool.Transient = MakeDefaultTransientPool("trasient-vector-pool")
 	}
-	if r.Throttle == nil {
-		r.Throttle = NewThrottle()
+	if r.Compaction.Throttle == nil {
+		r.Compaction.Throttle = NewThrottle()
+	}
+	if r.Compaction.BlockTracer == nil {
+		r.Compaction.BlockTracer = NewBlockTracer()
+	}
+	if r.Compaction.HealthCheckTTL <= 0 {
+		r.Compaction.HealthCheckTTL = time.Minute * 5
 	}
 }
