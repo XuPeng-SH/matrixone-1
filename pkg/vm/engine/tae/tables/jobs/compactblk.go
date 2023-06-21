@@ -254,10 +254,7 @@ func (task *compactBlockTask) Execute(ctx context.Context) (err error) {
 			data,
 			deletes,
 		)
-		if err = task.rt.Scheduler.Schedule(ablockTask); err != nil {
-			return
-		}
-		if err = ablockTask.WaitDone(); err != nil {
+		if err = ablockTask.OnExec(ctx); err != nil {
 			return
 		}
 		metaLocABlk := blockio.EncodeLocation(
@@ -289,10 +286,7 @@ func (task *compactBlockTask) Execute(ctx context.Context) (err error) {
 		if deletes != nil {
 			defer deletes.Close()
 			deleteTask := NewFlushDeletesTask(tasks.WaitableCtx, oldBlkData.GetFs(), oldBMeta, deletes)
-			if err = task.rt.Scheduler.Schedule(deleteTask); err != nil {
-				return
-			}
-			if err = deleteTask.WaitDone(); err != nil {
+			if err = deleteTask.OnExec(ctx); err != nil {
 				return
 			}
 			deltaLoc := blockio.EncodeLocation(
