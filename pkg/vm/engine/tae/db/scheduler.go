@@ -50,17 +50,6 @@ func newTaskScheduler(db *DB, asyncWorkers int, ioWorkers int) *taskScheduler {
 	jobHandler := tasks.NewPoolHandler(db.Opts.Ctx, asyncWorkers)
 	jobHandler.Start()
 	jobDispatcher.RegisterHandler(tasks.DataCompactionTask, jobHandler)
-	// jobDispatcher.RegisterHandler(tasks.GCTask, jobHandler)
-	gcHandler := tasks.NewSingleWorkerHandler(db.Opts.Ctx, "gc")
-	gcHandler.Start()
-	jobDispatcher.RegisterHandler(tasks.GCTask, gcHandler)
-
-	ckpDispatcher := tasks.NewBaseScopedDispatcher(tasks.DefaultScopeSharder)
-	for i := 0; i < 4; i++ {
-		handler := tasks.NewSingleWorkerHandler(db.Opts.Ctx, fmt.Sprintf("[ckpworker-%d]", i))
-		ckpDispatcher.AddHandle(handler)
-		handler.Start()
-	}
 
 	ioDispatcher := tasks.NewBaseScopedDispatcher(nil)
 	for i := 0; i < ioWorkers; i++ {
@@ -69,10 +58,8 @@ func newTaskScheduler(db *DB, asyncWorkers int, ioWorkers int) *taskScheduler {
 		handler.Start()
 	}
 
-	s.RegisterDispatcher(tasks.GCTask, jobDispatcher)
 	s.RegisterDispatcher(tasks.DataCompactionTask, jobDispatcher)
 	s.RegisterDispatcher(tasks.IOTask, ioDispatcher)
-	s.RegisterDispatcher(tasks.CheckpointTask, ckpDispatcher)
 	s.Start()
 	return s
 }
