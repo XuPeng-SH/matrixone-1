@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 )
@@ -83,6 +85,26 @@ type HealthCheckOption struct {
 	TTL    time.Duration
 	Memory int64
 	Disk   int64
+	Print  bool
+}
+
+type traceStats struct {
+	createTimes   atomic.Int64
+	releaseTimes  atomic.Int64
+	conflictTimes atomic.Int64
+	queryTimes    atomic.Int64
+	checkTimes    atomic.Int64
+}
+
+func (s *traceStats) String() string {
+	return fmt.Sprintf(
+		"[create=%d,release=%d,conflict=%d,query=%d,check=%d]",
+		s.createTimes.Load(),
+		s.releaseTimes.Load(),
+		s.conflictTimes.Load(),
+		s.queryTimes.Load(),
+		s.checkTimes.Load(),
+	)
 }
 
 // ============================================================================
@@ -93,6 +115,7 @@ type BlockTracer struct {
 	mu      sync.RWMutex
 	index   map[objectio.Blockid]*traceTicket
 	tickets map[uint64]*traceTicket
+	stats   traceStats
 }
 
 func NewBlockTracer() *BlockTracer {
@@ -103,6 +126,10 @@ func NewBlockTracer() *BlockTracer {
 }
 
 func (m *BlockTracer) HealthCheck(opt HealthCheckOption) error {
+	if opt.Print {
+		logutil.Info(m.PPString())
+	}
+	m.stats.checkTimes.Add(1)
 	if opt.TTL == 0 {
 		return nil
 	}
@@ -140,6 +167,7 @@ func (m *BlockTracer) Return(id uint64) (err error) {
 }
 
 func (m *BlockTracer) returnLocked(id uint64) (err error) {
+	m.stats.releaseTimes.Add(1)
 	tic, ok := m.tickets[id]
 	if !ok {
 		return moerr.NewInternalErrorNoCtx("ticket %d not found", id)
@@ -157,6 +185,7 @@ func (m *BlockTracer) returnLocked(id uint64) (err error) {
 }
 
 func (m *BlockTracer) Apply2(ids ...common.ID) *traceTicket {
+	m.stats.createTimes.Add(1)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	nids := make([]objectio.Blockid, 0, len(ids))
@@ -180,6 +209,7 @@ func (m *BlockTracer) Apply2(ids ...common.ID) *traceTicket {
 }
 
 func (m *BlockTracer) Apply(ids ...objectio.Blockid) *traceTicket {
+	m.stats.createTimes.Add(1)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, id := range ids {
@@ -239,5 +269,7 @@ func (m *BlockTracer) PPString() string {
 		}
 		_, _ = w.WriteString(tic.stringFormat("\t"))
 	}
+	_ = w.WriteByte('\n')
+	_, _ = w.WriteString(m.stats.String())
 	return w.String()
 }

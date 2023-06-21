@@ -88,6 +88,7 @@ type Runtime struct {
 		Throttle       *Throttle
 		BlockTracer    *BlockTracer
 		HealthCheckTTL time.Duration
+		LastCheckTime  time.Time
 	}
 
 	Fs *objectio.ObjectFS
@@ -123,4 +124,16 @@ func (r *Runtime) fillDefaults() {
 	if r.Compaction.HealthCheckTTL <= 0 {
 		r.Compaction.HealthCheckTTL = time.Minute * 5
 	}
+}
+
+func (r *Runtime) HealthCheck() {
+	if time.Since(r.Compaction.LastCheckTime) < time.Minute {
+		return
+	}
+	r.Compaction.LastCheckTime = time.Now()
+	opt := HealthCheckOption{
+		TTL:   r.Compaction.HealthCheckTTL,
+		Print: true,
+	}
+	r.Compaction.BlockTracer.HealthCheck(opt)
 }

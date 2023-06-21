@@ -45,6 +45,7 @@ type dbScanner struct {
 	*catalog.LoopProcessor
 	db         *DB
 	ops        []ScannerOp
+	triggerOps []func()
 	errHandler ErrHandler
 	dbmask     *roaring.Bitmap
 	tablemask  *roaring.Bitmap
@@ -59,6 +60,9 @@ func (scanner *dbScanner) OnExec() {
 	scanner.dbmask.Clear()
 	scanner.tablemask.Clear()
 	scanner.segmask.Clear()
+	for _, op := range scanner.triggerOps {
+		op()
+	}
 	for _, op := range scanner.ops {
 		err := op.PreExecute()
 		if err != nil {
@@ -84,6 +88,7 @@ func NewDBScanner(db *DB, errHandler ErrHandler) *dbScanner {
 		LoopProcessor: new(catalog.LoopProcessor),
 		db:            db,
 		ops:           make([]ScannerOp, 0),
+		triggerOps:    make([]func(), 0),
 		errHandler:    errHandler,
 		dbmask:        roaring.New(),
 		tablemask:     roaring.New(),
@@ -99,6 +104,10 @@ func NewDBScanner(db *DB, errHandler ErrHandler) *dbScanner {
 
 func (scanner *dbScanner) RegisterOp(op ScannerOp) {
 	scanner.ops = append(scanner.ops, op)
+}
+
+func (scanner *dbScanner) AddTriggerOp(op func()) {
+	scanner.triggerOps = append(scanner.triggerOps, op)
 }
 
 func (scanner *dbScanner) onBlock(entry *catalog.BlockEntry) (err error) {

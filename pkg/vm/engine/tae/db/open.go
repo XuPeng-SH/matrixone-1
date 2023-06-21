@@ -161,6 +161,7 @@ func Open(ctx context.Context, dirname string, opts *options.Options) (db *DB, e
 	scanner := NewDBScanner(db, nil)
 	mergeOp := newMergeTaskBuiler(db)
 	scanner.RegisterOp(mergeOp)
+	scanner.AddTriggerOp(db.Runtime.HealthCheck)
 	db.Wal.Start()
 	db.BGCheckpointRunner.Start()
 
