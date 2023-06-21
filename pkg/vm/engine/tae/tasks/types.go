@@ -42,8 +42,6 @@ const (
 	CustomizedTask
 
 	DataCompactionTask
-	CheckpointTask
-	GCTask
 	IOTask
 )
 
@@ -51,8 +49,6 @@ var taskNames = map[TaskType]string{
 	NoopTask:           "Noop",
 	MockTask:           "Mock",
 	DataCompactionTask: "Compaction",
-	CheckpointTask:     "Checkpoint",
-	GCTask:             "GC",
 	IOTask:             "IO",
 }
 
