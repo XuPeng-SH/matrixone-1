@@ -46,7 +46,7 @@ func newTaskScheduler(db *DB, asyncWorkers int, ioWorkers int) *taskScheduler {
 		BaseScheduler: tasks.NewBaseScheduler(db.Opts.Ctx, "taskScheduler"),
 		db:            db,
 	}
-	jobDispatcher := newAsyncJobDispatcher()
+	jobDispatcher := newAsyncJobDispatcher(db)
 	jobHandler := tasks.NewPoolHandler(db.Opts.Ctx, asyncWorkers)
 	jobHandler.Start()
 	jobDispatcher.RegisterHandler(tasks.DataCompactionTask, jobHandler)

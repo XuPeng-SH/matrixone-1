@@ -17,6 +17,7 @@ package dbutils
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -38,7 +39,7 @@ type TraceTicket interface {
 type traceTicket struct {
 	createTime time.Time
 	id         uint64
-	ids        []*objectio.Blockid
+	ids        []objectio.Blockid
 	mon        *BlockTracer
 }
 
@@ -122,30 +123,67 @@ func (m *BlockTracer) Query(id *objectio.Blockid) *traceTicket {
 	return m.index[*id]
 }
 
+func (m *BlockTracer) ReturnByAny(id *objectio.Blockid) (err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tic, ok := m.index[*id]
+	if !ok {
+		return moerr.NewInternalErrorNoCtx("blk %s not found", id.String())
+	}
+	return m.returnLocked(tic.id)
+}
+
 func (m *BlockTracer) Return(id uint64) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.returnLocked(id)
+}
+
+func (m *BlockTracer) returnLocked(id uint64) (err error) {
 	tic, ok := m.tickets[id]
 	if !ok {
 		return moerr.NewInternalErrorNoCtx("ticket %d not found", id)
 	}
 	for _, bid := range tic.ids {
-		if _, ok := m.index[*bid]; !ok {
+		if _, ok := m.index[bid]; !ok {
 			return moerr.NewInternalErrorNoCtx("ticket %d blk %s not found", id, bid.String())
 		}
 	}
 	for _, bid := range tic.ids {
-		delete(m.index, *bid)
+		delete(m.index, bid)
 	}
 	delete(m.tickets, id)
 	return
 }
 
-func (m *BlockTracer) Apply(ids ...*objectio.Blockid) *traceTicket {
+func (m *BlockTracer) Apply2(ids ...common.ID) *traceTicket {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	nids := make([]objectio.Blockid, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := m.index[id.BlockID]; ok {
+			return nil
+		}
+		nids = append(nids, id.BlockID)
+	}
+	tic := &traceTicket{
+		id:         common.NextGlobalSeqNum(),
+		createTime: time.Now(),
+		ids:        nids,
+		mon:        m,
+	}
+	for _, id := range ids {
+		m.index[id.BlockID] = tic
+	}
+	m.tickets[tic.id] = tic
+	return tic
+}
+
+func (m *BlockTracer) Apply(ids ...objectio.Blockid) *traceTicket {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, id := range ids {
-		if _, ok := m.index[*id]; ok {
+		if _, ok := m.index[id]; ok {
 			return nil
 		}
 	}
@@ -156,7 +194,7 @@ func (m *BlockTracer) Apply(ids ...*objectio.Blockid) *traceTicket {
 		mon:        m,
 	}
 	for _, id := range ids {
-		m.index[*id] = tic
+		m.index[id] = tic
 	}
 	m.tickets[tic.id] = tic
 	return tic
@@ -175,18 +213,26 @@ func (m *BlockTracer) String() string {
 func (m *BlockTracer) PPString() string {
 	var w bytes.Buffer
 	m.mu.RLock()
-	defer m.mu.RUnlock()
+	arr := make([]*traceTicket, 0, len(m.tickets))
+	for _, tic := range m.tickets {
+		arr = append(arr, tic)
+	}
+	cnt1 := len(m.tickets)
+	cnt2 := len(m.index)
+	m.mu.RUnlock()
+	sort.Slice(arr, func(i, j int) bool {
+		return arr[i].createTime.Before(arr[j].createTime)
+	})
 	_, _ = w.WriteString(fmt.Sprintf(
 		"<BlockTracer>[TIC-CNT=%d][BLK-CNT=%d]",
-		len(m.tickets),
-		len(m.index),
+		cnt1, cnt2,
 	))
-	if len(m.index) == 0 {
+	if cnt1 == 0 {
 		return w.String()
 	}
 	_ = w.WriteByte('\n')
 	first := true
-	for _, tic := range m.tickets {
+	for _, tic := range arr {
 		if !first {
 			_ = w.WriteByte('\n')
 			first = false

@@ -15,52 +15,19 @@
 package db
 
 import (
-	"sync"
-
-	"github.com/matrixorigin/matrixone/pkg/objectio"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 )
 
-func ScopeConflictCheck(oldScope, newScope *common.ID) (err error) {
-	if oldScope.TableID != newScope.TableID {
-		return
-	}
-	if !oldScope.SegmentID().Eq(*newScope.SegmentID()) &&
-		!objectio.IsEmptySegid(oldScope.SegmentID()) &&
-		!objectio.IsEmptySegid(newScope.SegmentID()) {
-		return
-	}
-	if oldScope.BlockID != newScope.BlockID &&
-		!objectio.IsEmptyBlkid(&oldScope.BlockID) &&
-		!objectio.IsEmptyBlkid(&newScope.BlockID) {
-		return
-	}
-	return tasks.ErrScheduleScopeConflict
-}
-
 type asyncJobDispatcher struct {
-	sync.RWMutex
 	*tasks.BaseDispatcher
-	actives map[common.ID]bool
+	db *DB
 }
 
-func newAsyncJobDispatcher() *asyncJobDispatcher {
+func newAsyncJobDispatcher(db *DB) *asyncJobDispatcher {
 	return &asyncJobDispatcher{
-		actives:        make(map[common.ID]bool),
 		BaseDispatcher: tasks.NewBaseDispatcher(),
+		db:             db,
 	}
-}
-
-func (dispatcher *asyncJobDispatcher) checkConflictLocked(scopes []common.ID) (err error) {
-	for active := range dispatcher.actives {
-		for _, scope := range scopes {
-			if err = ScopeConflictCheck(&active, &scope); err != nil {
-				return
-			}
-		}
-	}
-	return
 }
 
 func (dispatcher *asyncJobDispatcher) TryDispatch(task tasks.Task) (err error) {
@@ -70,21 +37,13 @@ func (dispatcher *asyncJobDispatcher) TryDispatch(task tasks.Task) (err error) {
 		dispatcher.Dispatch(task)
 		return
 	}
-	dispatcher.Lock()
-	if err = dispatcher.checkConflictLocked(scopes); err != nil {
-		// str := ""
-		// for scope := range dispatcher.actives {
-		// 	str = fmt.Sprintf("%s%s,", str, scope.String())
-		// }
-		// logutil.Warnf("ActiveScopes: %s, Incomming: %s", str, common.IDArraryString(scopes))
-		dispatcher.Unlock()
+
+	tic := dispatcher.db.Runtime.Compaction.BlockTracer.Apply2(scopes...)
+	if tic == nil {
+		err = tasks.ErrScheduleScopeConflict
 		return
 	}
-	for _, scope := range scopes {
-		dispatcher.actives[scope] = true
-	}
 	task.AddObserver(dispatcher)
-	dispatcher.Unlock()
 	dispatcher.Dispatch(task)
 	return
 }
@@ -92,9 +51,10 @@ func (dispatcher *asyncJobDispatcher) TryDispatch(task tasks.Task) (err error) {
 func (dispatcher *asyncJobDispatcher) OnExecDone(v any) {
 	task := v.(tasks.MScopedTask)
 	scopes := task.Scopes()
-	dispatcher.Lock()
-	for _, scope := range scopes {
-		delete(dispatcher.actives, scope)
+	if len(scopes) == 0 {
+		return
 	}
-	dispatcher.Unlock()
+	if err := dispatcher.db.Runtime.Compaction.BlockTracer.ReturnByAny(&scopes[0].BlockID); err != nil {
+		panic(err)
+	}
 }
