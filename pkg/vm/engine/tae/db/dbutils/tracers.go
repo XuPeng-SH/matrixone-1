@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
+	"github.com/matrixorigin/matrixone/pkg/util/metric/stats"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 )
 
@@ -89,22 +89,48 @@ type HealthCheckOption struct {
 }
 
 type traceStats struct {
-	createTimes   atomic.Int64
-	releaseTimes  atomic.Int64
-	conflictTimes atomic.Int64
-	queryTimes    atomic.Int64
-	checkTimes    atomic.Int64
+	createTimes   stats.Counter
+	releaseTimes  stats.Counter
+	conflictTimes stats.Counter
+	queryTimes    stats.Counter
+}
+
+func (s *traceStats) Export(swap bool) []int64 {
+	if swap {
+		return []int64{
+			s.createTimes.SwapW(0),
+			s.releaseTimes.SwapW(0),
+			s.conflictTimes.SwapW(0),
+			s.queryTimes.SwapW(0),
+			s.createTimes.Load(),
+			s.releaseTimes.Load(),
+			s.conflictTimes.Load(),
+			s.queryTimes.Load(),
+		}
+	} else {
+		return []int64{
+			s.createTimes.LoadW(),
+			s.releaseTimes.LoadW(),
+			s.conflictTimes.LoadW(),
+			s.queryTimes.LoadW(),
+			s.createTimes.Load(),
+			s.releaseTimes.Load(),
+			s.conflictTimes.Load(),
+			s.queryTimes.Load(),
+		}
+	}
+}
+
+func (s *traceStats) Format(counters []int64) string {
+	return fmt.Sprintf(
+		"W[%d,%d,%d,%d],G[%d,%d,%d,%d]",
+		counters[0], counters[1], counters[2], counters[3],
+		counters[4], counters[5], counters[6], counters[7],
+	)
 }
 
 func (s *traceStats) String() string {
-	return fmt.Sprintf(
-		"[create=%d,release=%d,conflict=%d,query=%d,check=%d]",
-		s.createTimes.Load(),
-		s.releaseTimes.Load(),
-		s.conflictTimes.Load(),
-		s.queryTimes.Load(),
-		s.checkTimes.Load(),
-	)
+	return s.Format(s.Export(false))
 }
 
 // ============================================================================
@@ -129,7 +155,6 @@ func (m *BlockTracer) HealthCheck(opt HealthCheckOption) error {
 	if opt.Print {
 		logutil.Info(m.PPString())
 	}
-	m.stats.checkTimes.Add(1)
 	if opt.TTL == 0 {
 		return nil
 	}
@@ -257,6 +282,10 @@ func (m *BlockTracer) PPString() string {
 		"<BlockTracer>[TIC-CNT=%d][BLK-CNT=%d]",
 		cnt1, cnt2,
 	))
+	_ = w.WriteByte('\n')
+	_ = w.WriteByte('\t')
+	counters := m.stats.Export(true)
+	_, _ = w.WriteString(m.stats.Format(counters))
 	if cnt1 == 0 {
 		return w.String()
 	}
@@ -269,7 +298,5 @@ func (m *BlockTracer) PPString() string {
 		}
 		_, _ = w.WriteString(tic.stringFormat("\t"))
 	}
-	_ = w.WriteByte('\n')
-	_, _ = w.WriteString(m.stats.String())
 	return w.String()
 }
