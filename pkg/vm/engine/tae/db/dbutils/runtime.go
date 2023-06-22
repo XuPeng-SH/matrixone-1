@@ -122,7 +122,7 @@ func (r *Runtime) fillDefaults() {
 		r.Compaction.BlockTracer = NewBlockTracer()
 	}
 	if r.Compaction.HealthCheckTTL <= 0 {
-		r.Compaction.HealthCheckTTL = time.Minute * 5
+		r.Compaction.HealthCheckTTL = time.Minute * 2
 	}
 }
 
