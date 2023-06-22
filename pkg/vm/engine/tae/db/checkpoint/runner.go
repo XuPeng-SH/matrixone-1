@@ -699,7 +699,15 @@ func (r *runner) tryCompactBlock(dbID, tableID uint64, id *objectio.Blockid, for
 		return nil
 	}
 
-	if _, err = r.rt.Scheduler.ScheduleMultiScopedTxnTask(nil, taskType, scopes, factory); err != nil {
+	// PXU TODO
+	desc := ""
+	if _, err = r.rt.Scheduler.ScheduleMultiScopedTxnTask(
+		nil,
+		taskType,
+		scopes,
+		factory,
+		desc,
+	); err != nil {
 		logutil.Warnf("%s: %v", blkData.MutationInfo(), err)
 	}
 

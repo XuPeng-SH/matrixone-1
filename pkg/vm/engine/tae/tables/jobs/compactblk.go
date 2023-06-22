@@ -93,7 +93,9 @@ func NewCompactBlockTask(
 		return
 	}
 	task.scopes = append(task.scopes, *task.compacted.Fingerprint())
-	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx)
+	// PXU TODO
+	desc := ""
+	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx, desc)
 	return
 }
 

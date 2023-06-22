@@ -152,7 +152,9 @@ func TestHiddenWithPK1(t *testing.T) {
 		seg := segMeta.GetSegmentData()
 		factory, taskType, scopes, err := seg.BuildCompactionTaskFactory()
 		assert.NoError(t, err)
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+		// PXU TODO
+		desc := ""
+		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory, desc)
 		assert.NoError(t, err)
 		err = task.WaitDone()
 		assert.NoError(t, err)
@@ -300,7 +302,9 @@ func TestHidden2(t *testing.T) {
 		for _, blk := range blks {
 			factory, taskType, scopes, err := blk.BuildCompactionTaskFactory()
 			assert.NoError(t, err)
-			task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+			// PXU TODO
+			desc := ""
+			task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory, desc)
 			assert.NoError(t, err)
 			err = task.WaitDone()
 			assert.NoError(t, err)
@@ -324,7 +328,9 @@ func TestHidden2(t *testing.T) {
 			if factory == nil {
 				continue
 			}
-			task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+			// PXU TODO
+			desc := ""
+			task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory, desc)
 			assert.NoError(t, err)
 			err = task.WaitDone()
 			assert.NoError(t, err)

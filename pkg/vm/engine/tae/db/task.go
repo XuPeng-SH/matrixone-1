@@ -29,13 +29,20 @@ type ScheduledTxnTask struct {
 	scopes  []common.ID
 }
 
-func NewScheduledTxnTask(ctx *tasks.Context, db *DB, taskType tasks.TaskType, scopes []common.ID, factory tasks.TxnTaskFactory) (task *ScheduledTxnTask) {
+func NewScheduledTxnTask(
+	ctx *tasks.Context,
+	db *DB,
+	taskType tasks.TaskType,
+	scopes []common.ID,
+	factory tasks.TxnTaskFactory,
+	desc string,
+) (task *ScheduledTxnTask) {
 	task = &ScheduledTxnTask{
 		db:      db,
 		factory: factory,
 		scopes:  scopes,
 	}
-	task.BaseTask = tasks.NewBaseTask(task, taskType, ctx)
+	task.BaseTask = tasks.NewBaseTask(task, taskType, ctx, desc)
 	return
 }
 

@@ -112,7 +112,9 @@ func NewMergeBlocksTask(
 		task.compacted = append(task.compacted, blk)
 		task.scopes = append(task.scopes, *meta.AsCommonID())
 	}
-	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx)
+	// PXU TODO
+	desc := ""
+	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx, desc)
 	return
 }
 

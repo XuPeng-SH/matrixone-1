@@ -41,13 +41,15 @@ type BaseTask struct {
 	id       uint64
 	taskType TaskType
 	exec     func(Task) error
+	desc     string
 }
 
-func NewBaseTask(impl Task, taskType TaskType, ctx *Context) *BaseTask {
+func NewBaseTask(impl Task, taskType TaskType, ctx *Context, desc string) *BaseTask {
 	task := &BaseTask{
 		id:       NextTaskId(),
 		taskType: taskType,
 		impl:     impl,
+		desc:     desc,
 	}
 	var doneCB ops.OpDoneCB
 	if ctx != nil {
@@ -87,4 +89,8 @@ func (task *BaseTask) Execute() (err error) {
 }
 func (task *BaseTask) Name() string {
 	return fmt.Sprintf("Task[ID=%d][T=%s]", task.id, TaskName(task.taskType))
+}
+
+func (task *BaseTask) Description() string {
+	return task.desc
 }

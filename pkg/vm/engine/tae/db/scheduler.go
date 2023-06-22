@@ -69,31 +69,25 @@ func (s *taskScheduler) Stop() {
 	logutil.Info("TaskScheduler Stopped")
 }
 
-func (s *taskScheduler) ScheduleTxnTask(
-	ctx *tasks.Context,
-	taskType tasks.TaskType,
-	factory tasks.TxnTaskFactory) (task tasks.Task, err error) {
-	task = NewScheduledTxnTask(ctx, s.db, taskType, nil, factory)
-	err = s.Schedule(task)
-	return
-}
+// func (s *taskScheduler) ScheduleTxnTask(
+// 	ctx *tasks.Context,
+// 	taskType tasks.TaskType,
+// 	factory tasks.TxnTaskFactory,
+// 	desc string,
+// ) (task tasks.Task, err error) {
+// 	task = NewScheduledTxnTask(ctx, s.db, taskType, nil, factory, desc)
+// 	err = s.Schedule(task)
+// 	return
+// }
 
 func (s *taskScheduler) ScheduleMultiScopedTxnTask(
 	ctx *tasks.Context,
 	taskType tasks.TaskType,
 	scopes []common.ID,
-	factory tasks.TxnTaskFactory) (task tasks.Task, err error) {
-	task = NewScheduledTxnTask(ctx, s.db, taskType, scopes, factory)
-	err = s.Schedule(task)
-	return
-}
-
-func (s *taskScheduler) ScheduleMultiScopedFn(
-	ctx *tasks.Context,
-	taskType tasks.TaskType,
-	scopes []common.ID,
-	fn tasks.FuncT) (task tasks.Task, err error) {
-	task = tasks.NewMultiScopedFnTask(ctx, taskType, scopes, fn)
+	factory tasks.TxnTaskFactory,
+	desc string,
+) (task tasks.Task, err error) {
+	task = NewScheduledTxnTask(ctx, s.db, taskType, scopes, factory, desc)
 	err = s.Schedule(task)
 	return
 }
@@ -110,14 +104,14 @@ func (s *taskScheduler) GetCheckpointedLSN() uint64 {
 	return s.db.Wal.GetCheckpointed()
 }
 
-func (s *taskScheduler) ScheduleFn(ctx *tasks.Context, taskType tasks.TaskType, fn func() error) (task tasks.Task, err error) {
-	task = tasks.NewFnTask(ctx, taskType, fn)
-	err = s.Schedule(task)
-	return
-}
-
-func (s *taskScheduler) ScheduleScopedFn(ctx *tasks.Context, taskType tasks.TaskType, scope *common.ID, fn func() error) (task tasks.Task, err error) {
-	task = tasks.NewScopedFnTask(ctx, taskType, scope, fn)
+func (s *taskScheduler) ScheduleScopedFn(
+	ctx *tasks.Context,
+	taskType tasks.TaskType,
+	scope *common.ID,
+	fn func() error,
+	desc string,
+) (task tasks.Task, err error) {
+	task = tasks.NewScopedFnTask(ctx, taskType, scope, fn, desc)
 	err = s.Schedule(task)
 	return
 }

@@ -17,6 +17,7 @@ package tasks
 import (
 	"context"
 	"hash/fnv"
+	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -74,10 +75,22 @@ func NextTaskId() uint64 {
 	return taskIdAlloctor.Alloc()
 }
 
-type Task interface {
-	base.IOp
+type TaskDesc interface {
 	ID() uint64
 	Type() TaskType
+
+	GetError() error
+	GetCreateTime() time.Time
+	GetStartTime() time.Time
+	GetEndTime() time.Time
+	GetExecutTime() int64
+
+	Description() string
+}
+
+type Task interface {
+	base.IOp
+	TaskDesc
 	Cancel() error
 	Name() string
 }
@@ -111,11 +124,11 @@ type FnTask struct {
 	Fn FuncT
 }
 
-func NewFnTask(ctx *Context, taskType TaskType, fn FuncT) *FnTask {
+func NewFnTask(ctx *Context, taskType TaskType, fn FuncT, desc string) *FnTask {
 	task := &FnTask{
 		Fn: fn,
 	}
-	task.BaseTask = NewBaseTask(task, taskType, ctx)
+	task.BaseTask = NewBaseTask(task, taskType, ctx, desc)
 	return task
 }
 
@@ -128,13 +141,19 @@ type ScopedFnTask struct {
 	scope *common.ID
 }
 
-func NewScopedFnTask(ctx *Context, taskType TaskType, scope *common.ID, fn FuncT) *ScopedFnTask {
+func NewScopedFnTask(
+	ctx *Context,
+	taskType TaskType,
+	scope *common.ID,
+	fn FuncT,
+	desc string,
+) *ScopedFnTask {
 	task := &ScopedFnTask{
 		FnTask: new(FnTask),
 		scope:  scope,
 	}
 	task.Fn = fn
-	task.BaseTask = NewBaseTask(task, taskType, ctx)
+	task.BaseTask = NewBaseTask(task, taskType, ctx, desc)
 	return task
 }
 
@@ -145,13 +164,19 @@ type MultiScopedFnTask struct {
 	scopes []common.ID
 }
 
-func NewMultiScopedFnTask(ctx *Context, taskType TaskType, scopes []common.ID, fn FuncT) *MultiScopedFnTask {
+func NewMultiScopedFnTask(
+	ctx *Context,
+	taskType TaskType,
+	scopes []common.ID,
+	fn FuncT,
+	desc string,
+) *MultiScopedFnTask {
 	task := &MultiScopedFnTask{
 		FnTask: new(FnTask),
 		scopes: scopes,
 	}
 	task.Fn = fn
-	task.BaseTask = NewBaseTask(task, taskType, ctx)
+	task.BaseTask = NewBaseTask(task, taskType, ctx, desc)
 	return task
 }
 

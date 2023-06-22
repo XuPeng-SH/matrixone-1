@@ -1127,7 +1127,15 @@ func TestAutoCompactABlk1(t *testing.T) {
 		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
 		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
 		assert.Nil(t, err)
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+		// PXU TODO
+		desc := ""
+		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
+			tasks.WaitableCtx,
+			taskType,
+			scopes,
+			factory,
+			desc,
+		)
 		assert.Nil(t, err)
 		err = task.WaitDone()
 		assert.Nil(t, err)
@@ -1230,7 +1238,15 @@ func TestCompactABlk(t *testing.T) {
 		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
 		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
 		assert.NoError(t, err)
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+		// PXU TODO
+		desc := ""
+		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
+			tasks.WaitableCtx,
+			taskType,
+			scopes,
+			factory,
+			desc,
+		)
 		assert.NoError(t, err)
 		err = task.WaitDone()
 		assert.NoError(t, err)
@@ -1606,7 +1622,15 @@ func TestDelete1(t *testing.T) {
 		blkData := blkMeta.GetBlockData()
 		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
 		assert.NoError(t, err)
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(tasks.WaitableCtx, taskType, scopes, factory)
+		// PXU TODO
+		desc := ""
+		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
+			tasks.WaitableCtx,
+			taskType,
+			scopes,
+			factory,
+			desc,
+		)
 		assert.NoError(t, err)
 		err = task.WaitDone()
 		assert.NoError(t, err)

@@ -16,6 +16,7 @@ package jobs
 
 import (
 	"context"
+
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
 
 	"github.com/matrixorigin/matrixone/pkg/objectio"
@@ -46,7 +47,9 @@ func NewFlushDeletesTask(
 		fs:    fs,
 		delta: delta,
 	}
-	task.BaseTask = tasks.NewBaseTask(task, tasks.IOTask, ctx)
+	// PXU TODO
+	desc := ""
+	task.BaseTask = tasks.NewBaseTask(task, tasks.IOTask, ctx, desc)
 	return task
 }
 

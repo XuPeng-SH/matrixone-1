@@ -106,19 +106,27 @@ func (entry *compactBlockEntry) PrepareRollback() (err error) {
 		toName = objectio.BuildObjectName(seg, num).String()
 	}
 
-	entry.rt.Scheduler.ScheduleScopedFn(&tasks.Context{}, tasks.IOTask, fromBlockEntry.AsCommonID(), func() error {
-		// TODO: variable as timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-		defer cancel()
-		if fromName != "" {
-			_ = fs.Delete(ctx, fromName)
-		}
-		if toName != "" {
-			_ = fs.Delete(ctx, toName)
-		}
-		// logutil.Infof("rollback unfinished compact file %q and %q", fromName, toName)
-		return nil
-	})
+	// PXU TODO
+	desc := ""
+	entry.rt.Scheduler.ScheduleScopedFn(
+		&tasks.Context{},
+		tasks.IOTask,
+		fromBlockEntry.AsCommonID(),
+		func() error {
+			// TODO: variable as timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
+			defer cancel()
+			if fromName != "" {
+				_ = fs.Delete(ctx, fromName)
+			}
+			if toName != "" {
+				_ = fs.Delete(ctx, toName)
+			}
+			// logutil.Infof("rollback unfinished compact file %q and %q", fromName, toName)
+			return nil
+		},
+		desc,
+	)
 	return
 }
 func (entry *compactBlockEntry) ApplyRollback() (err error) {
