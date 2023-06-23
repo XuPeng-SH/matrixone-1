@@ -1125,16 +1125,12 @@ func TestAutoCompactABlk1(t *testing.T) {
 		txn, rel := getDefaultRelation(t, tae, schema.Name)
 		blk := getOneBlock(rel)
 		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
-		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
+		factory, _, scopes, err := blkData.BuildCompactionTaskFactory()
 		assert.Nil(t, err)
-		// PXU TODO
-		desc := ""
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
+		task, err := tae.Runtime.ScheduleBlockCompactionTask(
 			tasks.WaitableCtx,
-			taskType,
 			scopes,
 			factory,
-			desc,
 		)
 		assert.Nil(t, err)
 		err = task.WaitDone()
@@ -1236,16 +1232,12 @@ func TestCompactABlk(t *testing.T) {
 		txn, rel := getDefaultRelation(t, tae, schema.Name)
 		blk := getOneBlock(rel)
 		blkData := blk.GetMeta().(*catalog.BlockEntry).GetBlockData()
-		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
+		factory, _, scopes, err := blkData.BuildCompactionTaskFactory()
 		assert.NoError(t, err)
-		// PXU TODO
-		desc := ""
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
+		task, err := tae.Runtime.ScheduleBlockCompactionTask(
 			tasks.WaitableCtx,
-			taskType,
 			scopes,
 			factory,
-			desc,
 		)
 		assert.NoError(t, err)
 		err = task.WaitDone()
@@ -1620,16 +1612,12 @@ func TestDelete1(t *testing.T) {
 		txn, rel := getDefaultRelation(t, tae, schema.Name)
 		blkMeta := getOneBlockMeta(rel)
 		blkData := blkMeta.GetBlockData()
-		factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
+		factory, _, scopes, err := blkData.BuildCompactionTaskFactory()
 		assert.NoError(t, err)
-		// PXU TODO
-		desc := ""
-		task, err := tae.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
+		task, err := tae.Runtime.ScheduleBlockCompactionTask(
 			tasks.WaitableCtx,
-			taskType,
 			scopes,
 			factory,
-			desc,
 		)
 		assert.NoError(t, err)
 		err = task.WaitDone()

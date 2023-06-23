@@ -35,13 +35,12 @@ func NewDelSegTask(
 	ctx *tasks.Context,
 	txn txnif.AsyncTxn,
 	delSegs []*catalog.SegmentEntry,
+	desc string,
 ) *delSegTask {
 	task := &delSegTask{
 		delSegs: delSegs,
 		txn:     txn,
 	}
-	// PXU TODO
-	desc := ""
 	task.BaseTask = tasks.NewBaseTask(task, tasks.DataCompactionTask, ctx, desc)
 	return task
 }

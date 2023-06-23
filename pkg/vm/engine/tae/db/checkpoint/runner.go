@@ -693,20 +693,14 @@ func (r *runner) tryCompactBlock(dbID, tableID uint64, id *objectio.Blockid, for
 		return
 	}
 
-	factory, taskType, scopes, err := blkData.BuildCompactionTaskFactory()
+	factory, _, scopes, err := blkData.BuildCompactionTaskFactory()
 	if err != nil || factory == nil {
 		logutil.Warnf("%s: %v", blkData.MutationInfo(), err)
 		return nil
 	}
 
-	// PXU TODO
-	desc := ""
-	if _, err = r.rt.Scheduler.ScheduleMultiScopedTxnTask(
-		nil,
-		taskType,
-		scopes,
-		factory,
-		desc,
+	if _, err = r.rt.ScheduleBlockCompactionTask(
+		nil, scopes, factory,
 	); err != nil {
 		logutil.Warnf("%s: %v", blkData.MutationInfo(), err)
 	}

@@ -315,16 +315,10 @@ func (s *MergeTaskBuilder) trySchedMergeTask() {
 	// remove stale segments only
 	if hasDelSeg && !hasMergeBlk {
 		factory := func(ctx *tasks.Context, txn txnif.AsyncTxn) (tasks.Task, error) {
-			return jobs.NewDelSegTask(ctx, txn, mergedSegs), nil
+			return jobs.NewDelSegTask(ctx, txn, mergedSegs, ""), nil
 		}
-		// PXU TODO
-		desc := ""
-		_, err := s.db.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
-			nil,
-			tasks.DataCompactionTask,
-			segScopes,
-			factory,
-			desc,
+		_, err := s.db.Runtime.ScheduleDelSegTask(
+			nil, segScopes, factory,
 		)
 		if err != nil {
 			logutil.Infof("[Mergeblocks] Schedule del seg errinfo=%v", err)
@@ -342,14 +336,8 @@ func (s *MergeTaskBuilder) trySchedMergeTask() {
 	factory := func(ctx *tasks.Context, txn txnif.AsyncTxn) (tasks.Task, error) {
 		return jobs.NewMergeBlocksTask(ctx, txn, mergedBlks, mergedSegs, nil, s.db.Runtime)
 	}
-	// PXU TODO
-	desc := ""
-	task, err := s.db.Runtime.Scheduler.ScheduleMultiScopedTxnTask(
-		nil,
-		tasks.DataCompactionTask,
-		scopes,
-		factory,
-		desc,
+	task, err := s.db.Runtime.ScheduleBlockCompactionTask(
+		nil, scopes, factory,
 	)
 	if err != nil {
 		if err != tasks.ErrScheduleScopeConflict {

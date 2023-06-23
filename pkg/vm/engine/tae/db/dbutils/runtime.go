@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/objectio"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/model"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
@@ -136,4 +137,53 @@ func (r *Runtime) HealthCheck() {
 		Print: true,
 	}
 	r.Compaction.BlockTracer.HealthCheck(opt)
+}
+
+// ============================================================
+// Scheduler Related
+// ============================================================
+
+func (r *Runtime) ScheduleBlockCompactionTask(
+	ctx *tasks.Context,
+	scopes []common.ID,
+	factory tasks.TxnTaskFactory,
+) (tasks.Task, error) {
+	desc := MakeBlockCompactionDesc(scopes[0])
+	return r.Scheduler.ScheduleMultiScopedTxnTask(
+		ctx,
+		tasks.DataCompactionTask,
+		scopes,
+		factory,
+		desc,
+	)
+}
+
+func (r *Runtime) ScheduleDelSegTask(
+	ctx *tasks.Context,
+	scopes []common.ID,
+	factory tasks.TxnTaskFactory,
+) (tasks.Task, error) {
+	desc := MakeDelSegDesc(scopes)
+	return r.Scheduler.ScheduleMultiScopedTxnTask(
+		ctx,
+		tasks.DataCompactionTask,
+		scopes,
+		factory,
+		desc,
+	)
+}
+
+func (r *Runtime) ScheduleMergeBlocksTask(
+	ctx *tasks.Context,
+	scopes []common.ID,
+	factory tasks.TxnTaskFactory,
+) (tasks.Task, error) {
+	desc := MakeMergeBlocksDesc(scopes)
+	return r.Scheduler.ScheduleMultiScopedTxnTask(
+		ctx,
+		tasks.DataCompactionTask,
+		scopes,
+		factory,
+		desc,
+	)
 }
