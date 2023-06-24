@@ -15,8 +15,11 @@
 package db
 
 import (
+	"time"
+
 	"github.com/RoaringBitmap/roaring"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/db/dbutils"
@@ -50,6 +53,7 @@ type dbScanner struct {
 	dbmask     *roaring.Bitmap
 	tablemask  *roaring.Bitmap
 	segmask    *roaring.Bitmap
+	lastTs     time.Time
 }
 
 func (scanner *dbScanner) OnStopped() {
@@ -61,6 +65,10 @@ func (scanner *dbScanner) OnExec() {
 	scanner.tablemask.Clear()
 	scanner.segmask.Clear()
 	dbutils.PrintMemStats()
+	if time.Since(scanner.lastTs) > time.Second*30 {
+		scanner.lastTs = time.Now()
+		logutil.Info(mpool.ReportMemUsage(""))
+	}
 	for _, op := range scanner.ops {
 		err := op.PreExecute()
 		if err != nil {
