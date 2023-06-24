@@ -22,6 +22,7 @@ import (
 	"unsafe"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 )
 
 //
@@ -327,6 +328,9 @@ func (n *Bitmap) TryExpand(m *Bitmap) {
 }
 
 func (n *Bitmap) TryExpandWithSize(size int) {
+	if size >= 20000 {
+		logutil.Warnf("XXX TOO-LARGE BITMAP: %d", size)
+	}
 	if int(n.len) >= size {
 		return
 	}

@@ -189,9 +189,13 @@ func (o *Options) FillDefaults(dirname string) *Options {
 		if ioworkers < runtime.NumCPU() {
 			ioworkers = runtime.NumCPU()
 		}
+		cnt := runtime.NumCPU() / 3
+		if cnt < 1 {
+			cnt = 1
+		}
 		o.SchedulerCfg = &SchedulerCfg{
 			IOWorkers:    ioworkers,
-			AsyncWorkers: DefaultAsyncWorkers,
+			AsyncWorkers: cnt,
 		}
 	}
 
