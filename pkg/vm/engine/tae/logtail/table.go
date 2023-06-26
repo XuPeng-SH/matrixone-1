@@ -180,6 +180,7 @@ func (table *TxnTable) ForeachRowInBetween(
 	from, to types.TS,
 	skipBlkOp func(blk BlockT) bool,
 	rowOp func(row RowT) (goNext bool),
+	blkOp func(blk BlockT) (goNext bool),
 ) (readRows int) {
 	snapshot := table.Snapshot()
 	pivot := &txnBlock{bornTS: from}

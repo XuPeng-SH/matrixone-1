@@ -57,6 +57,7 @@ func TestTxnTable1(t *testing.T) {
 		types.MaxTs(),
 		nil,
 		op,
+		nil,
 	)
 	assert.Equal(t, txnCnt, cnt)
 
@@ -66,6 +67,7 @@ func TestTxnTable1(t *testing.T) {
 		types.MaxTs(),
 		nil,
 		op,
+		nil,
 	)
 	assert.Equal(t, txnCnt-blockSize, cnt)
 
@@ -75,6 +77,7 @@ func TestTxnTable1(t *testing.T) {
 		types.MaxTs(),
 		nil,
 		op,
+		nil,
 	)
 	assert.Equal(t, txnCnt-2*blockSize, cnt)
 

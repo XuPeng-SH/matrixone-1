@@ -37,7 +37,7 @@ func (r *Reader) GetDirty() (tree *model.Tree, count int) {
 		count++
 		return true
 	}
-	r.table.ForeachRowInBetween(r.from, r.to, nil, op)
+	r.table.ForeachRowInBetween(r.from, r.to, nil, op, nil)
 	return
 }
 
@@ -55,7 +55,7 @@ func (r *Reader) HasCatalogChanges() bool {
 		summary := blk.summary.Load()
 		return summary != nil && !summary.hasCatalogChanges
 	}
-	r.table.ForeachRowInBetween(r.from, r.to, skipFn, op)
+	r.table.ForeachRowInBetween(r.from, r.to, skipFn, op, nil)
 	return changed
 }
 
@@ -68,7 +68,7 @@ func (r *Reader) IsCommitted() bool {
 			return false
 		}
 		return true
-	})
+	}, nil)
 	return committed
 }
 
@@ -83,7 +83,7 @@ func (r *Reader) GetDirtyByTable(
 		}
 		return true
 	}
-	r.table.ForeachRowInBetween(r.from, r.to, nil, op)
+	r.table.ForeachRowInBetween(r.from, r.to, nil, op, nil)
 	return
 }
 
@@ -99,6 +99,8 @@ func (r *Reader) GetMaxLSN() (maxLsn uint64) {
 				maxLsn = lsn
 			}
 			return true
-		})
+		},
+		nil,
+	)
 	return
 }
