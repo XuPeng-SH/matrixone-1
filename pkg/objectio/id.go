@@ -38,6 +38,11 @@ func NewSegmentid() *Segmentid {
 	return &id
 }
 
+func RandomBlockid(fnum, blknum uint16) *Blockid {
+	sid := NewSegmentid()
+	return NewBlockid(sid, fnum, blknum)
+}
+
 func NewBlockid(segid *Segmentid, fnum, blknum uint16) *Blockid {
 	var id Blockid
 	size := SegmentIdSize

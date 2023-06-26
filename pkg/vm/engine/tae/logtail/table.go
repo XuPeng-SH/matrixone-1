@@ -37,6 +37,12 @@ type summary struct {
 	// maxLsn
 }
 
+type archiveEntry struct {
+	memo   *txnif.TxnMemo
+	txnCnt int
+	maxLSN uint64
+}
+
 type txnRow struct {
 	txnif.AsyncTxn
 }
@@ -46,9 +52,64 @@ func (row *txnRow) Window(_, _ int) *txnRow { return nil }
 
 type txnBlock struct {
 	sync.RWMutex
-	bornTS  types.TS
-	rows    []*txnRow
-	summary atomic.Pointer[summary]
+	bornTS       types.TS
+	rows         []*txnRow
+	summary      atomic.Pointer[summary]
+	archiveEntry atomic.Pointer[archiveEntry]
+}
+
+func (blk *txnBlock) GetArchiveEntry() *archiveEntry {
+	return blk.archiveEntry.Load()
+}
+
+func (blk *txnBlock) TryArchive() *archiveEntry {
+	entry := blk.GetArchiveEntry()
+	if entry != nil {
+		return entry
+	}
+	blk.RLock()
+	full := len(blk.rows) == cap(blk.rows)
+	blk.RUnlock()
+	if !full {
+		return nil
+	}
+	blk.Lock()
+	if !blk.AllCommittedLocked() {
+		blk.Unlock()
+		return nil
+	}
+
+	if entry = blk.GetArchiveEntry(); entry != nil {
+		blk.Unlock()
+		return entry
+	}
+	entry = new(archiveEntry)
+	entry.memo = txnif.NewTxnMemo()
+	for _, row := range blk.rows {
+		rowMemo := row.GetMemo()
+		if rowMemo.HasCatalogChanges() {
+			entry.memo.AddCatalogChange()
+		}
+		if row.GetLSN() > entry.maxLSN {
+			entry.maxLSN = row.GetLSN()
+		}
+		entry.memo.Merge(rowMemo.GetDirty())
+	}
+	entry.txnCnt = len(blk.rows)
+	blk.rows = nil
+	blk.archiveEntry.Store(entry)
+	blk.Unlock()
+	return entry
+}
+
+func (blk *txnBlock) AllCommittedLocked() bool {
+	for _, row := range blk.rows {
+		state := row.GetTxnState(false)
+		if state != txnif.TxnStateCommitted && state != txnif.TxnStateRollbacked {
+			return false
+		}
+	}
+	return true
 }
 
 func (blk *txnBlock) Length() int {
@@ -180,7 +241,7 @@ func (table *TxnTable) ForeachRowInBetween(
 	from, to types.TS,
 	skipBlkOp func(blk BlockT) bool,
 	rowOp func(row RowT) (goNext bool),
-	blkOp func(blk BlockT) (goNext bool),
+	blkOp func(blk BlockT) (goNext, goRecr bool),
 ) (readRows int) {
 	snapshot := table.Snapshot()
 	pivot := &txnBlock{bornTS: from}
@@ -208,6 +269,16 @@ func (table *TxnTable) ForeachRowInBetween(
 		if skipBlkOp != nil && skipBlkOp(blk) {
 			return blk.rows[len(blk.rows)-1].GetPrepareTS().LessEq(to)
 		}
+		if blkOp != nil {
+			goNext, goRecr := blkOp(blk)
+			if !goNext {
+				return false
+			}
+			if !goRecr {
+				return true
+			}
+		}
+
 		outOfRange, cnt := blk.ForeachRowInBetween(
 			from,
 			to,

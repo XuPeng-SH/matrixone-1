@@ -18,10 +18,75 @@ import (
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/txn/txnbase"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestOptimizeTable(t *testing.T) {
+	txnCnt := 10
+	blockSize := 4
+	idAlloc := common.NewTxnIDAllocator()
+	tsAlloc := types.GlobalTsAlloctor
+	table := NewTxnTable(blockSize, tsAlloc.Alloc)
+
+	// block-0: [tid-0] [tid-0: block-0] [tid-0: block-1] [tid-1]
+	// block-1: [tid-0] [tid-0: block-2] [tid-1: block-3] [tid-2]
+	// block-2: [tid-2: block-4] [tid-0: block-2] [tid-1] [tid-1: block-3]
+	dbId := common.NextGlobalSeqNum()
+	tblId0 := common.NextGlobalSeqNum()
+	tblId1 := common.NextGlobalSeqNum()
+	tblId2 := common.NextGlobalSeqNum()
+	blk0 := objectio.RandomBlockid(0, 0)
+	blk1 := objectio.RandomBlockid(0, 0)
+	blk2 := objectio.RandomBlockid(0, 0)
+	blk3 := objectio.RandomBlockid(0, 0)
+	blk4 := objectio.RandomBlockid(0, 0)
+
+	memos := make([]*txnif.TxnMemo, 0, txnCnt)
+	for i := 0; i < txnCnt; i++ {
+		memo := txnif.NewTxnMemo()
+		memos = append(memos, memo)
+		txn := new(txnbase.Txn)
+		txn.TxnCtx = txnbase.NewTxnCtx(idAlloc.Alloc(), tsAlloc.Alloc(), types.TS{})
+		txn.PrepareTS = tsAlloc.Alloc()
+		txn.Memo = memo
+		assert.NoError(t, table.AddTxn(txn))
+	}
+
+	for i := 0; i < txnCnt; i++ {
+		memo := memos[i]
+		switch i {
+		case 0:
+			memo.AddCatalogChange()
+			memo.AddTable(dbId, tblId0)
+			memos = append(memos, memo)
+		case 1:
+			memo.AddBlock(dbId, tblId0, blk0)
+		case 2:
+			memo.AddBlock(dbId, tblId0, blk1)
+		case 3:
+			memo.AddCatalogChange()
+			memo.AddTable(dbId, tblId1)
+		case 4:
+			memo.AddCatalogChange()
+			memo.AddTable(dbId, tblId0)
+		case 5:
+			memo.AddBlock(dbId, tblId0, blk2)
+		case 6:
+			memo.AddBlock(dbId, tblId1, blk3)
+		case 7:
+			memo.AddCatalogChange()
+			memo.AddTable(dbId, tblId2)
+		case 8:
+			memo.AddBlock(dbId, tblId2, blk4)
+		case 9:
+			memo.AddBlock(dbId, tblId1, blk3)
+		}
+	}
+}
 
 func TestTxnTable1(t *testing.T) {
 	txnCnt := 22
