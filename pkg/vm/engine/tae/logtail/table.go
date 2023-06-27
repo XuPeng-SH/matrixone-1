@@ -62,7 +62,12 @@ func (blk *txnBlock) GetArchiveEntry() *archiveEntry {
 	return blk.archiveEntry.Load()
 }
 
-func (blk *txnBlock) TryArchive() *archiveEntry {
+// TryArchive tries to archive the block if it is full and all the txns are committed.
+// the max committed ts less equal than the given ts.
+func (blk *txnBlock) TryArchive(ts types.TS) *archiveEntry {
+	if blk.bornTS.Greater(ts) {
+		return nil
+	}
 	entry := blk.GetArchiveEntry()
 	if entry != nil {
 		return entry
@@ -75,6 +80,11 @@ func (blk *txnBlock) TryArchive() *archiveEntry {
 	}
 	blk.Lock()
 	if !blk.AllCommittedLocked() {
+		blk.Unlock()
+		return nil
+	}
+
+	if blk.rows[len(blk.rows)-1].GetCommitTS().Greater(ts) {
 		blk.Unlock()
 		return nil
 	}
@@ -103,13 +113,9 @@ func (blk *txnBlock) TryArchive() *archiveEntry {
 }
 
 func (blk *txnBlock) AllCommittedLocked() bool {
-	for _, row := range blk.rows {
-		state := row.GetTxnState(false)
-		if state != txnif.TxnStateCommitted && state != txnif.TxnStateRollbacked {
-			return false
-		}
-	}
-	return true
+	row := blk.rows[len(blk.rows)-1]
+	state := row.GetTxnState(false)
+	return state == txnif.TxnStateCommitted || state == txnif.TxnStateRollbacked
 }
 
 func (blk *txnBlock) Length() int {
@@ -186,7 +192,12 @@ func (blk *txnBlock) String() string {
 	length := blk.Length()
 	var buf bytes.Buffer
 	_, _ = buf.WriteString(
-		fmt.Sprintf("TXNBLK-[%s][Len=%d]", blk.bornTS.ToString(), length))
+		fmt.Sprintf(
+			"TXNBLK-[%s][Len=%d][%v]",
+			blk.bornTS.ToString(),
+			length,
+			blk.GetArchiveEntry() != nil,
+		))
 	return buf.String()
 }
 
@@ -229,6 +240,18 @@ func (table *TxnTable) AddTxn(txn txnif.AsyncTxn) (err error) {
 		AsyncTxn: txn,
 	}
 	err = table.Append(row)
+	return
+}
+
+// Optimize will merge all the txn blocks which bornTS is less than the given ts
+func (table *TxnTable) Optimize(ts types.TS) (err error) {
+	snapshot := table.Snapshot()
+	from := types.TS{}
+	pivot := &txnBlock{bornTS: from}
+	snapshot.Ascend(pivot, func(blk BlockT) bool {
+		entry := blk.TryArchive(ts)
+		return entry != nil
+	})
 	return
 }
 

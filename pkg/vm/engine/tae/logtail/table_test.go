@@ -16,6 +16,7 @@ package logtail
 
 import (
 	"testing"
+	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
@@ -45,24 +46,24 @@ func TestOptimizeTable(t *testing.T) {
 	blk3 := objectio.RandomBlockid(0, 0)
 	blk4 := objectio.RandomBlockid(0, 0)
 
-	memos := make([]*txnif.TxnMemo, 0, txnCnt)
+	txns := make([]*txnbase.Txn, 0, txnCnt)
 	for i := 0; i < txnCnt; i++ {
 		memo := txnif.NewTxnMemo()
-		memos = append(memos, memo)
 		txn := new(txnbase.Txn)
 		txn.TxnCtx = txnbase.NewTxnCtx(idAlloc.Alloc(), tsAlloc.Alloc(), types.TS{})
+		time.Sleep(time.Microsecond)
 		txn.PrepareTS = tsAlloc.Alloc()
 		txn.Memo = memo
 		assert.NoError(t, table.AddTxn(txn))
+		txns = append(txns, txn)
 	}
 
 	for i := 0; i < txnCnt; i++ {
-		memo := memos[i]
+		memo := txns[i].Memo
 		switch i {
 		case 0:
 			memo.AddCatalogChange()
 			memo.AddTable(dbId, tblId0)
-			memos = append(memos, memo)
 		case 1:
 			memo.AddBlock(dbId, tblId0, blk0)
 		case 2:
@@ -86,6 +87,27 @@ func TestOptimizeTable(t *testing.T) {
 			memo.AddBlock(dbId, tblId1, blk3)
 		}
 	}
+
+	blks := make([]*txnBlock, 0)
+	table.Scan(func(block *txnBlock) bool {
+		blks = append(blks, block)
+		return true
+	})
+
+	// block-0: 0,1,2 committed  3 uncommitted
+	txns[0].ToPrepared()
+	txns[0].ToCommittedLocked()
+	txns[1].ToPrepared()
+	txns[1].ToCommittedLocked()
+	txns[2].ToPrepared()
+	txns[2].ToCommittedLocked()
+
+	// exeTs < block-0.bornTs
+	// no archive should be done
+	exeTs := txns[0].StartTS.Prev()
+	assert.NoError(t, table.Optimize(exeTs))
+	entry := blks[0].GetArchiveEntry()
+	assert.Nil(t, entry)
 }
 
 func TestTxnTable1(t *testing.T) {
