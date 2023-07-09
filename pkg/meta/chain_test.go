@@ -113,3 +113,12 @@ func TestChain(t *testing.T) {
 
 	// TODO: test waiter
 }
+
+func TestMutation(t *testing.T) {
+	blkId := common.NextGlobalSeqNum()
+	mut := NewMutation(types.TS{})
+	txn1 := getNextTxn()
+	n1_0, err := mut.Delete(txn1, blkId, 0, 2, 3)
+	require.NoError(t, err)
+	require.Equal(t, uint64(3), n1_0.mask.GetCardinality())
+}

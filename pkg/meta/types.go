@@ -10,6 +10,13 @@ import (
 	"github.com/tidwall/btree"
 )
 
+type AppendNode struct {
+	txnbase.TxnMVCCNode
+	chain    *AppendChain
+	startRow uint32
+	endRow   uint32
+}
+
 type DeleteNode struct {
 	txnbase.TxnMVCCNode
 	mask  *roaring.Bitmap
@@ -29,8 +36,15 @@ type DeleteChain struct {
 	index map[uint32]*DeleteNode
 }
 
+type AppendChain struct {
+	sync.RWMutex
+	id    uint64
+	nodes *txnbase.MVCCSlice[*AppendNode]
+	data  *container.Batch
+}
+
 type Mutation struct {
-	mu        *sync.RWMutex
+	sync.RWMutex
 	from      types.TS
 	chains    *btree.BTreeG[*DeleteChain]
 	locations *btree.BTreeG[*DeleteLocation]
