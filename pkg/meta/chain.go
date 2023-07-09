@@ -91,6 +91,25 @@ func (chain *DeleteChain) PrepareDeleteLocked(
 	return nil
 }
 
+func (chain *DeleteChain) IsDeletedLocked(
+	txn txnif.TxnReader,
+	row uint32,
+) (deleted bool, waiter func()) {
+	n := chain.index[row]
+	if n == nil {
+		return
+	}
+	needWait, waitTxn := n.NeedWaitCommitting(txn.GetStartTS())
+	if needWait {
+		waiter = func() {
+			waitTxn.GetTxnState(true)
+		}
+		return
+	}
+	deleted = n.IsVisible(txn)
+	return
+}
+
 func (chain *DeleteChain) Truncate(
 	ts types.TS,
 ) {
