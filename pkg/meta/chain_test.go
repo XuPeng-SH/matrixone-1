@@ -1,6 +1,7 @@
 package meta
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -13,6 +14,9 @@ var idAlloc = common.NewTxnIDAllocator()
 
 func getNextTxn() *txnbase.Txn {
 	txn := new(txnbase.Txn)
+	for i := 0; i < 10+rand.Intn(10); i++ {
+		types.NextGlobalTsForTest()
+	}
 	txn.TxnCtx = txnbase.NewTxnCtx(
 		idAlloc.Alloc(),
 		types.NextGlobalTsForTest(),
@@ -22,6 +26,9 @@ func getNextTxn() *txnbase.Txn {
 }
 
 func commitNode(t *testing.T, txn *txnbase.Txn, node *DeleteNode) {
+	for i := 0; i < rand.Intn(10)+10; i++ {
+		types.NextGlobalTsForTest()
+	}
 	txn.CommitTS = types.NextGlobalTsForTest()
 	txn.PrepareTS = txn.CommitTS
 	err := node.PrepareCommit()
@@ -89,6 +96,20 @@ func TestChain(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, waiter)
 	require.Equal(t, 1, deletes.Count())
+
+	deletes, waiter, err = chain.CollectDeletesInRange(
+		txn3.GetCommitTS(), types.NextGlobalTsForTest(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 1, deletes.Count())
+
+	deletes, waiter, err = chain.CollectDeletesInRange(
+		txn3.GetCommitTS().Next(), types.NextGlobalTsForTest(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 0, deletes.Count())
 
 	// TODO: test waiter
 }
