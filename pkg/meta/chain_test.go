@@ -54,4 +54,41 @@ func TestChain(t *testing.T) {
 	commitNode(t, txn3, node3)
 
 	t.Log(chain.String())
+
+	deletes, waiter, err := chain.CollectDeletesInRange(
+		types.TS{}, txn1.GetStartTS(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 0, deletes.Count())
+
+	deletes, waiter, err = chain.CollectDeletesInRange(
+		types.TS{}, txn3.GetStartTS(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 0, deletes.Count())
+
+	deletes, waiter, err = chain.CollectDeletesInRange(
+		types.TS{}, txn3.GetCommitTS(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 0, deletes.Count())
+
+	deletes, waiter, err = chain.CollectDeletesInRange(
+		types.TS{}, txn3.GetCommitTS().Next(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 1, deletes.Count())
+
+	deletes, waiter, err = chain.CollectDeletesInRange(
+		types.TS{}, types.NextGlobalTsForTest(), true,
+	)
+	require.NoError(t, err)
+	require.Nil(t, waiter)
+	require.Equal(t, 1, deletes.Count())
+
+	// TODO: test waiter
 }

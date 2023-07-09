@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/pkg/errors"
@@ -139,6 +140,50 @@ func (chain *DeleteChain) TruncateLocked(
 	}
 }
 
+// [from, to)
+func (chain *DeleteChain) CollectDeletesInRange(
+	from, to types.TS, wait bool,
+) (deletes *nulls.Bitmap, waiter func(), err error) {
+	snap := chain.nodes.Copy()
+	pivot := &DeleteNode{}
+	pivot.Prepare = from
+
+	chain.RLock()
+	defer chain.RUnlock()
+
+	snap.Ascend(
+		pivot,
+		func(n *DeleteNode) bool {
+			if n.Prepare.GreaterEq(to) {
+				return false
+			}
+			needWait, txn := n.NeedWaitCommitting(to)
+			if needWait {
+				waiter = func() {
+					txn.GetTxnState(true)
+				}
+			}
+			if wait && waiter != nil {
+				chain.RUnlock()
+				waiter()
+				chain.RLock()
+				waiter = nil
+			}
+
+			if !n.IsAborted() {
+				if deletes == nil {
+					deletes = nulls.NewWithSize(int(n.mask.Maximum()))
+				}
+
+				mergeDelete(deletes, n)
+			}
+
+			return true
+		},
+	)
+	return
+}
+
 func (chain *DeleteChain) String() string {
 	chain.RLock()
 	defer chain.RUnlock()
@@ -156,6 +201,16 @@ func (chain *DeleteChain) StringLocked() string {
 		return true
 	})
 	return w.String()
+}
+
+func mergeDelete(mask *nulls.Bitmap, n *DeleteNode) {
+	if n == nil || n.mask == nil {
+		return
+	}
+	it := n.mask.Iterator()
+	for it.HasNext() {
+		mask.Add(uint64(it.Next()))
+	}
 }
 
 // DeleteLocation
