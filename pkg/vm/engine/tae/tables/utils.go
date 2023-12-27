@@ -16,6 +16,7 @@ package tables
 
 import (
 	"context"
+
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -134,24 +135,6 @@ func LoadPersistedDeletes(
 	}
 	return
 }
-
-// func MakeBFLoader(
-// 	meta *catalog.BlockEntry,
-// 	bf objectio.BloomFilter,
-// 	cache model.LRUCache,
-// 	fs fileservice.FileService,
-// ) indexwrapper.Loader {
-// 	return func(ctx context.Context) ([]byte, error) {
-// 		location := meta.GetMetaLoc()
-// 		var err error
-// 		if len(bf) == 0 {
-// 			if bf, err = LoadBF(ctx, location, cache, fs, false); err != nil {
-// 				return nil, err
-// 			}
-// 		}
-// 		return bf.GetBloomFilter(uint32(location.ID())), nil
-// 	}
-// }
 
 func MakeImmuIndex(
 	ctx context.Context,

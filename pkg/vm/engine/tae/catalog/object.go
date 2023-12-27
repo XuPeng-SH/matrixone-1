@@ -34,6 +34,7 @@ import (
 )
 
 type ObjectEntry struct {
+	ObjectNode
 	ID   types.Objectid
 	Stat ObjStat
 	*BaseEntryImpl[*ObjectMVCCNode]
@@ -41,7 +42,6 @@ type ObjectEntry struct {
 	entries map[types.Blockid]*common.GenericDLNode[*BlockEntry]
 	//link.head and tail is nil when new a ObjectEntry object.
 	link *common.GenericSortedDList[*BlockEntry]
-	*ObjectNode
 }
 
 type ObjStat struct {
@@ -112,7 +112,7 @@ func NewObjectEntry(table *TableEntry, id *objectio.ObjectId, txn txnif.AsyncTxn
 		table:   table,
 		link:    common.NewGenericSortedDList((*BlockEntry).Less),
 		entries: make(map[types.Blockid]*common.GenericDLNode[*BlockEntry]),
-		ObjectNode: &ObjectNode{
+		ObjectNode: ObjectNode{
 			state:    state,
 			SortHint: table.GetDB().catalog.NextObject(),
 		},
@@ -130,7 +130,7 @@ func NewObjectEntryByMetaLocation(table *TableEntry, id *objectio.ObjectId, star
 		table:   table,
 		link:    common.NewGenericSortedDList((*BlockEntry).Less),
 		entries: make(map[types.Blockid]*common.GenericDLNode[*BlockEntry]),
-		ObjectNode: &ObjectNode{
+		ObjectNode: ObjectNode{
 			state:    state,
 			sorted:   state == ES_NotAppendable,
 			SortHint: table.GetDB().catalog.NextObject(),
@@ -160,7 +160,7 @@ func NewStandaloneObject(table *TableEntry, ts types.TS) *ObjectEntry {
 		table:   table,
 		link:    common.NewGenericSortedDList((*BlockEntry).Less),
 		entries: make(map[types.Blockid]*common.GenericDLNode[*BlockEntry]),
-		ObjectNode: &ObjectNode{
+		ObjectNode: ObjectNode{
 			state:   ES_Appendable,
 			IsLocal: true,
 		},
@@ -177,7 +177,7 @@ func NewSysObjectEntry(table *TableEntry, id types.Uuid) *ObjectEntry {
 		table:   table,
 		link:    common.NewGenericSortedDList((*BlockEntry).Less),
 		entries: make(map[types.Blockid]*common.GenericDLNode[*BlockEntry]),
-		ObjectNode: &ObjectNode{
+		ObjectNode: ObjectNode{
 			state: ES_Appendable,
 		},
 	}
@@ -734,10 +734,9 @@ func MockObjEntryWithTbl(tbl *TableEntry, size uint64) *ObjectEntry {
 	e := &ObjectEntry{
 		BaseEntryImpl: NewBaseEntry(
 			func() *ObjectMVCCNode { return &ObjectMVCCNode{*objectio.NewObjectStats()} }),
-		table:      tbl,
-		link:       common.NewGenericSortedDList((*BlockEntry).Less),
-		entries:    make(map[types.Blockid]*common.GenericDLNode[*BlockEntry]),
-		ObjectNode: &ObjectNode{},
+		table:   tbl,
+		link:    common.NewGenericSortedDList((*BlockEntry).Less),
+		entries: make(map[types.Blockid]*common.GenericDLNode[*BlockEntry]),
 	}
 	e.CreateWithTS(types.BuildTS(time.Now().UnixNano(), 0), &ObjectMVCCNode{*stats})
 	e.Stat.entry = e

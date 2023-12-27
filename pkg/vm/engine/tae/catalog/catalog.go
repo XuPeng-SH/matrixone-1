@@ -546,7 +546,7 @@ func (catalog *Catalog) onReplayUpdateObject(
 		obj.ID = *cmd.ID.ObjectID()
 		obj.table = tbl
 		obj.Insert(un)
-		obj.ObjectNode = cmd.node
+		obj.ObjectNode = *cmd.node
 		tbl.AddEntryLocked(obj)
 	} else {
 		node := obj.SearchNode(un)
@@ -599,7 +599,7 @@ func (catalog *Catalog) onReplayCheckpointObject(
 		obj = NewReplayObjectEntry()
 		obj.ID = *objid
 		obj.table = rel
-		obj.ObjectNode = &ObjectNode{
+		obj.ObjectNode = ObjectNode{
 			state:    state,
 			sorted:   state == ES_NotAppendable,
 			SortHint: catalog.NextObject(),
