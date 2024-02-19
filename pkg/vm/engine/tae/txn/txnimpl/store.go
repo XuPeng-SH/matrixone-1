@@ -625,12 +625,13 @@ func (store *txnStore) ApplyRollback() (err error) {
 }
 
 func (store *txnStore) WaitPrepared(ctx context.Context) (err error) {
-	for _, db := range store.dbs {
-		if err = db.WaitPrepared(); err != nil {
-			return
-		}
-	}
+	store.cmdMgr.EndWaitTrace()
 	moprobe.WithRegion(ctx, moprobe.TxnStoreWaitWALFlush, func() {
+		for _, db := range store.dbs {
+			if err = db.WaitPrepared(); err != nil {
+				return
+			}
+		}
 		for _, e := range store.logs {
 			if err = e.WaitDone(); err != nil {
 				break

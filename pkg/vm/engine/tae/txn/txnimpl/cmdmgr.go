@@ -15,6 +15,8 @@
 package txnimpl
 
 import (
+	"context"
+	"runtime/trace"
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
@@ -32,6 +34,8 @@ type commandManager struct {
 	lsn    uint64
 	csn    uint32
 	driver wal.Driver
+
+	traceWait *trace.Task
 }
 
 func newCommandManager(driver wal.Driver, maxMessageSize uint64) *commandManager {
@@ -52,6 +56,13 @@ func (mgr *commandManager) AddInternalCmd(cmd txnif.TxnCmd) {
 func (mgr *commandManager) AddCmd(cmd txnif.TxnCmd) {
 	mgr.cmd.AddCmd(cmd)
 	mgr.csn++
+}
+
+func (mgr *commandManager) EndWaitTrace() {
+	if mgr.traceWait != nil {
+		mgr.traceWait.End()
+		mgr.traceWait = nil
+	}
 }
 
 func (mgr *commandManager) ApplyTxnRecord(txn txnif.AsyncTxn) (logEntry entry.Entry, err error) {
@@ -76,6 +87,7 @@ func (mgr *commandManager) ApplyTxnRecord(txn txnif.AsyncTxn) (logEntry entry.En
 	}
 	logEntry.SetInfo(info)
 	t2 := time.Now()
+	_, mgr.traceWait = trace.NewTask(context.Background(), "enqueue-log-to-dequeue-wait")
 	mgr.lsn, err = mgr.driver.AppendEntry(wal.GroupPrepare, logEntry)
 	t3 := time.Now()
 	if t3.Sub(t1) > time.Millisecond*500 {
