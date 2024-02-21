@@ -29,6 +29,8 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
@@ -62,6 +64,17 @@ var (
 	}
 	//No need to add T_array here, as Array is cast from varchar.
 )
+
+var xxVecPool *containers.VectorPool
+
+func init() {
+	xxVecPool = containers.NewVectorPool(
+		"xxxxx",
+		1000,
+		containers.WithAllocationLimit(mpool.KB*100),
+		containers.WithMPool(common.SmallAllocator),
+	)
+}
 
 // ExpressionExecutor
 // generated from plan.Expr, can evaluate the result from vectors directly.
@@ -128,9 +141,13 @@ func NewExpressionExecutor(proc *process.Process, planExpr *plan.Expr) (Expressi
 		}, nil
 
 	case *plan.Expr_P:
-		return &ParamExpressionExecutor{
-			mp:  proc.Mp(),
-			vec: nil,
+		// return &ParamExpressionExecutor{
+		// 	mp:  proc.Mp(),
+		// 	vec: nil,
+		// 	pos: int(t.P.Pos),
+		// 	typ: types.T_text.ToType(),
+		// }, nil
+		return &ParamExpressionExecutor2{
 			pos: int(t.P.Pos),
 			typ: types.T_text.ToType(),
 		}, nil
@@ -333,6 +350,38 @@ type ParamExpressionExecutor struct {
 	vec  *vector.Vector
 	pos  int
 	typ  types.Type
+}
+
+type ParamExpressionExecutor2 struct {
+	vec containers.Vector
+	pos int
+	typ types.Type
+}
+
+func (expr *ParamExpressionExecutor2) Eval(proc *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
+	val, err := proc.GetPrepareParamsAt(expr.pos)
+	if err != nil {
+		return nil, err
+	}
+
+	if expr.vec == nil {
+		expr.vec = xxVecPool.GetVector(&expr.typ)
+	}
+	err = vector.AppendBytes(expr.vec.GetDownstreamVector(), val, len(val) == 0, expr.vec.GetAllocator())
+	return expr.vec.GetDownstreamVector(), err
+}
+func (expr *ParamExpressionExecutor2) EvalWithoutResultReusing(proc *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
+	panic("implement me")
+}
+
+func (expr *ParamExpressionExecutor2) IsColumnExpr() bool {
+	return false
+}
+func (expr *ParamExpressionExecutor2) Free() {
+	if expr.vec != nil {
+		expr.vec.Close()
+		expr.vec = nil
+	}
 }
 
 func (expr *ParamExpressionExecutor) Eval(proc *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
