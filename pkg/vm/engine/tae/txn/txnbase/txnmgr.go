@@ -227,7 +227,8 @@ func (mgr *TxnManager) StartTxnWithStartTSAndSnapshotTS(
 func (mgr *TxnManager) GetOrCreateTxnWithMeta(
 	info []byte,
 	id []byte,
-	ts types.TS) (txn txnif.AsyncTxn, err error) {
+	ts types.TS,
+) (txn txnif.AsyncTxn, err error) {
 	if exp := mgr.Exception.Load(); exp != nil {
 		err = exp.(error)
 		logutil.Warnf("StartTxn: %v", err)
@@ -235,7 +236,7 @@ func (mgr *TxnManager) GetOrCreateTxnWithMeta(
 	}
 	if _, ok := mgr.IDMap.Load(util.UnsafeBytesToString(id)); !ok {
 		store := mgr.TxnStoreFactory()
-		txn := mgr.TxnFactory(mgr, store, id, ts, ts)
+		txn = mgr.TxnFactory(mgr, store, id, ts, ts)
 		store.BindTxn(txn)
 		mgr.IDMap.Store(util.UnsafeBytesToString(id), txn)
 	}
