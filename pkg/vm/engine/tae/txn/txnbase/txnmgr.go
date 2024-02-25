@@ -27,6 +27,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/common/util"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/txn/clock"
 
@@ -86,7 +87,7 @@ type TxnManager struct {
 	sm.ClosedState
 	PreparingSM     sm.StateMachine
 	FlushQueue      sm.Queue
-	IDMap           map[string]txnif.AsyncTxn
+	IDMap           *sync.Map
 	IdAlloc         *common.TxnIDAllocator
 	TsAlloc         *types.TsAlloctor
 	MaxCommittedTS  atomic.Pointer[types.TS]
@@ -110,7 +111,7 @@ func NewTxnManager(txnStoreFactory TxnStoreFactory, txnFactory TxnFactory, clock
 		txnFactory = DefaultTxnFactory
 	}
 	mgr := &TxnManager{
-		IDMap:           make(map[string]txnif.AsyncTxn),
+		IDMap:           new(sync.Map),
 		IdAlloc:         common.NewTxnIDAllocator(),
 		TsAlloc:         types.NewTsAlloctor(clock),
 		TxnStoreFactory: txnStoreFactory,
@@ -160,10 +161,8 @@ func (mgr *TxnManager) StatMaxCommitTS() (ts types.TS) {
 
 // Note: Replay should always runs in a single thread
 func (mgr *TxnManager) OnReplayTxn(txn txnif.AsyncTxn) (err error) {
-	mgr.Lock()
-	defer mgr.Unlock()
 	// TODO: idempotent check
-	mgr.IDMap[txn.GetID()] = txn
+	mgr.IDMap.Store(txn.GetID(), txn)
 	return
 }
 
@@ -182,7 +181,7 @@ func (mgr *TxnManager) StartTxn(info []byte) (txn txnif.AsyncTxn, err error) {
 	store := mgr.TxnStoreFactory()
 	txn = mgr.TxnFactory(mgr, store, txnId, startTs, types.TS{})
 	store.BindTxn(txn)
-	mgr.IDMap[string(txnId)] = txn
+	mgr.IDMap.Store(util.UnsafeBytesToString(txnId), txn)
 	return
 }
 
@@ -201,7 +200,7 @@ func (mgr *TxnManager) StartTxnWithLatestTS(info []byte) (txn txnif.AsyncTxn, er
 	store := mgr.TxnStoreFactory()
 	txn = mgr.TxnFactory(mgr, store, txnId, startTs, types.TS{})
 	store.BindTxn(txn)
-	mgr.IDMap[string(txnId)] = txn
+	mgr.IDMap.Store(util.UnsafeBytesToString(txnId), txn)
 	return
 }
 
@@ -220,7 +219,7 @@ func (mgr *TxnManager) StartTxnWithStartTSAndSnapshotTS(
 	txnId := mgr.IdAlloc.Alloc()
 	txn = mgr.TxnFactory(mgr, store, txnId, startTS, snapshotTS)
 	store.BindTxn(txn)
-	mgr.IDMap[string(txnId)] = txn
+	mgr.IDMap.Store(util.UnsafeBytesToString(txnId), txn)
 	return
 }
 
@@ -234,28 +233,20 @@ func (mgr *TxnManager) GetOrCreateTxnWithMeta(
 		logutil.Warnf("StartTxn: %v", err)
 		return
 	}
-	mgr.Lock()
-	defer mgr.Unlock()
-	txn, ok := mgr.IDMap[string(id)]
-	if !ok {
+	if _, ok := mgr.IDMap.Load(util.UnsafeBytesToString(id)); !ok {
 		store := mgr.TxnStoreFactory()
-		txn = mgr.TxnFactory(mgr, store, id, ts, ts)
+		txn := mgr.TxnFactory(mgr, store, id, ts, ts)
 		store.BindTxn(txn)
-		mgr.IDMap[string(id)] = txn
+		mgr.IDMap.Store(util.UnsafeBytesToString(id), txn)
 	}
 	return
 }
 
 func (mgr *TxnManager) DeleteTxn(id string) (err error) {
-	mgr.Lock()
-	defer mgr.Unlock()
-	txn := mgr.IDMap[id]
-	if txn == nil {
+	if _, loaded := mgr.IDMap.LoadAndDelete(id); !loaded {
 		err = moerr.NewTxnNotFoundNoCtx()
 		logutil.Warnf("Txn %s not found", id)
-		return
 	}
-	delete(mgr.IDMap, id)
 	return
 }
 
@@ -264,9 +255,10 @@ func (mgr *TxnManager) GetTxnByCtx(ctx []byte) txnif.AsyncTxn {
 }
 
 func (mgr *TxnManager) GetTxn(id string) txnif.AsyncTxn {
-	mgr.RLock()
-	defer mgr.RUnlock()
-	return mgr.IDMap[id]
+	if v, ok := mgr.IDMap.Load(id); ok {
+		return v.(txnif.AsyncTxn)
+	}
+	return nil
 }
 
 func (mgr *TxnManager) EnqueueFlushing(op any) (err error) {
@@ -631,15 +623,15 @@ func (mgr *TxnManager) OnException(new error) {
 // MinTSForTest is only be used in ut to ensure that
 // files that have been gc will not be used.
 func (mgr *TxnManager) MinTSForTest() types.TS {
-	mgr.RLock()
-	defer mgr.RUnlock()
 	minTS := types.MaxTs()
-	for _, txn := range mgr.IDMap {
+	mgr.IDMap.Range(func(k, v interface{}) bool {
+		txn := v.(txnif.AsyncTxn)
 		startTS := txn.GetStartTS()
 		if startTS.Less(minTS) {
 			minTS = startTS
 		}
-	}
+		return true
+	})
 	return minTS
 }
 
