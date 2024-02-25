@@ -83,7 +83,6 @@ type TxnStoreFactory = func() txnif.TxnStore
 type TxnFactory = func(*TxnManager, txnif.TxnStore, []byte, types.TS, types.TS) txnif.AsyncTxn
 
 type TxnManager struct {
-	sync.RWMutex
 	sm.ClosedState
 	PreparingSM     sm.StateMachine
 	FlushQueue      sm.Queue
@@ -140,8 +139,6 @@ func (mgr *TxnManager) initMaxCommittedTS() {
 // all timestamps allocated before have been assigned to txn, which means those
 // txn are visible for the returned timestamp.
 func (mgr *TxnManager) Now() types.TS {
-	mgr.Lock()
-	defer mgr.Unlock()
 	return mgr.TsAlloc.Alloc()
 }
 
@@ -153,9 +150,7 @@ func (mgr *TxnManager) Init(prevTs types.TS) error {
 }
 
 func (mgr *TxnManager) StatMaxCommitTS() (ts types.TS) {
-	mgr.RLock()
 	ts = mgr.TsAlloc.Alloc()
-	mgr.RUnlock()
 	return
 }
 
@@ -173,8 +168,6 @@ func (mgr *TxnManager) StartTxn(info []byte) (txn txnif.AsyncTxn, err error) {
 		logutil.Warnf("StartTxn: %v", err)
 		return
 	}
-	mgr.Lock()
-	defer mgr.Unlock()
 	txnId := mgr.IdAlloc.Alloc()
 	startTs := *mgr.MaxCommittedTS.Load()
 
@@ -192,8 +185,6 @@ func (mgr *TxnManager) StartTxnWithLatestTS(info []byte) (txn txnif.AsyncTxn, er
 		logutil.Warnf("StartTxn: %v", err)
 		return
 	}
-	mgr.Lock()
-	defer mgr.Unlock()
 	txnId := mgr.IdAlloc.Alloc()
 	startTs := mgr.TsAlloc.Alloc()
 
@@ -213,8 +204,6 @@ func (mgr *TxnManager) StartTxnWithStartTSAndSnapshotTS(
 		logutil.Warnf("StartTxn: %v", err)
 		return
 	}
-	mgr.Lock()
-	defer mgr.Unlock()
 	store := mgr.TxnStoreFactory()
 	txnId := mgr.IdAlloc.Alloc()
 	txn = mgr.TxnFactory(mgr, store, txnId, startTS, snapshotTS)
@@ -291,8 +280,6 @@ func (mgr *TxnManager) newHeartbeatOpTxn(ctx context.Context) *OpTxn {
 		logutil.Warnf("StartTxn: %v", err)
 		return nil
 	}
-	mgr.Lock()
-	defer mgr.Unlock()
 	txnId := mgr.IdAlloc.Alloc()
 	startTs := mgr.TsAlloc.Alloc()
 
@@ -351,9 +338,6 @@ func (mgr *TxnManager) onBindPrepareTimeStamp(op *OpTxn) (ts types.TS) {
 		}
 		return
 	}
-
-	mgr.Lock()
-	defer mgr.Unlock()
 
 	ts = mgr.TsAlloc.Alloc()
 	if !mgr.prevPrepareTS.IsEmpty() {
