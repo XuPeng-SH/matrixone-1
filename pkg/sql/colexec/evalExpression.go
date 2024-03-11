@@ -121,8 +121,7 @@ func NewExpressionExecutor(proc *process.Process, planExpr *plan.Expr) (Expressi
 		if err != nil {
 			return nil, err
 		}
-		return &FixedVectorExpressionExecutor{
-			m:            proc.Mp(),
+		return &FixedVectorExpressionExecutor2{
 			resultVector: vec,
 		}, nil
 
@@ -641,82 +640,93 @@ func (expr *FixedVectorExpressionExecutor) IsColumnExpr() bool {
 	return false
 }
 
-func generateConstExpressionExecutor(proc *process.Process, typ types.Type, con *plan.Literal) (vec *vector.Vector, err error) {
+func generateConstExpressionExecutor(
+	proc *process.Process, typ types.Type, con *plan.Literal,
+) (vec containers.Vector, err error) {
+	vec = evalExprVPool.GetVector(&typ)
 	if con.GetIsnull() {
-		vec = vector.NewConstNull(typ, 1, proc.Mp())
+		// TODO: vec.ToConstNull(1)
+		err = vector.ToConstNull(vec.GetDownstreamVector(), 1, vec.GetAllocator())
 	} else {
-		switch val := con.GetValue().(type) {
+		length := 1
+		switch con.GetValue().(type) {
 		case *plan.Literal_Bval:
-			vec, err = vector.NewConstFixed(constBType, val.Bval, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetBval(), length, vec.GetAllocator())
 		case *plan.Literal_I8Val:
-			vec, err = vector.NewConstFixed(constI8Type, int8(val.I8Val), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetI8Val(), length, vec.GetAllocator())
 		case *plan.Literal_I16Val:
-			vec, err = vector.NewConstFixed(constI16Type, int16(val.I16Val), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetI16Val(), length, vec.GetAllocator())
 		case *plan.Literal_I32Val:
-			vec, err = vector.NewConstFixed(constI32Type, val.I32Val, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetI32Val(), length, vec.GetAllocator())
 		case *plan.Literal_I64Val:
-			vec, err = vector.NewConstFixed(constI64Type, val.I64Val, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetI64Val(), length, vec.GetAllocator())
 		case *plan.Literal_U8Val:
-			vec, err = vector.NewConstFixed(constU8Type, uint8(val.U8Val), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetU8Val(), length, vec.GetAllocator())
 		case *plan.Literal_U16Val:
-			vec, err = vector.NewConstFixed(constU16Type, uint16(val.U16Val), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetU16Val(), length, vec.GetAllocator())
 		case *plan.Literal_U32Val:
-			vec, err = vector.NewConstFixed(constU32Type, val.U32Val, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetU32Val(), length, vec.GetAllocator())
 		case *plan.Literal_U64Val:
-			vec, err = vector.NewConstFixed(constU64Type, val.U64Val, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetU64Val(), length, vec.GetAllocator())
 		case *plan.Literal_Fval:
-			vec, err = vector.NewConstFixed(constFType, val.Fval, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetFval(), length, vec.GetAllocator())
 		case *plan.Literal_Dval:
-			vec, err = vector.NewConstFixed(constDType, val.Dval, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetDval(), length, vec.GetAllocator())
 		case *plan.Literal_Dateval:
-			vec, err = vector.NewConstFixed(constDateType, types.Date(val.Dateval), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), types.Date(con.GetDateval()), length, vec.GetAllocator())
 		case *plan.Literal_Timeval:
-			vec, err = vector.NewConstFixed(typ, types.Time(val.Timeval), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), types.Time(con.GetTimeval()), length, vec.GetAllocator())
 		case *plan.Literal_Datetimeval:
-			vec, err = vector.NewConstFixed(typ, types.Datetime(val.Datetimeval), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), types.Datetime(con.GetDatetimeval()), length, vec.GetAllocator())
 		case *plan.Literal_Decimal64Val:
-			cd64 := val.Decimal64Val
+			cd64 := con.GetDecimal64Val()
 			d64 := types.Decimal64(cd64.A)
-			vec, err = vector.NewConstFixed(typ, d64, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), d64, length, vec.GetAllocator())
 		case *plan.Literal_Decimal128Val:
-			cd128 := val.Decimal128Val
+			cd128 := con.GetDecimal128Val()
 			d128 := types.Decimal128{B0_63: uint64(cd128.A), B64_127: uint64(cd128.B)}
-			vec, err = vector.NewConstFixed(typ, d128, 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), d128, length, vec.GetAllocator())
 		case *plan.Literal_Timestampval:
 			scale := typ.Scale
 			if scale < 0 || scale > 6 {
 				return nil, moerr.NewInternalError(proc.Ctx, "invalid timestamp scale")
 			}
-			vec, err = vector.NewConstFixed(constTimestampTypes[scale], types.Timestamp(val.Timestampval), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), types.Timestamp(con.GetTimestampval()), length, vec.GetAllocator())
 		case *plan.Literal_Sval:
-			sval := val.Sval
+			sval := con.GetSval()
 			// Distinguish binary with non-binary string.
 			if typ.Oid == types.T_binary || typ.Oid == types.T_varbinary || typ.Oid == types.T_blob {
-				vec, err = vector.NewConstBytes(constBinType, []byte(sval), 1, proc.Mp())
+				err = vector.ToConstBytes(vec.GetDownstreamVector(), []byte(sval), length, vec.GetAllocator())
 			} else if typ.Oid == types.T_array_float32 {
 				array, err1 := types.StringToArray[float32](sval)
 				if err1 != nil {
 					return nil, err1
 				}
-				vec, err = vector.NewConstArray(typ, array, 1, proc.Mp())
+				err = vector.ToConstArray(vec.GetDownstreamVector(), array, length, vec.GetAllocator())
 			} else if typ.Oid == types.T_array_float64 {
 				array, err1 := types.StringToArray[float64](sval)
 				if err1 != nil {
 					return nil, err1
 				}
-				vec, err = vector.NewConstArray(typ, array, 1, proc.Mp())
+				err = vector.ToConstArray(vec.GetDownstreamVector(), array, length, vec.GetAllocator())
 			} else {
-				vec, err = vector.NewConstBytes(constSType, []byte(sval), 1, proc.Mp())
+				err = vector.ToConstBytes(vec.GetDownstreamVector(), []byte(sval), length, vec.GetAllocator())
 			}
 		case *plan.Literal_Defaultval:
-			defaultVal := val.Defaultval
-			vec, err = vector.NewConstFixed(constBType, defaultVal, 1, proc.Mp())
+			defaultVal := con.GetDefaultval()
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), defaultVal, length, vec.GetAllocator())
 		case *plan.Literal_EnumVal:
-			vec, err = vector.NewConstFixed(constEnumType, types.Enum(val.EnumVal), 1, proc.Mp())
+			err = vector.ToConstFixed(vec.GetDownstreamVector(), con.GetEnumVal(), length, vec.GetAllocator())
 		default:
-			return nil, moerr.NewNYI(proc.Ctx, fmt.Sprintf("const expression %v", con.GetValue()))
+			err = moerr.NewNYI(proc.Ctx, fmt.Sprintf("const expression %v", con.GetValue()))
 		}
-		vec.SetIsBin(con.IsBin)
+		if err != nil {
+			vec.GetDownstreamVector().SetIsBin(con.IsBin)
+		}
+	}
+	if err != nil {
+		vec.Close()
+		vec = nil
 	}
 	return vec, err
 }

@@ -322,6 +322,36 @@ func NewConstArray[T types.RealNumbers](typ types.Type, val []T, length int, mp 
 	return vec, err
 }
 
+func ToConstNull(v *Vector, length int, mp *mpool.MPool) (err error) {
+	v.class = CONSTANT
+	v.length = length
+	return
+}
+
+func ToConstFixed[T any](v *Vector, val T, length int, mp *mpool.MPool) (err error) {
+	v.class = CONSTANT
+	if length > 0 {
+		err = SetConstFixed(v, val, length, mp)
+	}
+	return
+}
+
+func ToConstBytes(v *Vector, val []byte, length int, mp *mpool.MPool) (err error) {
+	v.class = CONSTANT
+	if length > 0 {
+		err = SetConstBytes(v, val, length, mp)
+	}
+	return
+}
+
+func ToConstArray[T types.RealNumbers](v *Vector, val []T, length int, mp *mpool.MPool) (err error) {
+	v.class = CONSTANT
+	if length > 0 {
+		err = SetConstArray[T](v, val, length, mp)
+	}
+	return
+}
+
 func (v *Vector) IsConst() bool {
 	return v.class == CONSTANT
 }
