@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"time"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/txn/client"
 	"github.com/matrixorigin/matrixone/pkg/txn/trace"
@@ -148,7 +149,13 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 		tmpSize := arg.tmpBuf.Size()
 		batSize := bat.Size()
 		if arg.tmpBuf.RowCount()+bat.RowCount() < colexec.DefaultBatchSize && tmpSize+batSize < maxBatchMemSize {
+			rowCnt1 := arg.tmpBuf.RowCount()
+			rowCnt2 := bat.RowCount()
 			_, err := arg.tmpBuf.Append(proc.Ctx, proc.GetMPool(), bat)
+			if err != nil {
+				logutil.Errorf("tmpBuf.RowCount()=%d, bat.RowCount()=%d", rowCnt1, rowCnt2)
+				panic(err)
+			}
 			proc.PutBatch(bat)
 			if err != nil {
 				e = err

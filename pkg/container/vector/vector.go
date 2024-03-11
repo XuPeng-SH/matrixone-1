@@ -2481,6 +2481,14 @@ func (v *Vector) UnionBatch(w *Vector, offset int64, cnt int, flags []uint8, mp 
 			}
 		} else {
 			if flags == nil {
+				s1 := v.length * tlen
+				e1 := (v.length + cnt) * tlen
+				s2 := int(offset) * tlen
+				e2 := (int(offset) + cnt) * tlen
+				if s1 < 0 || e1 < 0 || s2 < 0 || e2 < 0 {
+					err := moerr.NewInternalErrorNoCtx(fmt.Sprintf("YYY length=%d,tlen=%d,offset=%d,cnt=%d", v.length, tlen, offset, cnt))
+					return err
+				}
 				copy(v.data[v.length*tlen:(v.length+cnt)*tlen], w.data[(int(offset))*tlen:(int(offset)+cnt)*tlen])
 				v.length += cnt
 			} else {
