@@ -144,8 +144,6 @@ func NewExpressionExecutor(proc *process.Process, planExpr *plan.Expr) (Expressi
 
 	case *plan.Expr_P:
 		return &ParamExpressionExecutor{
-			mp:  proc.Mp(),
-			vec: nil,
 			pos: int(t.P.Pos),
 			typ: types.T_text.ToType(),
 		}, nil
@@ -348,11 +346,9 @@ func (expr *ColumnExpressionExecutor) GetColIndex() int {
 }
 
 type ParamExpressionExecutor struct {
-	mp   *mpool.MPool
-	null *vector.Vector
-	vec  *vector.Vector
-	pos  int
-	typ  types.Type
+	vec containers.Vector
+	pos int
+	typ types.Type
 }
 
 func (expr *ParamExpressionExecutor) Eval(proc *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
@@ -361,42 +357,25 @@ func (expr *ParamExpressionExecutor) Eval(proc *process.Process, batches []*batc
 		return nil, err
 	}
 
-	if val == nil {
-		if expr.null == nil {
-			expr.null = vector.NewConstNull(expr.typ, 1, proc.GetMPool())
-		}
-		return expr.null, nil
-	}
-
 	if expr.vec == nil {
-		expr.vec, err = vector.NewConstBytes(expr.typ, val, 1, proc.Mp())
-	} else {
-		err = vector.SetConstBytes(expr.vec, val, 1, proc.GetMPool())
+		expr.vec = evalExprVPool.GetVector(&expr.typ)
 	}
-	return expr.vec, err
+	if val == nil {
+		err = vector.ToConstNull(expr.vec.GetDownstreamVector(), 1, expr.vec.GetAllocator())
+	} else {
+		err = vector.SetConstBytes(expr.vec.GetDownstreamVector(), val, 1, expr.vec.GetAllocator())
+	}
+	return expr.vec.GetDownstreamVector(), err
 }
 
 func (expr *ParamExpressionExecutor) EvalWithoutResultReusing(proc *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
-	vec, err := expr.Eval(proc, batches)
-	if err != nil {
-		return nil, err
-	}
-	if vec == expr.null {
-		expr.null = nil
-		return vec, nil
-	}
-	expr.vec = nil
-	return vec, nil
+	panic("implement me")
 }
 
 func (expr *ParamExpressionExecutor) Free() {
 	if expr.vec != nil {
-		expr.vec.Free(expr.mp)
+		expr.vec.Close()
 		expr.vec = nil
-	}
-	if expr.null != nil {
-		expr.null.Free(expr.mp)
-		expr.null = nil
 	}
 }
 
