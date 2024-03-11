@@ -29,6 +29,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/sql/plan/function"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
@@ -289,6 +290,11 @@ type FixedVectorExpressionExecutor struct {
 
 	fixed        bool
 	resultVector *vector.Vector
+}
+
+type FixedVectorExpressionExecutor2 struct {
+	fixed        bool
+	resultVector containers.Vector
 }
 
 type FunctionExpressionExecutor struct {
@@ -565,6 +571,32 @@ func (expr *ColumnExpressionExecutor) Free() {
 
 func (expr *ColumnExpressionExecutor) IsColumnExpr() bool {
 	return true
+}
+
+func (expr *FixedVectorExpressionExecutor2) Eval(_ *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
+	if !expr.fixed {
+		expr.resultVector.GetDownstreamVector().SetLength(batches[0].RowCount())
+	}
+	return expr.resultVector.GetDownstreamVector(), nil
+}
+
+func (expr *FixedVectorExpressionExecutor2) EvalWithoutResultReusing(proc *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
+	vec, err := expr.Eval(proc, batches)
+	if err != nil {
+		return nil, err
+	}
+	return vec.Dup(proc.Mp())
+}
+
+func (expr *FixedVectorExpressionExecutor2) IsColumnExpr() bool {
+	return false
+}
+
+func (expr *FixedVectorExpressionExecutor2) Free() {
+	if expr.resultVector != nil {
+		expr.resultVector.Close()
+		expr.resultVector = nil
+	}
 }
 
 func (expr *FixedVectorExpressionExecutor) Eval(_ *process.Process, batches []*batch.Batch) (*vector.Vector, error) {
