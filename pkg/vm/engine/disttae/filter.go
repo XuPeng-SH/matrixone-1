@@ -21,6 +21,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
@@ -1090,6 +1091,9 @@ func ExecuteBlockFilter(
 					} else {
 						rows = objStats.Rows() - options.DefaultBlockMaxRows*uint32(pos)
 					}
+				}
+				if rows <= 0 {
+					logutil.Warnf("YYY rows=%d, blkMetaIsNil=%v,obj=%s", rows, blkMeta == nil, objStats.String())
 				}
 				loc := objectio.BuildLocation(name, extent, rows, uint16(pos))
 				blk := objectio.BlockInfo{
