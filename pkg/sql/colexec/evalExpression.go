@@ -64,6 +64,21 @@ var (
 	//No need to add T_array here, as Array is cast from varchar.
 )
 
+var evalExprVPool *containers.VectorPool
+
+func init() {
+	mp, err := mpool.NewMPool("eval_expr", 0, mpool.NoFixed)
+	if err != nil {
+		panic(err)
+	}
+	evalExprVPool = containers.NewVectorPool(
+		"eval_expr_vpool",
+		2048,
+		containers.WithAllocationLimit(mpool.KB*32),
+		containers.WithMPool(mp),
+	)
+}
+
 // ExpressionExecutor
 // generated from plan.Expr, can evaluate the result from vectors directly.
 type ExpressionExecutor interface {
