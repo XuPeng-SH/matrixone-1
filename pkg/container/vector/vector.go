@@ -25,6 +25,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vectorize/moarray"
 	"github.com/matrixorigin/matrixone/pkg/vectorize/shuffle"
 )
@@ -3041,6 +3042,9 @@ func shrinkFixed[T types.FixedSizeT](v *Vector, sels []int64, negate bool) {
 			}
 		}
 		nulls.Filter(&v.nsp, sels, true)
+		if v.length < len(sels) {
+			logutil.Warnf("YYY v.length=%d<len(sels)=%d, len(data)=%d, typ=%s", v.length, len(sels), len(v.data), v.typ.String())
+		}
 		v.length -= len(sels)
 	}
 }

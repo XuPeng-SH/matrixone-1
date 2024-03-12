@@ -26,6 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 )
 
@@ -207,6 +208,9 @@ func ConstructRowidColumnTo(
 	vec *vector.Vector,
 	id *Blockid, start, length uint32, mp *mpool.MPool,
 ) (err error) {
+	if length == 0 || length > 8192 {
+		logutil.Warnf("YYY Bad rowid length: %d, block: %s", length, id.String())
+	}
 	if err = vec.PreExtend(int(length), mp); err != nil {
 		return
 	}

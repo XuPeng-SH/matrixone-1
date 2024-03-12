@@ -153,7 +153,7 @@ func (arg *Argument) Call(proc *process.Process) (vm.CallResult, error) {
 			rowCnt2 := bat.RowCount()
 			_, err := arg.tmpBuf.Append(proc.Ctx, proc.GetMPool(), bat)
 			if err != nil {
-				logutil.Errorf("tmpBuf.RowCount()=%d, bat.RowCount()=%d", rowCnt1, rowCnt2)
+				logutil.Errorf("YYY tmpBuf.RowCount()=%d, bat.RowCount()=%d", rowCnt1, rowCnt2)
 				panic(err)
 			}
 			proc.PutBatch(bat)
