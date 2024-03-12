@@ -667,6 +667,7 @@ func (c *PushClient) unusedTableGCTicker(ctx context.Context) {
 func (c *PushClient) partitionStateGCTicker(ctx context.Context, e *Engine) {
 	go func() {
 		ticker := time.NewTicker(gcPartitionStateTicker)
+		ticker2 := time.NewTicker(time.Second * 20)
 		for {
 			select {
 			case <-ctx.Done():
@@ -680,6 +681,16 @@ func (c *PushClient) partitionStateGCTicker(ctx context.Context, e *Engine) {
 				}
 				if c.subscriber == nil {
 					continue
+				}
+			case <-ticker2.C:
+				parts := make(map[[2]uint64]*logtailreplay.Partition)
+				e.Lock()
+				for ids, part := range e.partitions {
+					parts[ids] = part
+				}
+				e.Unlock()
+				for _, part := range parts {
+					part.Check()
 				}
 			}
 			parts := make(map[[2]uint64]*logtailreplay.Partition)

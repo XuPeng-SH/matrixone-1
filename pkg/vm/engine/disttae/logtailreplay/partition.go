@@ -20,6 +20,7 @@ import (
 	"sync/atomic"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 )
 
@@ -122,6 +123,18 @@ func (p *Partition) ConsumeCheckpoints(
 	p.checkpointConsumed.Store(true)
 
 	return
+}
+
+func (p *Partition) Check() {
+	state := p.Snapshot()
+	iter := state.dataObjectsByCreateTS.Copy().Iter()
+	defer iter.Release()
+	for ok := iter.First(); ok; ok = iter.Next() {
+		entry := iter.Item()
+		if entry.Rows() == 0 {
+			logutil.Warnf("YYY2 %s", entry.String())
+		}
+	}
 }
 
 func (p *Partition) Truncate(ctx context.Context, ids [2]uint64, ts types.TS) error {
