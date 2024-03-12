@@ -20,6 +20,7 @@ import (
 	"unsafe"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
@@ -185,6 +186,9 @@ func (e *ObjectMVCCNode) IsEmpty() bool {
 func (e *ObjectMVCCNode) AppendTuple(sid *types.Objectid, batch *containers.Batch) {
 	if e == nil || e.IsEmpty() {
 		objectio.SetObjectStatsObjectName(&e.ObjectStats, objectio.BuildObjectNameWithObjectID(sid)) // when replay, sid is get from object name
+	}
+	if e.ObjectStats.Rows() == 0 {
+		logutil.Warnf("YYY Stats:%s", e.ObjectStats.String())
 	}
 	batch.GetVectorByName(ObjectAttr_ObjectStats).Append(e.ObjectStats[:], false)
 }

@@ -383,6 +383,9 @@ func (entry *ObjectEntry) UpdateObjectInfo(txn txnif.TxnReader, stats *objectio.
 	if err != nil {
 		return
 	}
+	if stats.Rows() == 0 {
+		logutil.Warnf("YYY Stats=%s", stats.String())
+	}
 	baseNode := NewObjectInfoWithObjectStats(stats)
 	var node *MVCCNode[*ObjectMVCCNode]
 	isNewNode, node = entry.getOrSetUpdateNode(txn)
