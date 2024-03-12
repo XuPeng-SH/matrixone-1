@@ -455,6 +455,9 @@ func (p *PartitionState) HandleObjectInsert(ctx context.Context, bat *api.Batch,
 		objEntry.Sorted = sortedCol[idx]
 
 		p.dataObjects.Set(objEntry)
+		if objEntry.Rows() == 0 {
+			logutil.Warnf("YYY ObjectStats:%s", objEntry.String())
+		}
 		p.dataObjectsByCreateTS.Set(ObjectIndexByCreateTSEntry(objEntry))
 		{
 			//Need to insert an entry in objectIndexByTS, when soft delete appendable object.
@@ -810,6 +813,9 @@ func (p *PartitionState) HandleMetadataInsert(
 						objectio.SetObjectStatsBlkCnt(&objEntry.ObjectStats, uint32(blkCnt))
 					}
 					p.dataObjects.Set(objEntry)
+					if objEntry.Rows() == 0 {
+						logutil.Warnf("YYY ObjectStats:%s", objEntry.String())
+					}
 					p.dataObjectsByCreateTS.Set(ObjectIndexByCreateTSEntry(objEntry))
 					return
 				}
@@ -834,6 +840,9 @@ func (p *PartitionState) HandleMetadataInsert(
 					logutil.Errorf("prefetch object meta failed. %v", err)
 				}
 
+				if objEntry.Rows() == 0 {
+					logutil.Warnf("YYY ObjectStats:%s", objEntry.String())
+				}
 				p.dataObjectsByCreateTS.Set(ObjectIndexByCreateTSEntry(objEntry))
 
 				{
@@ -873,6 +882,9 @@ func (p *PartitionState) objectDeleteHelper(
 		// apply first delete
 		objEntry.DeleteTime = deleteTime
 		p.dataObjects.Set(objEntry)
+		if objEntry.Rows() == 0 {
+			logutil.Warnf("YYY ObjectStats:%s", objEntry.String())
+		}
 		p.dataObjectsByCreateTS.Set(ObjectIndexByCreateTSEntry(objEntry))
 
 		{
@@ -903,6 +915,9 @@ func (p *PartitionState) objectDeleteHelper(
 			p.objectIndexByTS.Delete(old)
 			objEntry.DeleteTime = deleteTime
 			p.dataObjects.Set(objEntry)
+			if objEntry.Rows() == 0 {
+				logutil.Warnf("YYY ObjectStats:%s", objEntry.String())
+			}
 			p.dataObjectsByCreateTS.Set(ObjectIndexByCreateTSEntry(objEntry))
 
 			new := ObjectIndexByTSEntry{
@@ -1054,6 +1069,9 @@ func (p *PartitionState) truncate(ids [2]uint64, ts types.TS) {
 			//	//ShortObjName: objEntry.ShortObjName,
 			//	ObjectInfo: objEntry.ObjectInfo,
 			//})
+			if objEntry.Rows() == 0 {
+				logutil.Warnf("YYY ObjectStats:%s", objEntry.String())
+			}
 			p.dataObjectsByCreateTS.Delete(ObjectIndexByCreateTSEntry(objEntry))
 			if objGced {
 				objsToDelete = fmt.Sprintf("%s, %s", objsToDelete, objEntry.Location().Name().String())

@@ -1092,8 +1092,8 @@ func ExecuteBlockFilter(
 						rows = objStats.Rows() - options.DefaultBlockMaxRows*uint32(pos)
 					}
 				}
-				if rows <= 0 {
-					logutil.Warnf("YYY rows=%d, blkMetaIsNil=%v,obj=%s", rows, blkMeta == nil, objStats.String())
+				if rows == 0 || rows > options.DefaultBlockMaxRows {
+					logutil.Warnf("YYY rows=%d, blkMetaIsNil=%v,pos=%d,obj=%s", rows, blkMeta == nil, pos, objStats.String())
 				}
 				loc := objectio.BuildLocation(name, extent, rows, uint16(pos))
 				blk := objectio.BlockInfo{
