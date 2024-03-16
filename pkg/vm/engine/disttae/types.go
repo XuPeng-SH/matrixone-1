@@ -446,7 +446,7 @@ func (txn *Transaction) String() string {
 	txn.Lock()
 	for i, entry := range txn.writes {
 		w.WriteByte('\n')
-		w.WriteString(fmt.Sprintf("%d: %s", i, entry.String()))
+		w.WriteString(fmt.Sprintf("Entry[%d]: %s", i, entry.String()))
 	}
 	txn.Unlock()
 	return w.String()
@@ -554,7 +554,11 @@ type Entry struct {
 
 func (e *Entry) String() string {
 	if e.bat != nil {
-		return fmt.Sprintf("[F:%s][TBL:%s]:[BAT:%s]", e.fileName, e.tableName, common.MoBatchToString(e.bat, 10))
+		if e.fileName != "" {
+			return fmt.Sprintf("(T:%d)(F:%s)(TBL:%s):(BAT:%s)", e.typ, e.fileName, e.tableName, common.MoBatchToString(e.bat, 10))
+		} else {
+			return fmt.Sprintf("(T:%d)(TBL:%s):(BAT:%s)", e.typ, e.tableName, common.MoBatchToString(e.bat, 10))
+		}
 	}
 	return ""
 }
