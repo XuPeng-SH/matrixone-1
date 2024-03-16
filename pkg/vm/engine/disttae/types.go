@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -553,7 +554,7 @@ type Entry struct {
 }
 
 func (e *Entry) String() string {
-	if e.bat != nil {
+	if e.bat != nil && strings.HasPrefix(e.tableName, "sbtest") {
 		if e.fileName != "" {
 			return fmt.Sprintf("(T:%d)(F:%s)(TBL:%s):(BAT:%s)", e.typ, e.fileName, e.tableName, common.MoBatchToString(e.bat, 10))
 		} else {
