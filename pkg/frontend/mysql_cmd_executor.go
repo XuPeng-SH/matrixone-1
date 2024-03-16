@@ -3004,7 +3004,7 @@ func (mce *MysqlCmdExecutor) executeStmt(requestCtx context.Context,
 	sql string,
 ) (err error) {
 	defer func() {
-		logutil.Infof("YYY2: %s:%v", sql, err)
+		logutil.Infof("YYY2: %s:%s:%v", ses.GetTxnId().String(), sql, err)
 	}()
 	var span trace.Span
 	requestCtx, span = trace.Start(requestCtx, "MysqlCmdExecutor.executeStmt",
