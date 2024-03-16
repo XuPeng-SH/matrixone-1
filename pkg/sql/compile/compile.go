@@ -568,6 +568,7 @@ func (c *Compile) prepareRetry(defChanged bool) (*Compile, error) {
 		}
 		c.pn = pn
 	}
+	logutil.Infof("YYY2 Retry Compile: %s", runC.sql)
 	if e = runC.Compile(c.proc.Ctx, c.pn, c.u, c.fill); e != nil {
 		return nil, e
 	}
