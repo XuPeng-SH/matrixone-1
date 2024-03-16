@@ -512,6 +512,10 @@ func (c *Compile) Run(_ uint64) (result *util2.RunResult, err error) {
 
 		c.fatalLog(retryTimes, err)
 		if !c.canRetry(err) {
+			if moerr.IsMoErrCode(err, moerr.ErrDuplicateEntry) {
+				debugStr := c.proc.TxnOperator.GetWorkspace().String()
+				logutil.Error(debugStr)
+			}
 			return nil, err
 		}
 

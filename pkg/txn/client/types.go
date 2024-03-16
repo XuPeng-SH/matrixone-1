@@ -227,6 +227,7 @@ type TimestampWaiter interface {
 }
 
 type Workspace interface {
+	String() string
 	// StartStatement tag a statement is running
 	StartStatement()
 	// EndStatement tag end a statement is completed
