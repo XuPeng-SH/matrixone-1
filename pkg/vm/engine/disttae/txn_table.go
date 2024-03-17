@@ -650,7 +650,7 @@ func (tbl *txnTable) rangesOnePart(
 		deleteObjs, createObjs := state.GetChangedObjsBetween(lastTS, endTS)
 		if strings.HasPrefix(tbl.tableName, "sbtest") {
 			var buf bytes.Buffer
-			buf.WriteString(fmt.Sprintf("YYY4 %s:%s:(%s->%s),(", tbl.db.txn.op.Txn().DebugString(), tbl.tableName, lastTS.ToString(), endTS.ToString()))
+			buf.WriteString(fmt.Sprintf("YYY4 %s:%s:(%s->%s)(%p:%d),(", tbl.db.txn.op.Txn().DebugString(), tbl.tableName, lastTS.ToString(), endTS.ToString(), tbl, tbl.db.txn.statementID))
 			for obj, _ := range deleteObjs {
 				buf.WriteString(obj.String())
 				buf.WriteByte(',')
