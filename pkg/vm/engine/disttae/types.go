@@ -464,7 +464,7 @@ func (txn *Transaction) StringLocked() string {
 	return w.String()
 }
 
-func (txn *Transaction) FullString() {
+func (txn *Transaction) FullString() string {
 	str := txn.String()
 	return fmt.Sprintf("%s\n[prev1]:::%s\n[prev2]:::%s", str, txn.xxprev1, txn.xxprev2)
 }
