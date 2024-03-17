@@ -50,7 +50,7 @@ func BuildObjectNameWithObjectID(segid *ObjectId) ObjectName {
 }
 
 func (s *ObjectNameShort) String() string {
-	return fmt.Sprintf("%s-%d", *&s.Segmentid().ToString(), s.Num())
+	return fmt.Sprintf("%s-%d", s.Segmentid().ToString(), s.Num())
 }
 
 func (s *ObjectNameShort) Segmentid() *Segmentid {
