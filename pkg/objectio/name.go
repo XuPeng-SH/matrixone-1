@@ -49,6 +49,10 @@ func BuildObjectNameWithObjectID(segid *ObjectId) ObjectName {
 	return unsafe.Slice((*byte)(unsafe.Pointer(&name)), ObjectNameLen)
 }
 
+func (s *ObjectNameShort) String() string {
+	return fmt.Sprintf("%s-%d", *&s.Segmentid().ToString(), s.Num())
+}
+
 func (s *ObjectNameShort) Segmentid() *Segmentid {
 	return (*Segmentid)(unsafe.Pointer(&s[0]))
 }

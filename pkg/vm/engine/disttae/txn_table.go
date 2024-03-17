@@ -15,9 +15,12 @@
 package disttae
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 	"unsafe"
 
@@ -642,8 +645,19 @@ func (tbl *txnTable) rangesOnePart(
 		if err != nil {
 			return err
 		}
-		deleteObjs, createObjs := state.GetChangedObjsBetween(types.TimestampToTS(tbl.lastTS),
-			types.TimestampToTS(tbl.db.txn.op.SnapshotTS()))
+		endTS := types.TimestampToTS(tbl.db.txn.op.SnapshotTS())
+		lastTS := types.TimestampToTS(tbl.lastTS)
+		deleteObjs, createObjs := state.GetChangedObjsBetween(lastTS, endTS)
+		if strings.HasPrefix(tbl.tableName, "sbtest") {
+			var buf bytes.Buffer
+			buf.WriteString(fmt.Sprintf("YYY4 %s:%s:(%s->%s),(", tbl.db.txn.op.Txn().DebugString(), tbl.tableName, lastTS, endTS))
+			for obj, _ := range deleteObjs {
+				buf.WriteString(obj.String())
+				buf.WriteByte(',')
+			}
+			buf.WriteByte(')')
+			logutil.Info(buf.String())
+		}
 		trace.GetService().ApplyFlush(
 			tbl.db.txn.op.Txn().ID,
 			tbl.tableId,

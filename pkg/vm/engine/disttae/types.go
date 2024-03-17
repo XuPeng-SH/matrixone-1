@@ -470,6 +470,7 @@ func (txn *Transaction) FullString() string {
 }
 
 func (txn *Transaction) RollbackLastStatement(ctx context.Context) error {
+	logutil.Infof("rollback %s:%d", txn.op.Txn().DebugString(), txn.statementID)
 	txn.Lock()
 	defer txn.Unlock()
 
