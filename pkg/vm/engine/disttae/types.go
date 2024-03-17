@@ -151,6 +151,8 @@ type Transaction struct {
 	//meta     *txn.TxnMeta
 	op       client.TxnOperator
 	sqlCount atomic.Uint64
+	xxprev1  string
+	xxprev2  string
 
 	// writes cache stores any writes done by txn
 	writes []Entry
@@ -442,15 +444,29 @@ func (txn *Transaction) gcObjs(start int, ctx context.Context) error {
 }
 
 func (txn *Transaction) String() string {
+	txn.Lock()
+	defer txn.Unlock()
+	return txn.StringLocked()
+}
+func (txn *Transaction) StringLocked() string {
 	var w bytes.Buffer
 	w.WriteString(fmt.Sprintf("YYY3 %s:", txn.op.Txn().DebugString()))
-	txn.Lock()
 	for i, entry := range txn.writes {
 		w.WriteByte('\n')
 		w.WriteString(fmt.Sprintf("Entry[%d]: %s", i, entry.String()))
 	}
-	txn.Unlock()
+	w.WriteByte('\n')
+	w.WriteString("[offsets]:")
+	for i, offset := range txn.offsets {
+		w.WriteString(fmt.Sprintf("(%d:%d),", i, offset))
+	}
+	w.WriteByte('\n')
 	return w.String()
+}
+
+func (txn *Transaction) FullString() {
+	str := txn.String()
+	return fmt.Sprintf("%s\n[prev1]:::%s\n[prev2]:::%s", str, txn.xxprev1, txn.xxprev2)
 }
 
 func (txn *Transaction) RollbackLastStatement(ctx context.Context) error {
@@ -459,6 +475,7 @@ func (txn *Transaction) RollbackLastStatement(ctx context.Context) error {
 
 	txn.rollbackCount++
 	if txn.statementID > 0 {
+		txn.xxprev1 = txn.StringLocked()
 		txn.clearTableCache()
 		txn.rollbackCreateTableLocked()
 
@@ -475,6 +492,7 @@ func (txn *Transaction) RollbackLastStatement(ctx context.Context) error {
 		}
 		txn.writes = txn.writes[:end]
 		txn.offsets = txn.offsets[:txn.statementID]
+		txn.xxprev2 = txn.StringLocked()
 	}
 	// rollback current statement's writes info
 	for b := range txn.batchSelectList {

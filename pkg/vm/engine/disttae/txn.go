@@ -974,6 +974,8 @@ func (txn *Transaction) delTransaction() {
 	}
 	colexec.Get().DeleteTxnSegmentIds(segmentnames)
 	txn.cnBlkId_Pos = nil
+	txn.xxprev1 = ""
+	txn.xxprev2 = ""
 	txn.hasS3Op.Store(false)
 	txn.removed = true
 }
