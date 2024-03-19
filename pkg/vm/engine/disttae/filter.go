@@ -1348,9 +1348,13 @@ func (n *leafNode) Eval() ReaderFilter {
 	case IN_AlgoOp:
 		return evalEQAndINFactory(n.val, n.vec, n.colPos, n.colType, n.isSortKey)
 	case LT_AlgoOp:
+		// TODO: implement me
 	case LE_AlgoOp:
+		// TODO: implement me
 	case GT_AlgoOp:
+		// TODO: implement me
 	case GE_AlgoOp:
+		// TODO: implement me
 	case PrefixEQ_AlgoOp:
 		return evalPrefixEQFactory(n.val, n.colPos, n.isSortKey)
 	case PrefixIN_AlgoOp:
@@ -1361,16 +1365,16 @@ func (n *leafNode) Eval() ReaderFilter {
 
 type intermediateNode struct {
 	canCompile bool
-	exprs      []leafNode
+	nodes      []leafNode
 	logicOps   []LogicOp
 }
 
-func (iexpr *intermediateNode) Eval() ReaderFilter {
-	if !iexpr.canCompile || len(iexpr.exprs) == 0 {
+func (inode *intermediateNode) Eval() ReaderFilter {
+	if !inode.canCompile || len(inode.nodes) == 0 {
 		return nil
 	}
-	if len(iexpr.exprs) == 1 {
-		return iexpr.exprs[0].Eval()
+	if len(inode.nodes) == 1 {
+		return inode.nodes[0].Eval()
 	}
 	return nil
 }
