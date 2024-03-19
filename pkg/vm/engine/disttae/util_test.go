@@ -758,7 +758,7 @@ func TestGetNonIntPkValueByExpr(t *testing.T) {
 
 	t.Run("test getPkValueByExpr", func(t *testing.T) {
 		for i, testCase := range testCases {
-			result, _, _, data := getPkValueByExpr(testCase.expr, "a", testCase.typ, true, nil)
+			result, _, _, _, data := getPkValueByExpr(testCase.expr, "a", testCase.typ, true, nil)
 			if result != testCase.result {
 				t.Fatalf("test getPkValueByExpr at cases[%d], get result is different with expected", i)
 			}
@@ -1245,7 +1245,7 @@ func TestGetPkExprValue(t *testing.T) {
 		},
 	}
 	for i, expr := range tc.exprs {
-		canEval, isNull, isVec, val := getPkValueByExpr(expr, "a", types.T_int64, false, proc)
+		canEval, isNull, isVec, _, val := getPkValueByExpr(expr, "a", types.T_int64, false, proc)
 		require.Equalf(t, tc.hasNull[i], isNull, tc.desc[i])
 		require.Equalf(t, tc.canEvals[i], canEval, tc.desc[i])
 		if !canEval {
@@ -1261,16 +1261,16 @@ func TestGetPkExprValue(t *testing.T) {
 		makeColExprForTest(0, types.T_int64),
 		plan2.MakePlan2Int64VecExprWithType(m, int64(1), int64(10)),
 	})
-	canEval, _, _, _ := getPkValueByExpr(expr, "a", types.T_int64, true, proc)
+	canEval, _, _, _, _ := getPkValueByExpr(expr, "a", types.T_int64, true, proc)
 	require.False(t, canEval)
-	canEval, _, _, _ = getPkValueByExpr(expr, "a", types.T_int64, false, proc)
+	canEval, _, _, _, _ = getPkValueByExpr(expr, "a", types.T_int64, false, proc)
 	require.True(t, canEval)
 
 	expr = makeFunctionExprForTest("in", []*plan.Expr{
 		makeColExprForTest(0, types.T_int64),
 		plan2.MakePlan2Int64VecExprWithType(m, int64(1)),
 	})
-	canEval, _, _, val := getPkValueByExpr(expr, "a", types.T_int64, true, proc)
+	canEval, _, _, _, val := getPkValueByExpr(expr, "a", types.T_int64, true, proc)
 	require.True(t, canEval)
 	require.True(t, equalToValFn([]int64{1}, val))
 

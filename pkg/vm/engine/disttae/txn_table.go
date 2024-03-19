@@ -1866,7 +1866,7 @@ func (tbl *txnTable) makeEncodedPK(
 			isExactlyEqual = len(pk.Names) == cnt
 		} else {
 			pkColumn := tbl.tableDef.Cols[tbl.primaryIdx]
-			ok, isNull, _, v := getPkValueByExpr(expr, pkColumn.Name, types.T(pkColumn.Typ.Id), true, tbl.proc.Load())
+			ok, isNull, _, isPrefix, v := getPkValueByExpr(expr, pkColumn.Name, types.T(pkColumn.Typ.Id), true, tbl.proc.Load())
 			hasNull = isNull
 			if hasNull {
 				return
@@ -1877,7 +1877,7 @@ func (tbl *txnTable) makeEncodedPK(
 				encodedPK = logtailreplay.EncodePrimaryKey(v, packer)
 				put.Put()
 			}
-			isExactlyEqual = true
+			isExactlyEqual = !isPrefix
 		}
 		return
 	}

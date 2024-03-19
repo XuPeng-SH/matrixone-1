@@ -717,29 +717,35 @@ func evalLiteralExpr(expr *plan.Literal, oid types.T) (canEval bool, val any) {
 	return
 }
 
-// return canEval, isNull, isVec, evaledVal
+// return canEval, isNull, isVec, isPrefix, evaledVal
 func getPkValueByExpr(
 	expr *plan.Expr,
 	pkName string,
 	oid types.T,
 	mustOne bool,
 	proc *process.Process,
-) (bool, bool, bool, any) {
+) (bool, bool, bool, bool, any) {
 	valExpr := getPkExpr(expr, pkName, proc)
 	if valExpr == nil {
-		return false, false, false, nil
+		return false, false, false, false, nil
 	}
 
 	switch exprImpl := valExpr.Expr.(type) {
+	case *plan.Expr_F:
+		switch exprImpl.F.Func.ObjName {
+		case "prefix_eq":
+			val := util.UnsafeStringToBytes(exprImpl.F.Args[1].GetLit().GetSval())
+			return true, false, false, true, val
+		}
 	case *plan.Expr_Lit:
 		if exprImpl.Lit.Isnull {
-			return false, true, false, nil
+			return false, true, false, false, nil
 		}
 		canEval, val := evalLiteralExpr(exprImpl.Lit, oid)
 		if canEval {
-			return true, false, false, val
+			return true, false, false, false, val
 		} else {
-			return false, false, false, nil
+			return false, false, false, false, nil
 		}
 
 	case *plan.Expr_Vec:
@@ -747,37 +753,37 @@ func getPkValueByExpr(
 			vec := vector.NewVec(types.T_any.ToType())
 			vec.UnmarshalBinary(exprImpl.Vec.Data)
 			if vec.Length() != 1 {
-				return false, false, false, nil
+				return false, false, false, false, nil
 			}
 			exprLit := rule.GetConstantValue(vec, true, 0)
 			if exprLit == nil {
-				return false, false, false, nil
+				return false, false, false, false, nil
 			}
 			if exprLit.Isnull {
-				return false, true, false, nil
+				return false, true, false, false, nil
 			}
 			canEval, val := evalLiteralExpr(exprLit, oid)
 			if canEval {
-				return true, false, false, val
+				return true, false, false, false, val
 			}
-			return false, false, false, nil
+			return false, false, false, false, nil
 		}
-		return true, false, true, exprImpl.Vec.Data
+		return true, false, true, false, exprImpl.Vec.Data
 
 	case *plan.Expr_List:
 		if mustOne {
-			return false, false, false, nil
+			return false, false, false, false, nil
 		}
 		canEval, vec, put := evalExprListToVec(oid, exprImpl, proc)
 		if !canEval || vec == nil || vec.Length() == 0 {
-			return false, false, false, nil
+			return false, false, false, false, nil
 		}
 		data, _ := vec.MarshalBinary()
 		put()
-		return true, false, true, data
+		return true, false, true, false, data
 	}
 
-	return false, false, false, nil
+	return false, false, false, false, nil
 }
 
 func evalExprListToVec(
@@ -1284,7 +1290,8 @@ func extractPKValueFromEqualExprs(
 	colType := types.T(column.Typ.Id)
 	for _, expr := range exprs {
 		var v any
-		if canEval, _, isVec, v = getPkValueByExpr(expr, name, colType, false, proc); canEval {
+		var isPrefix bool
+		if canEval, _, isVec, isPrefix, v = getPkValueByExpr(expr, name, colType, false, proc); canEval && !isPrefix {
 			if isVec {
 				val = v.([]byte)
 			} else {
