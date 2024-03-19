@@ -1369,6 +1369,44 @@ type intermediateNode struct {
 	logicOps   []LogicOp
 }
 
+func (inode *intermediateNode) addEQLeaf(colPos uint16, colType types.T, val []byte, isSortKey bool) {
+	inode.nodes = append(inode.nodes, leafNode{
+		op:        EQ_AlgoOp,
+		colPos:    colPos,
+		colType:   colType,
+		val:       val,
+		isSortKey: isSortKey,
+	})
+}
+
+func (inode *intermediateNode) addINLeaf(colPos uint16, colType types.T, vec *vector.Vector, isSortKey bool) {
+	inode.nodes = append(inode.nodes, leafNode{
+		op:        IN_AlgoOp,
+		colPos:    colPos,
+		colType:   colType,
+		vec:       vec,
+		isSortKey: isSortKey,
+	})
+}
+
+func (inode *intermediateNode) addPrefixEQLeaf(colPos uint16, val []byte, isSortKey bool) {
+	inode.nodes = append(inode.nodes, leafNode{
+		op:        PrefixEQ_AlgoOp,
+		colPos:    colPos,
+		val:       val,
+		isSortKey: isSortKey,
+	})
+}
+
+func (inode *intermediateNode) addPrefixINLeaf(colPos uint16, vec *vector.Vector, isSortKey bool) {
+	inode.nodes = append(inode.nodes, leafNode{
+		op:        PrefixIN_AlgoOp,
+		colPos:    colPos,
+		vec:       vec,
+		isSortKey: isSortKey,
+	})
+}
+
 func (inode *intermediateNode) Eval() ReaderFilter {
 	if !inode.canCompile || len(inode.nodes) == 0 {
 		return nil
@@ -1380,10 +1418,50 @@ func (inode *intermediateNode) Eval() ReaderFilter {
 }
 
 func CompileReaderFilterExpr(
-	tableDef *plan.TableDef, expr *plan.Expr,
+	tableDef *plan.TableDef, expr *plan.Expr, proc *process.Process,
 ) (filter ReaderFilter, err error) {
 	if expr == nil {
 		return
 	}
 	return
+}
+
+func doCompileReaderFilterExpr(
+	tableDef *plan.TableDef, expr *plan.Expr, node *intermediateNode, proc *process.Process,
+) bool {
+	switch exprImpl := expr.Expr.(type) {
+	case *plan.Expr_F:
+		switch exprImpl.F.Func.ObjName {
+		case "or":
+			if !doCompileReaderFilterExpr(tableDef, exprImpl.F.Args[0], node) {
+				return false
+			}
+			node.logicOps = append(node.logicOps, OR_LogicOp)
+			if !doCompileReaderFilterExpr(tableDef, exprImpl.F.Args[1], node) {
+				return false
+			}
+			return true
+		case "and":
+			if !doCompileReaderFilterExpr(tableDef, exprImpl.F.Args[0], node) {
+				return
+			}
+			node.logicOps = append(node.logicOps, AND_LogicOp)
+			if !doCompileReaderFilterExpr(tableDef, exprImpl.F.Args[1], node) {
+				return
+			}
+			return true
+		case "=":
+			colExpr, vals, ok := mustColConstValueFromBinaryFuncExpr(exprImpl, tableDef, nil)
+			if !ok {
+				return false
+			}
+			colDef := getColDefByName(colExpr.Col.Name, tableDef)
+			_, isSorted := isSortedKey(colDef)
+		case "in":
+		case "prefix_eq":
+		case "prefix_in":
+		case "prefix_between":
+		}
+	}
+	return false
 }
