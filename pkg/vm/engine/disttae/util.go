@@ -525,12 +525,12 @@ func getNonCompositePKSearchFuncByExpr(
 		switch exprImpl.F.Func.ObjName {
 		case "prefix_eq":
 			val := util.UnsafeStringToBytes(exprImpl.F.Args[1].GetLit().GetSval())
-			searchPKFunc = vector.CollectOffsetsByPrefixEqFactory(val)
+			searchPKFunc = vector.CollectOffsetsByPrefixEqSortedFactory(val)
 
 		case "prefix_between":
 			lval := util.UnsafeStringToBytes(exprImpl.F.Args[1].GetLit().GetSval())
 			rval := util.UnsafeStringToBytes(exprImpl.F.Args[2].GetLit().GetSval())
-			searchPKFunc = vector.CollectOffsetsByPrefixBetweenFactory(lval, rval)
+			searchPKFunc = vector.CollectOffsetsByPrefixBetweenSortedFactory(lval, rval)
 
 		case "prefix_in":
 			vec := vector.NewVec(types.T_any.ToType())

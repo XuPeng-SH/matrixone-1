@@ -92,10 +92,10 @@ func TestCollectOffsetsByPrefixEqFactory(t *testing.T) {
 	prefix3 := []byte("14")
 	prefix4 := []byte("113")
 
-	fn1 := CollectOffsetsByPrefixEqFactory(prefix1)
-	fn2 := CollectOffsetsByPrefixEqFactory(prefix2)
-	fn3 := CollectOffsetsByPrefixEqFactory(prefix3)
-	fn4 := CollectOffsetsByPrefixEqFactory(prefix4)
+	fn1 := CollectOffsetsByPrefixEqSortedFactory(prefix1)
+	fn2 := CollectOffsetsByPrefixEqSortedFactory(prefix2)
+	fn3 := CollectOffsetsByPrefixEqSortedFactory(prefix3)
+	fn4 := CollectOffsetsByPrefixEqSortedFactory(prefix4)
 	off1 := fn1(v1)
 	off2 := fn2(v1)
 	off3 := fn3(v1)
@@ -123,8 +123,8 @@ func TestCollectOffsetsByPrefixBetweenFactory(t *testing.T) {
 	left2 := []byte("113")
 	right2 := []byte("124")
 
-	fn1 := CollectOffsetsByPrefixBetweenFactory(left1, right1)
-	fn2 := CollectOffsetsByPrefixBetweenFactory(left2, right2)
+	fn1 := CollectOffsetsByPrefixBetweenSortedFactory(left1, right1)
+	fn2 := CollectOffsetsByPrefixBetweenSortedFactory(left2, right2)
 	off1 := fn1(v1)
 	off2 := fn2(v1)
 

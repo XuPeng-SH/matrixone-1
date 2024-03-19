@@ -1143,3 +1143,244 @@ func ExecuteBlockFilter(
 	)
 	return
 }
+
+// -------------------------------------------
+// ----------- Reader Filter -----------------
+//--------------------------------------------
+
+type AlgoOp uint8
+type LogicOp uint8
+
+const (
+	Invalid_AlgoOp AlgoOp = iota
+	EQ_AlgoOp
+	IN_AlgoOp
+	LT_AlgoOp
+	LE_AlgoOp
+	GT_AlgoOp
+	GE_AlgoOp
+	PrefixEQ_AlgoOp
+	PrefixIN_AlgoOp
+)
+
+const (
+	Invalid_LogicOp LogicOp = iota
+	AND_LogicOp
+	OR_LogicOp
+)
+
+type ReaderFilter func([]*vector.Vector, bool, bool) []int32
+type InternalReaderFilter func([]*vector.Vector, []int32, *[]int32, bool, bool)
+
+func evalFixSizedEQAndINFactory[T types.FixedSizeT](
+	val []byte, vec *vector.Vector, colPos uint16, cmp func(T, T) int, isSortKey bool,
+) ReaderFilter {
+	var vals []T
+	if vec != nil {
+		vals = vector.MustFixedCol[T](vec)
+	} else {
+		vals = []T{types.DecodeFixed[T](val)}
+	}
+	return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
+		isSorted := isSortKey && sorted
+		if isSorted {
+			fn := vector.FixedSizedBinarySearchOffsetByValFactory(vals, cmp)
+			return fn(vecs[colPos])
+		}
+		fn := vector.FixedSizeSearchOffsetByValFactory(vals, cmp)
+		return fn(vecs[colPos])
+	}
+}
+
+func evalOrderedEQAndINFactory[T types.OrderedT](
+	val []byte, vec *vector.Vector, colPos uint16, isSortKey bool,
+) ReaderFilter {
+	var vals []T
+	if vec != nil {
+		vals = vector.MustFixedCol[T](vec)
+	} else {
+		vals = []T{types.DecodeFixed[T](val)}
+	}
+	return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
+		isSorted := isSortKey && sorted
+		if isSorted {
+			fn := vector.OrderedBinarySearchOffsetByValFactory(vals)
+			return fn(vecs[colPos])
+		}
+		fn := vector.OrderedSearchOffsetByValFactory(vals)
+		return fn(vecs[colPos])
+	}
+}
+
+// PrefixEQ
+func evalPrefixEQFactory(val []byte, colPos uint16, isSortKey bool) ReaderFilter {
+	return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
+		isSorted := isSortKey && sorted
+		if isSorted {
+			return vector.CollectOffsetsByPrefixEqSortedFactory(val)(vecs[colPos])
+		}
+		return vector.CollectOffsetsByPrefixEqFactory(val)(vecs[colPos])
+	}
+}
+
+// PrefixIN
+func evalPrefixINFactory(vec *vector.Vector, colPos uint16, isSortKey bool) ReaderFilter {
+	return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
+		isSorted := isSortKey && sorted
+		if isSorted {
+			return vector.CollectOffsetsByPrefixInFactory(vec)(vecs[colPos])
+		}
+		// TODO: check correctness
+		return vector.CollectOffsetsByPrefixInFactory(vec)(vecs[colPos])
+	}
+}
+
+// EQ and IN
+func evalEQAndINFactory(
+	val []byte, vec *vector.Vector, colPos uint16, colType types.T, isSortKey bool,
+) ReaderFilter {
+	switch colType {
+	case types.T_bool:
+		return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
+			isSorted := isSortKey && sorted
+			var vals []bool
+			if vec != nil {
+				vals = vector.MustFixedCol[bool](vec)
+			} else {
+				vals = []bool{types.DecodeFixed[bool](val)}
+			}
+			cmp := func(lhs, rhs bool) int {
+				if lhs == rhs {
+					return 0
+				}
+				if lhs {
+					return 1
+				}
+				return -1
+			}
+			if isSorted {
+				return vector.FixedSizedBinarySearchOffsetByValFactory(vals, cmp)(vecs[colPos])
+			}
+			return vector.FixedSizeSearchOffsetByValFactory(vals, cmp)(vecs[colPos])
+		}
+	case types.T_int8:
+		return evalOrderedEQAndINFactory[int8](val, vec, colPos, isSortKey)
+	case types.T_int16:
+		return evalOrderedEQAndINFactory[int16](val, vec, colPos, isSortKey)
+	case types.T_int32:
+		return evalOrderedEQAndINFactory[int32](val, vec, colPos, isSortKey)
+	case types.T_int64:
+		return evalOrderedEQAndINFactory[int64](val, vec, colPos, isSortKey)
+	case types.T_uint8:
+		return evalOrderedEQAndINFactory[uint8](val, vec, colPos, isSortKey)
+	case types.T_uint16:
+		return evalOrderedEQAndINFactory[uint16](val, vec, colPos, isSortKey)
+	case types.T_uint32:
+		return evalOrderedEQAndINFactory[uint32](val, vec, colPos, isSortKey)
+	case types.T_uint64:
+		return evalOrderedEQAndINFactory[uint64](val, vec, colPos, isSortKey)
+	case types.T_float32:
+		return evalOrderedEQAndINFactory[float32](val, vec, colPos, isSortKey)
+	case types.T_float64:
+		return evalOrderedEQAndINFactory[float64](val, vec, colPos, isSortKey)
+	case types.T_date:
+		return evalOrderedEQAndINFactory[types.Date](val, vec, colPos, isSortKey)
+	case types.T_time:
+		return evalOrderedEQAndINFactory[types.Time](val, vec, colPos, isSortKey)
+	case types.T_datetime:
+		return evalOrderedEQAndINFactory[types.Datetime](val, vec, colPos, isSortKey)
+	case types.T_timestamp:
+		return evalOrderedEQAndINFactory[types.Timestamp](val, vec, colPos, isSortKey)
+	case types.T_enum:
+		return evalOrderedEQAndINFactory[types.Enum](val, vec, colPos, isSortKey)
+	case types.T_decimal64:
+		return evalFixSizedEQAndINFactory[types.Decimal64](val, vec, colPos, types.CompareDecimal64, isSortKey)
+	case types.T_decimal128:
+		return evalFixSizedEQAndINFactory[types.Decimal128](val, vec, colPos, types.CompareDecimal128, isSortKey)
+	}
+	if !colType.IsFixedLen() {
+		return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
+			isSorted := isSortKey && sorted
+			var vals [][]byte
+			if vec != nil {
+				vals = vector.MustBytesCol(vec)
+			} else {
+				vals = [][]byte{val}
+			}
+			if isSorted {
+				// TODO: optimize me later not to use MustBytesCol
+				return vector.VarlenBinarySearchOffsetByValFactory(vals)(vecs[colPos])
+			}
+			// TODO: optimize me later not to use MustBytesCol
+			return vector.VarlenSearchOffsetByValFactory(vals)(vecs[colPos])
+		}
+	}
+	return nil
+}
+
+type leafNode struct {
+	op        AlgoOp
+	colPos    uint16
+	colType   types.T
+	val       []byte
+	vec       *vector.Vector
+	closer    func()
+	isSortKey bool
+}
+
+func (n *leafNode) CanCompile() bool {
+	return n.op != Invalid_AlgoOp
+}
+
+func (n *leafNode) Close() {
+	if n.closer != nil {
+		n.closer()
+		n.closer = nil
+	}
+}
+
+func (n *leafNode) Eval() ReaderFilter {
+	if !n.CanCompile() {
+		return nil
+	}
+	switch n.op {
+	case EQ_AlgoOp:
+		return evalEQAndINFactory(n.val, n.vec, n.colPos, n.colType, n.isSortKey)
+	case IN_AlgoOp:
+		return evalEQAndINFactory(n.val, n.vec, n.colPos, n.colType, n.isSortKey)
+	case LT_AlgoOp:
+	case LE_AlgoOp:
+	case GT_AlgoOp:
+	case GE_AlgoOp:
+	case PrefixEQ_AlgoOp:
+		return evalPrefixEQFactory(n.val, n.colPos, n.isSortKey)
+	case PrefixIN_AlgoOp:
+		return evalPrefixINFactory(n.vec, n.colPos, n.isSortKey)
+	}
+	return nil
+}
+
+type intermediateNode struct {
+	canCompile bool
+	exprs      []leafNode
+	logicOps   []LogicOp
+}
+
+func (iexpr *intermediateNode) Eval() ReaderFilter {
+	if !iexpr.canCompile || len(iexpr.exprs) == 0 {
+		return nil
+	}
+	if len(iexpr.exprs) == 1 {
+		return iexpr.exprs[0].Eval()
+	}
+	return nil
+}
+
+func CompileReaderFilterExpr(
+	tableDef *plan.TableDef, expr *plan.Expr,
+) (filter ReaderFilter, err error) {
+	if expr == nil {
+		return
+	}
+	return
+}

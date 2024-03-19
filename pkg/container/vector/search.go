@@ -23,6 +23,52 @@ import (
 
 const kMaxLenForBinarySearch = 64
 
+func VarlenSearchOffsetByValFactory(vals [][]byte) func(*Vector) []int32 {
+	return func(vec *Vector) []int32 {
+		var sels []int32
+		data, area := MustVarlenaRawData(vec)
+		for i, vl := range data {
+			row := vl.GetByteSlice(area)
+			for _, val := range vals {
+				if bytes.Compare(row, val) == 0 {
+					sels = append(sels, int32(i))
+				}
+			}
+		}
+		return sels
+	}
+}
+
+func FixedSizeSearchOffsetByValFactory[T any](vals []T, cmp func(T, T) int) func(*Vector) []int32 {
+	return func(vec *Vector) []int32 {
+		var sels []int32
+		rows := MustFixedCol[T](vec)
+		for i, row := range rows {
+			for _, val := range vals {
+				if cmp(row, val) == 0 {
+					sels = append(sels, int32(i))
+				}
+			}
+		}
+		return sels
+	}
+}
+
+func OrderedSearchOffsetByValFactory[T types.OrderedT](vals []T) func(*Vector) []int32 {
+	return func(vec *Vector) []int32 {
+		var sels []int32
+		rows := MustFixedCol[T](vec)
+		for i, row := range rows {
+			for _, val := range vals {
+				if row == val {
+					sels = append(sels, int32(i))
+				}
+			}
+		}
+		return sels
+	}
+}
+
 func OrderedBinarySearchOffsetByValFactory[T types.OrderedT](vals []T) func(*Vector) []int32 {
 	return func(vec *Vector) []int32 {
 		var sels []int32
@@ -168,6 +214,23 @@ func CollectOffsetsByPrefixEqFactory(val []byte) func(*Vector) []int32 {
 			return nil
 		}
 		lcol, larea := MustVarlenaRawData(lvec)
+		var sels []int32
+		for i := 0; i < lvlen; i++ {
+			if bytes.HasPrefix(lcol[i].GetByteSlice(larea), val) {
+				sels = append(sels, int32(i))
+			}
+		}
+		return sels
+	}
+}
+
+func CollectOffsetsByPrefixEqSortedFactory(val []byte) func(*Vector) []int32 {
+	return func(lvec *Vector) []int32 {
+		lvlen := lvec.Length()
+		if lvlen == 0 {
+			return nil
+		}
+		lcol, larea := MustVarlenaRawData(lvec)
 		start, _ := sort.Find(lvlen, func(i int) int {
 			return bytes.Compare(val, lcol[i].GetByteSlice(larea))
 		})
@@ -186,7 +249,7 @@ func CollectOffsetsByPrefixEqFactory(val []byte) func(*Vector) []int32 {
 	}
 }
 
-func CollectOffsetsByPrefixBetweenFactory(lval, rval []byte) func(*Vector) []int32 {
+func CollectOffsetsByPrefixBetweenSortedFactory(lval, rval []byte) func(*Vector) []int32 {
 	return func(lvec *Vector) []int32 {
 		lvlen := lvec.Length()
 		if lvlen == 0 {
