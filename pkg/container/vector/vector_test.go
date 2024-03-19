@@ -1869,6 +1869,40 @@ func TestSetFunction2(t *testing.T) {
 	}
 }
 
+func TestSearch(t *testing.T) {
+	mp := mpool.MustNewZero()
+	vec1 := NewVec(types.T_int64.ToType())
+	defer vec1.Free(mp)
+	AppendAny(vec1, int64(2), false, mp)
+	AppendAny(vec1, int64(1), false, mp)
+	AppendAny(vec1, int64(3), false, mp)
+	AppendAny(vec1, int64(2), false, mp)
+	AppendAny(vec1, int64(2), false, mp)
+
+	cmp := func(r, l int64) int {
+		if r > l {
+			return 1
+		} else if r < l {
+			return -1
+		}
+		return 0
+	}
+
+	fn := OrderedSearchOffsetByValFactory([]int64{2})
+	sels := fn(vec1)
+	require.Equal(t, []int32{0, 3, 4}, sels)
+	fn = FixedSizeSearchOffsetByValFactory([]int64{2}, cmp)
+	sels = fn(vec1)
+	require.Equal(t, []int32{0, 3, 4}, sels)
+
+	fn = OrderedSearchOffsetByValFactory([]int64{1, 3})
+	sels = fn(vec1)
+	require.Equal(t, []int32{1, 2}, sels)
+	fn = FixedSizeSearchOffsetByValFactory([]int64{1, 3}, cmp)
+	sels = fn(vec1)
+	require.Equal(t, []int32{1, 2}, sels)
+}
+
 func BenchmarkUnmarshal(b *testing.B) {
 	mp := mpool.MustNewZero()
 	vec := NewVec(types.T_int8.ToType())
