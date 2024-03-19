@@ -535,7 +535,7 @@ func getNonCompositePKSearchFuncByExpr(
 		case "prefix_in":
 			vec := vector.NewVec(types.T_any.ToType())
 			vec.UnmarshalBinary(exprImpl.F.Args[1].GetVec().Data)
-			searchPKFunc = vector.CollectOffsetsByPrefixInFactory(vec)
+			searchPKFunc = vector.CollectOffsetsByPrefixInSortedFactory(vec)
 		}
 
 	case *plan.Expr_Vec:

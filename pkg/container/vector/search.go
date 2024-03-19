@@ -282,6 +282,26 @@ func CollectOffsetsByPrefixInFactory(rvec *Vector) func(*Vector) []int32 {
 		if lvlen == 0 {
 			return nil
 		}
+		rcol, rarea := MustVarlenaRawData(rvec)
+		lcol, larea := MustVarlenaRawData(lvec)
+		var sels []int32
+		for i := 0; i < lvlen; i++ {
+			for j := 0; j < rvec.Length(); j++ {
+				if bytes.HasPrefix(lcol[i].GetByteSlice(larea), rcol[j].GetByteSlice(rarea)) {
+					sels = append(sels, int32(i))
+				}
+			}
+		}
+		return sels
+	}
+}
+
+func CollectOffsetsByPrefixInSortedFactory(rvec *Vector) func(*Vector) []int32 {
+	return func(lvec *Vector) []int32 {
+		lvlen := lvec.Length()
+		if lvlen == 0 {
+			return nil
+		}
 
 		lcol, larea := MustVarlenaRawData(lvec)
 		rcol, rarea := MustVarlenaRawData(rvec)

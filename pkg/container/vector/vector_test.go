@@ -1901,6 +1901,35 @@ func TestSearch(t *testing.T) {
 	fn = FixedSizeSearchOffsetByValFactory([]int64{1, 3}, cmp)
 	sels = fn(vec1)
 	require.Equal(t, []int32{1, 2}, sels)
+
+	vec2 := NewVec(types.T_char.ToType())
+	defer vec2.Free(mp)
+
+	// "cba", "acb", "bca", "bac", "bcdd", "cbcc"
+	AppendBytes(vec2, []byte("cba"), false, mp)
+	AppendBytes(vec2, []byte("acb"), false, mp)
+	AppendBytes(vec2, []byte("bca"), false, mp)
+	AppendBytes(vec2, []byte("cba"), false, mp)
+	AppendBytes(vec2, []byte("bcdd"), false, mp)
+	AppendBytes(vec2, []byte("cbcc"), false, mp)
+
+	fn = VarlenSearchOffsetByValFactory([][]byte{[]byte("dd")})
+	sels = fn(vec2)
+	require.True(t, len(sels) == 0)
+	fn = VarlenSearchOffsetByValFactory([][]byte{[]byte("cba")})
+	sels = fn(vec2)
+	require.Equal(t, []int32{0, 3}, sels)
+
+	fn = CollectOffsetsByPrefixEqFactory([]byte("bc"))
+	sels = fn(vec2)
+	require.Equal(t, []int32{2, 4}, sels)
+	inVec := NewVec(types.T_char.ToType())
+	defer inVec.Free(mp)
+	AppendBytes(inVec, []byte("bc"), false, mp)
+	AppendBytes(inVec, []byte("cb"), false, mp)
+	fn = CollectOffsetsByPrefixInFactory(inVec)
+	sels = fn(vec2)
+	require.Equal(t, []int32{0, 2, 3, 4, 5}, sels)
 }
 
 func BenchmarkUnmarshal(b *testing.B) {

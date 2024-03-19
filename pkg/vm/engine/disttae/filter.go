@@ -1228,9 +1228,8 @@ func evalPrefixINFactory(vec *vector.Vector, colPos uint16, isSortKey bool) Read
 	return func(vecs []*vector.Vector, sorted bool, _ bool) []int32 {
 		isSorted := isSortKey && sorted
 		if isSorted {
-			return vector.CollectOffsetsByPrefixInFactory(vec)(vecs[colPos])
+			return vector.CollectOffsetsByPrefixInSortedFactory(vec)(vecs[colPos])
 		}
-		// TODO: check correctness
 		return vector.CollectOffsetsByPrefixInFactory(vec)(vecs[colPos])
 	}
 }
