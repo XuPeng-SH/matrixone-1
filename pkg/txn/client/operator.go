@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"runtime/trace"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -620,6 +621,15 @@ func (tc *txnOperator) Debug(ctx context.Context, requests []txn.TxnRequest) (*r
 }
 
 func (tc *txnOperator) doWrite(ctx context.Context, requests []txn.TxnRequest, commit bool) (*rpc.SendResult, error) {
+	var task1 *trace.Task
+	if commit {
+		_, task = trace.NewTask(context.Background(), "cnCommit")
+	}
+	defer func() {
+		if task1 != nil {
+			task1.End()
+		}
+	}()
 	for idx := range requests {
 		requests[idx].Method = txn.TxnMethod_Write
 	}
@@ -647,7 +657,11 @@ func (tc *txnOperator) doWrite(ctx context.Context, requests []txn.TxnRequest, c
 
 		if tc.needUnlockLocked() {
 			tc.mu.txn.LockTables = tc.mu.lockTables
-			defer tc.unlock(ctx)
+			defer func() {
+				_, task := trace.NewTask(context.Background(), "unlock")
+				tc.unlock(ctx)
+				task.End()
+			}()
 		}
 	}
 
