@@ -487,12 +487,10 @@ func (mgr *TxnManager) dequeuePreparing(items ...any) {
 			panic(err)
 		}
 	}
-	common.DoIfDebugEnabled(func() {
-		logutil.Debug("[dequeuePreparing]",
-			common.NameSpaceField("txns"),
-			common.DurationField(time.Since(now)),
-			common.CountField(len(items)))
-	})
+	logutil.Info("[xxx-1]",
+		common.NameSpaceField("txns"),
+		common.DurationField(time.Since(now)),
+		common.CountField(len(items)))
 }
 
 func (mgr *TxnManager) onPrepareWAL(items ...any) {
@@ -542,12 +540,10 @@ func (mgr *TxnManager) onPrepareWAL(items ...any) {
 			)
 		}
 	}
-	common.DoIfDebugEnabled(func() {
-		logutil.Debug("[prepareWAL]",
-			common.NameSpaceField("txns"),
-			common.DurationField(time.Since(now)),
-			common.CountField(len(items)))
-	})
+	logutil.Info("[xxx-2]",
+		common.NameSpaceField("txns"),
+		common.DurationField(time.Since(now)),
+		common.CountField(len(items)))
 }
 
 // 1PC and 2PC
