@@ -50,6 +50,9 @@ type Entry interface {
 	GetInfoBuf() []byte
 	SetInfoBuf(buf []byte)
 
+	RegisterPreCallback(func() error)
+	ExecutePreCallbacks() error
+
 	SetPayload([]byte) error
 	UnmarshalFromNode([]byte, bool) error
 

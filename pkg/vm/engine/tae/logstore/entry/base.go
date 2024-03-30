@@ -223,6 +223,7 @@ func (info *Info) ToString() string {
 
 type Base struct {
 	*descriptor
+
 	payload   []byte
 	info      any
 	infobuf   []byte
@@ -230,6 +231,8 @@ type Base struct {
 	t0        time.Time
 	printTime bool
 	err       error
+
+	preCallbacks []func() error
 }
 
 func GetBase() *Base {
@@ -241,6 +244,20 @@ func GetBase() *Base {
 	b.wg.Add(1)
 	return b
 }
+
+func (b *Base) RegisterPreCallback(cb func() error) {
+	b.preCallbacks = append(b.preCallbacks, cb)
+}
+
+func (b *Base) ExecutePreCallbacks() error {
+	for _, cb := range b.preCallbacks {
+		if err := cb(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (b *Base) StartTime() {
 	b.t0 = time.Now()
 }
@@ -262,6 +279,7 @@ func (b *Base) reset() {
 	b.t0 = time.Time{}
 	b.printTime = false
 	b.err = nil
+	b.preCallbacks = nil
 }
 func (b *Base) GetInfoBuf() []byte {
 	return b.infobuf
@@ -433,14 +451,19 @@ func (b *Base) ReadAt(r *os.File, offset int) (int, error) {
 }
 
 func (b *Base) PrepareWrite() {
-	if b.info == nil {
-		return
-	}
-	buf, err := b.info.(*Info).Marshal()
-	if err != nil {
-		panic(err)
-	}
-	b.SetInfoBuf(buf)
+	// delay and parallelize the marshal call
+	b.RegisterPreCallback(func() error {
+		if b.info == nil {
+			return nil
+		}
+		buf, err := b.info.(*Info).Marshal()
+		if err != nil {
+			panic(err)
+		}
+		b.SetInfoBuf(buf)
+
+		return nil
+	})
 }
 
 func (b *Base) WriteTo(w io.Writer) (int64, error) {
