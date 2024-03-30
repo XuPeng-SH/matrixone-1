@@ -623,7 +623,7 @@ func (tc *txnOperator) Debug(ctx context.Context, requests []txn.TxnRequest) (*r
 func (tc *txnOperator) doWrite(ctx context.Context, requests []txn.TxnRequest, commit bool) (*rpc.SendResult, error) {
 	var task1 *trace.Task
 	if commit {
-		_, task = trace.NewTask(context.Background(), "cnCommit")
+		_, task1 = trace.NewTask(context.Background(), "cnCommit")
 	}
 	defer func() {
 		if task1 != nil {
