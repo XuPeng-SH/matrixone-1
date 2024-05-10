@@ -4,3 +4,4 @@ data-dir = "./mo-data"
 
 [log]
 level = "info"
+format = "console"

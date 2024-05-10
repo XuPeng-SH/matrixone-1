@@ -673,6 +673,9 @@ func (tbl *txnTable) Ranges(ctx context.Context, exprs []*plan.Expr) (ranges eng
 			err)
 
 		v2.TxnTableRangeDurationHistogram.Observe(cost.Seconds())
+		if strings.HasPrefix(tbl.tableDef.Name, "%!%p0%!%bmsql_") && ranges.Len() > 20 {
+			logutil.Infof("yyyy %s:%s%d:%s", tbl.tableDef.Name, tbl.db.op.Txn().DebugString(), ranges.Len(), plan2.FormatExprs(exprs))
+		}
 	}()
 
 	var blocks objectio.BlockInfoSlice
@@ -1925,6 +1928,13 @@ func (tbl *txnTable) NewReader(
 	ctx context.Context, num int, expr *plan.Expr, ranges []byte, orderedScan bool,
 ) ([]engine.Reader, error) {
 	encodedPK, hasNull, _ := tbl.makeEncodedPK(expr)
+	if strings.HasPrefix(tbl.tableDef.Name, "%!%p0%!%bmsql_") {
+		ss := "none"
+		if expr != nil {
+			ss = plan2.FormatExpr(expr)
+		}
+		logutil.Infof("xxxx %s:%d:%s", tbl.tableDef.Name, len(encodedPK), ss)
+	}
 	blkArray := objectio.BlockInfoSlice(ranges)
 	if hasNull || plan2.IsFalseExpr(expr) {
 		return []engine.Reader{new(emptyReader)}, nil
