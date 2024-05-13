@@ -19,7 +19,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/config"
@@ -1092,6 +1091,7 @@ func buildValueScan(
 		}
 	}
 	bat.SetRowCount(len(slt.Rows))
+	rowsetData.RowCount = int32(len(slt.Rows))
 	nodeId, _ := uuid.NewV7()
 	scanNode := &plan.Node{
 		NodeType:      plan.Node_VALUE_SCAN,

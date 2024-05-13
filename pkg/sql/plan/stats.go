@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
-
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -32,6 +30,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	pb "github.com/matrixorigin/matrixone/pkg/pb/statsinfo"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
 	"github.com/matrixorigin/matrixone/pkg/sql/util"
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
@@ -799,8 +798,7 @@ func ReCalcNodeStats(nodeID int32, builder *QueryBuilder, recursive bool, leafNo
 
 	case plan.Node_VALUE_SCAN:
 		if node.RowsetData != nil {
-			colsData := node.RowsetData.Cols
-			rowCount := float64(len(colsData[0].Data))
+			rowCount := float64(node.RowsetData.RowCount)
 			node.Stats.TableCnt = rowCount
 			node.Stats.BlockNum = int32(rowCount/float64(options.DefaultBlockMaxRows) + 1)
 			node.Stats.Cost = rowCount
