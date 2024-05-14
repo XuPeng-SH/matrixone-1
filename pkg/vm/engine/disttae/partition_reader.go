@@ -43,6 +43,7 @@ type PartitionReader struct {
 	iter     logtailreplay.RowsIter
 	seqnumMp map[string]int
 	typsMap  map[string]types.Type
+	expr     *plan.Expr
 }
 
 var _ engine.Reader = new(PartitionReader)
@@ -132,6 +133,17 @@ func (p *PartitionReader) Read(
 	}
 
 	defer func() {
+		// if strings.HasPrefix(p.table.tableDef.Name, "%!%p0%!%bmsql_") {
+		// 	cnt := 0
+		// 	if result != nil {
+		// 		cnt = result.RowCount()
+		// 	}
+		// 	logutil.Infof("xxxx-2 %d:%p:%s", cnt, p.expr, p.table.tableDef.Name)
+		// 	// if cnt > 100 {
+		// 	// } else {
+		// 	// 	logutil.Infof("xxxx-2 %d:%s", cnt, p.table.tableDef.Name)
+		// 	// }
+		// }
 		if err != nil && result != nil {
 			if pool == nil {
 				result.Clean(mp)

@@ -515,6 +515,9 @@ func (r *blockReader) Read(
 	if err != nil {
 		return nil, err
 	}
+	// if strings.HasPrefix(r.tableDef.Name, "%!%p0%!%bmsql_stock") {
+	// 	logutil.Infof("xxxx-1 %d:%v:%s:%s", bat.RowCount(), filter, r.tableDef.Name, plan2.FormatExpr(r.filterState.expr))
+	// }
 
 	if filter != nil {
 		// we collect mem cache hit related statistics info for blk read here

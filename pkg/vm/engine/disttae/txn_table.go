@@ -1914,6 +1914,9 @@ func (tbl *txnTable) NewReader(
 	ctx context.Context, num int, expr *plan.Expr, ranges []byte, orderedScan bool,
 ) ([]engine.Reader, error) {
 	pkFilter := tbl.tryExtractPKFilter(expr)
+	// if strings.HasPrefix(tbl.tableDef.Name, "%!%p0%!%bmsql_order_line") {
+	// 	logutil.Infof("xxxx-3 %v:%p:%s", pkFilter.isValid, expr, plan2.FormatExpr(expr))
+	// }
 	blkArray := objectio.BlockInfoSlice(ranges)
 	if pkFilter.isNull || plan2.IsFalseExpr(expr) {
 		return []engine.Reader{new(emptyReader)}, nil
@@ -2211,6 +2214,7 @@ func (tbl *txnTable) newReader(
 	}
 
 	partReader := &PartitionReader{
+		expr:     expr,
 		table:    tbl,
 		iter:     iter,
 		seqnumMp: seqnumMp,
