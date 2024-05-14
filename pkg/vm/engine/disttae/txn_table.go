@@ -2010,8 +2010,13 @@ func (tbl *txnTable) tryExtractPKFilter(expr *plan.Expr) (retPKFilter PKFilter) 
 			if !retPKFilter.isVec {
 				var packer *types.Packer
 				put := tbl.getTxn().engine.packerPool.Get(&packer)
-				retPKFilter.SetFullData(function.EQUAL, false, logtailreplay.EncodePrimaryKey(retPKFilter.val, packer))
+				val := logtailreplay.EncodePrimaryKey(retPKFilter.val, packer)
 				put.Put()
+				if retPKFilter.op == function.EQUAL {
+					retPKFilter.SetFullData(function.EQUAL, false, val)
+				} else {
+					retPKFilter.SetFullData(function.PREFIX_EQ, false, val[0:len(val)-1])
+				}
 			}
 		}
 		return
