@@ -29,7 +29,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/fileservice/memorycache"
@@ -113,7 +112,7 @@ func NewLocalFS(
 	if fs.memCache != nil {
 		fs.allocator = fs.memCache
 	} else {
-		fs.allocator = GetDefaultCacheDataAllocator()
+		fs.allocator = DefaultCacheDataAllocator
 	}
 
 	return fs, nil
@@ -320,7 +319,7 @@ func (l *LocalFS) Read(ctx context.Context, vector *IOVector) (err error) {
 
 	allocator := l.allocator
 	if vector.Policy.Any(SkipMemoryCache) {
-		allocator = GetDefaultCacheDataAllocator()
+		allocator = DefaultCacheDataAllocator
 	}
 	for i := range vector.Entries {
 		vector.Entries[i].allocator = allocator
@@ -482,7 +481,7 @@ func (l *LocalFS) read(ctx context.Context, vector *IOVector, bytesCounter *atom
 					C: counter,
 				}
 				var bs memorycache.CacheData
-				bs, err = entry.ToCacheData(cr, nil, GetDefaultCacheDataAllocator())
+				bs, err = entry.ToCacheData(cr, nil, DefaultCacheDataAllocator)
 				if err != nil {
 					return err
 				}
@@ -542,7 +541,7 @@ func (l *LocalFS) read(ctx context.Context, vector *IOVector, bytesCounter *atom
 					closeFunc: func() error {
 						defer file.Close()
 						var bs memorycache.CacheData
-						bs, err = entry.ToCacheData(buf, buf.Bytes(), GetDefaultCacheDataAllocator())
+						bs, err = entry.ToCacheData(buf, buf.Bytes(), DefaultCacheDataAllocator)
 						if err != nil {
 							return err
 						}
@@ -582,11 +581,7 @@ func (l *LocalFS) read(ctx context.Context, vector *IOVector, bytesCounter *atom
 
 			} else {
 				if int64(len(entry.Data)) < entry.Size {
-					ptr, dec := getMallocAllocator().Allocate(uint64(entry.Size))
-					entry.Data = unsafe.Slice((*byte)(ptr), entry.Size)
-					entry.releaseFuncs = append(entry.releaseFuncs, func() {
-						dec.Deallocate(ptr)
-					})
+					entry.Data = make([]byte, entry.Size)
 				}
 				var n int
 				n, err = io.ReadFull(r, entry.Data)

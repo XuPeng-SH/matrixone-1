@@ -14,49 +14,32 @@
 
 package fileservice
 
-import (
-	"unsafe"
+import "github.com/matrixorigin/matrixone/pkg/fileservice/memorycache"
 
-	"github.com/matrixorigin/matrixone/pkg/common/malloc"
-	"github.com/matrixorigin/matrixone/pkg/fileservice/memorycache"
-)
-
-type Bytes struct {
-	bytes       []byte
-	ptr         unsafe.Pointer
-	deallocator malloc.Deallocator
-}
+type Bytes []byte
 
 func (b Bytes) Size() int64 {
-	return int64(len(b.bytes))
+	return int64(len(b))
 }
 
 func (b Bytes) Bytes() []byte {
-	return b.bytes
-}
-
-func (b Bytes) Slice(length int) memorycache.CacheData {
-	b.bytes = b.bytes[:length]
 	return b
 }
 
-func (b Bytes) Release() {
-	if b.deallocator != nil {
-		b.deallocator.Deallocate(b.ptr)
-	}
+func (b Bytes) Slice(length int) memorycache.CacheData {
+	return b[:length]
 }
 
-type bytesAllocator struct {
-	allocator malloc.Allocator
+func (b Bytes) Release() {
 }
+
+func (b Bytes) Retain() {
+}
+
+type bytesAllocator struct{}
 
 var _ CacheDataAllocator = new(bytesAllocator)
 
 func (b *bytesAllocator) Alloc(size int) memorycache.CacheData {
-	ptr, dec := b.allocator.Allocate(uint64(size))
-	return Bytes{
-		bytes:       unsafe.Slice((*byte)(ptr), size),
-		ptr:         ptr,
-		deallocator: dec,
-	}
+	return make(Bytes, size)
 }

@@ -124,18 +124,8 @@ var DisabledCacheConfig = CacheConfig{
 
 const DisableCacheCapacity = 1
 
-var initDefaultCacheDataAllocator sync.Once
-
-var _defaultCacheDataAllocator CacheDataAllocator
-
-func GetDefaultCacheDataAllocator() CacheDataAllocator {
-	initDefaultCacheDataAllocator.Do(func() {
-		_defaultCacheDataAllocator = &bytesAllocator{
-			allocator: getMallocAllocator(),
-		}
-	})
-	return _defaultCacheDataAllocator
-}
+// var DefaultCacheDataAllocator = RCBytesPool
+var DefaultCacheDataAllocator = new(bytesAllocator)
 
 // VectorCache caches IOVector
 type IOVectorCache interface {

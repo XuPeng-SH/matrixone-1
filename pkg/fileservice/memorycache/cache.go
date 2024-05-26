@@ -27,7 +27,6 @@ func NewCache(
 	postSet func(key cache.CacheKey, value CacheData),
 	postGet func(key cache.CacheKey, value CacheData),
 	postEvict func(key cache.CacheKey, value CacheData),
-	allocator malloc.Allocator,
 ) *Cache {
 	var c Cache
 
@@ -62,7 +61,7 @@ func NewCache(
 		}
 	}
 	c.l = lrucache.New(capacity, setFunc, getFunc, evictFunc)
-	c.allocator = allocator
+	c.allocator = malloc.NewDefault(nil)
 	return &c
 }
 

@@ -292,6 +292,8 @@ func (c *Config) setDefaultValue() error {
 	//no default proxy config
 	// Observability has been set in NewConfig
 	c.initMetaCache()
+	// set malloc default config
+	malloc.SetDefaultConfig(c.Malloc)
 	return nil
 }
 

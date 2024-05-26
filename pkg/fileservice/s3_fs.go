@@ -109,7 +109,7 @@ func NewS3FS(
 	if fs.memCache != nil {
 		fs.allocator = fs.memCache
 	} else {
-		fs.allocator = GetDefaultCacheDataAllocator()
+		fs.allocator = DefaultCacheDataAllocator
 	}
 
 	return fs, nil
@@ -414,7 +414,7 @@ func (s *S3FS) Read(ctx context.Context, vector *IOVector) (err error) {
 
 	allocator := s.allocator
 	if vector.Policy.Any(SkipMemoryCache) {
-		allocator = GetDefaultCacheDataAllocator()
+		allocator = DefaultCacheDataAllocator
 	}
 	for i := range vector.Entries {
 		vector.Entries[i].allocator = allocator

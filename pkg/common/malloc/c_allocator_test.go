@@ -23,11 +23,9 @@ func TestCAllocator(t *testing.T) {
 }
 
 func BenchmarkCAllocator(b *testing.B) {
-	for _, n := range benchNs {
-		benchmarkAllocator(b, func() Allocator {
-			return NewCAllocator()
-		}, n)
-	}
+	benchmarkAllocator(b, func() Allocator {
+		return NewCAllocator()
+	})
 }
 
 func FuzzCAllocator(f *testing.F) {
