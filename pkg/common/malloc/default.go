@@ -30,6 +30,17 @@ func NewDefault(config *Config) (allocator Allocator) {
 	if config.EnableMetrics {
 		go metrics.startExport()
 	}
+	return NewShardedAllocator(
+		runtime.GOMAXPROCS(0),
+		func() Allocator {
+			var ret Allocator
+			ret = NewPureGoClassAllocator(256 * MB)
+			if config.EnableMetrics {
+				ret = NewMetricsAllocator(ret, &metrics)
+			}
+			return ret
+		},
+	)
 
 	switch strings.TrimSpace(strings.ToLower(os.Getenv("MO_MALLOC"))) {
 
