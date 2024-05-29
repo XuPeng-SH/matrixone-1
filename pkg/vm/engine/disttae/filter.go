@@ -19,6 +19,7 @@ import (
 	"sort"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
@@ -1182,5 +1183,67 @@ func ExecuteBlockFilter(
 		snapshot,
 		uncommittedObjects...,
 	)
+	return
+}
+
+type InMemoryOp func(*logtailreplay.PartitionState) *batch.Batch
+type LoadInMemoryTombstonesOp func(*logtailreplay.PartitionState, types.Blockid, *[]int64)
+type BlockOp func(*vector.Vector, bool, []int32) []uint32
+
+func CompileReaderFilter(
+	expr *plan.Expr,
+	tableDef *plan.TableDef,
+	proc *process.Process,
+	fs fileservice.FileService,
+) (
+	inMemoryOp InMemoryOp,
+	loadInMemoryTombstonesOp LoadInMemoryTombstonesOp,
+	blockOp BlockOp,
+	canCompile bool,
+) {
+	switch exprImpl := expr.Expr.(type) {
+	case *plan.Expr_F:
+		switch exprImpl.F.Func.ObjName {
+		case "or":
+		case "and":
+			leftInmemoryOp, leftLoadInMemoryTombstonesOp, leftBlockOp, leftCan := CompileReaderFilter(
+				exprImpl.F.Args[0], tableDef, proc, fs,
+			)
+			if !leftCan {
+				return nil, nil, nil, false
+			}
+			_, rightLoadInMemoryTombstonesOp, rightBlockOp, rightCan := CompileReaderFilter(
+				exprImpl.F.Args[1], tableDef, proc, fs,
+			)
+			if !rightCan {
+				return nil, nil, nil, false
+			}
+			// for in-memory operation
+			// always return the left one. maybe we can optimize it later
+			inMemoryOp = leftInmemoryOp
+
+		case "=":
+			colExpr, vals, ok := mustColConstValueFromBinaryFuncExpr(exprImpl, tableDef, proc)
+			if !ok {
+				canCompile = false
+				return
+			}
+			colDef := getColDefByName(colExpr.Col.Name, tableDef)
+			isPK, isSorted := isSortedKey(colDef)
+			inMemoryOp = func(state *logtailreplay.PartitionState) *batch.Batch {
+				// TODO
+				return nil
+			}
+			loadInMemoryTombstonesOp = func(state *logtailreplay.PartitionState, blkID types.Blockid, tombstones *[]int64) {
+				// TODO
+			}
+			blockOp = func(vec *vector.Vector, sorted bool) []uint32 {
+				// TODO
+				return nil
+			}
+		}
+	default:
+		// TODO
+	}
 	return
 }
