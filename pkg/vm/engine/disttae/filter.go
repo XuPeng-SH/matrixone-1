@@ -180,7 +180,7 @@ func mustColConstValueFromBinaryFuncExpr(
 	return colExpr, vals, true
 }
 
-func CompileFilterExprs(
+func CompileBlockFilter(
 	exprs []*plan.Expr,
 	proc *process.Process,
 	tableDef *plan.TableDef,
@@ -198,7 +198,7 @@ func CompileFilterExprs(
 		return
 	}
 	if len(exprs) == 1 {
-		return CompileFilterExpr(exprs[0], proc, tableDef, fs)
+		return CompileOneBlockFilter(exprs[0], proc, tableDef, fs)
 	}
 	ops1 := make([]FastFilterOp, 0, len(exprs))
 	ops2 := make([]LoadOp, 0, len(exprs))
@@ -207,7 +207,7 @@ func CompileFilterExprs(
 	ops5 := make([]SeekFirstBlockOp, 0, len(exprs))
 
 	for _, expr := range exprs {
-		expr_op1, expr_op2, expr_op3, expr_op4, expr_op5, can := CompileFilterExpr(expr, proc, tableDef, fs)
+		expr_op1, expr_op2, expr_op3, expr_op4, expr_op5, can := CompileOneBlockFilter(expr, proc, tableDef, fs)
 		if !can {
 			return nil, nil, nil, nil, nil, false
 		}
@@ -292,7 +292,7 @@ func CompileFilterExprs(
 	return
 }
 
-func CompileFilterExpr(
+func CompileOneBlockFilter(
 	expr *plan.Expr,
 	proc *process.Process,
 	tableDef *plan.TableDef,
@@ -315,13 +315,13 @@ func CompileFilterExpr(
 	case *plan.Expr_F:
 		switch exprImpl.F.Func.ObjName {
 		case "or":
-			leftFastOp, leftLoadOp, leftObjectOp, leftBlockOp, leftSeekOp, leftCan := CompileFilterExpr(
+			leftFastOp, leftLoadOp, leftObjectOp, leftBlockOp, leftSeekOp, leftCan := CompileOneBlockFilter(
 				exprImpl.F.Args[0], proc, tableDef, fs,
 			)
 			if !leftCan {
 				return nil, nil, nil, nil, nil, false
 			}
-			rightFastOp, rightLoadOp, rightObjectOp, rightBlockOp, rightSeekOp, rightCan := CompileFilterExpr(
+			rightFastOp, rightLoadOp, rightObjectOp, rightBlockOp, rightSeekOp, rightCan := CompileOneBlockFilter(
 				exprImpl.F.Args[1], proc, tableDef, fs,
 			)
 			if !rightCan {
@@ -415,13 +415,13 @@ func CompileFilterExpr(
 				}
 			}
 		case "and":
-			leftFastOp, leftLoadOp, leftObjectOp, leftBlockOp, leftSeekOp, leftCan := CompileFilterExpr(
+			leftFastOp, leftLoadOp, leftObjectOp, leftBlockOp, leftSeekOp, leftCan := CompileOneBlockFilter(
 				exprImpl.F.Args[0], proc, tableDef, fs,
 			)
 			if !leftCan {
 				return nil, nil, nil, nil, nil, false
 			}
-			rightFastOp, rightLoadOp, rightObjectOp, rightBlockOp, rightSeekOp, rightCan := CompileFilterExpr(
+			rightFastOp, rightLoadOp, rightObjectOp, rightBlockOp, rightSeekOp, rightCan := CompileOneBlockFilter(
 				exprImpl.F.Args[1], proc, tableDef, fs,
 			)
 			if !rightCan {
@@ -988,7 +988,7 @@ func TryFastFilterBlocks(
 	fs fileservice.FileService,
 	proc *process.Process,
 ) (ok bool, err error) {
-	fastFilterOp, loadOp, objectFilterOp, blockFilterOp, seekOp, ok := CompileFilterExprs(exprs, proc, tableDef, fs)
+	fastFilterOp, loadOp, objectFilterOp, blockFilterOp, seekOp, ok := CompileBlockFilter(exprs, proc, tableDef, fs)
 	if !ok {
 		return false, nil
 	}
