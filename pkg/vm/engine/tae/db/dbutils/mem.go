@@ -46,7 +46,7 @@ func GetMemoryLimit() uint64 {
 	return memoryLimit
 }
 
-func MakeDefaultMediumVarcharPool(name string) *containers.VectorPool {
+func MakeDefaultMediumStringPool(name string) *containers.VectorPool {
 	var (
 		limit    int
 		capacity int

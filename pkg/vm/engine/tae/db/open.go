@@ -116,6 +116,7 @@ func Open(ctx context.Context, dirname string, opts *options.Options) (db *DB, e
 		dbutils.WithRuntimeObjectFS(fs),
 		dbutils.WithRuntimeSmallPool(dbutils.MakeDefaultSmallPool("small-vector-pool")),
 		dbutils.WithRuntimeTransientPool(dbutils.MakeDefaultTransientPool("trasient-vector-pool")),
+		dbutils.WithRuntimeMediumStringPool(dbutils.MakeDefaultMediumStringPool("medium-string-pool")),
 		dbutils.WithRuntimeScheduler(scheduler),
 		dbutils.WithRuntimeOptions(db.Opts),
 	)

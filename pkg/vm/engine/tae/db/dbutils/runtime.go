@@ -42,6 +42,12 @@ func WithRuntimeTransientPool(vp *containers.VectorPool) RuntimeOption {
 	}
 }
 
+func WithRuntimeMediumStringPool(vp *containers.VectorPool) RuntimeOption {
+	return func(r *Runtime) {
+		r.VectorPool.MediumString = vp
+	}
+}
+
 func WithRuntimeObjectFS(fs *objectio.ObjectFS) RuntimeOption {
 	return func(r *Runtime) {
 		r.Fs = fs
@@ -69,8 +75,9 @@ func WithRuntimeOptions(opts *options.Options) RuntimeOption {
 type Runtime struct {
 	Now        func() types.TS
 	VectorPool struct {
-		Small     *containers.VectorPool
-		Transient *containers.VectorPool
+		MediumString *containers.VectorPool
+		Small        *containers.VectorPool
+		Transient    *containers.VectorPool
 	}
 
 	Fs *objectio.ObjectFS
@@ -103,6 +110,9 @@ func (r *Runtime) fillDefaults() {
 	if r.VectorPool.Transient == nil {
 		r.VectorPool.Transient = MakeDefaultTransientPool("trasient-vector-pool")
 	}
+	if r.VectorPool.MediumString == nil {
+		r.VectorPool.MediumString = MakeDefaultMediumStringPool("string-vector-pool")
+	}
 }
 
 func (r *Runtime) PrintVectorPoolUsage() {
@@ -110,6 +120,8 @@ func (r *Runtime) PrintVectorPoolUsage() {
 	w.WriteString(r.VectorPool.Transient.String())
 	w.WriteByte('\n')
 	w.WriteString(r.VectorPool.Small.String())
+	w.WriteByte('\n')
+	w.WriteString(r.VectorPool.MediumString.String())
 	logutil.Info(w.String())
 }
 

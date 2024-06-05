@@ -212,6 +212,8 @@ func (p *VectorPool) GetMPool() *mpool.MPool {
 	return p.mp
 }
 
+func (p *VectorPool) MaxLimit() int { return p.maxAlloc }
+
 func (p *VectorPool) Allocated() int {
 	size := 0
 	size += p.FixedSizeAllocated()
