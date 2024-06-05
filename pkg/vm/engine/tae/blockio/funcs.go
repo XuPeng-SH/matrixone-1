@@ -74,6 +74,7 @@ func LoadColumnsData2(
 	policy fileservice.Policy,
 	needCopy bool,
 	vPool *containers.VectorPool,
+	bigStringPool *containers.VectorPool,
 ) (vectors []containers.Vector, release func(), err error) {
 	name := location.Name()
 	var meta objectio.ObjectMeta
@@ -104,10 +105,15 @@ func LoadColumnsData2(
 
 		var vec containers.Vector
 		if needCopy {
+			srcVec := obj.(*vector.Vector)
+			pool := vPool
+			if srcVec.Size() > pool.MaxLimit() && !srcVec.GetType().Oid.IsFixedLen() {
+				pool = bigStringPool
+			}
 			if vec, err = containers.CloneVector(
 				obj.(*vector.Vector),
-				vPool.GetMPool(),
-				vPool,
+				pool.GetMPool(),
+				pool,
 			); err != nil {
 				return
 			}
@@ -161,8 +167,9 @@ func LoadColumns2(
 	policy fileservice.Policy,
 	needCopy bool,
 	vPool *containers.VectorPool,
+	bigStringPool *containers.VectorPool,
 ) (vectors []containers.Vector, release func(), err error) {
-	return LoadColumnsData2(ctx, objectio.SchemaData, cols, typs, fs, location, policy, needCopy, vPool)
+	return LoadColumnsData2(ctx, objectio.SchemaData, cols, typs, fs, location, policy, needCopy, vPool, bigStringPool)
 }
 
 // LoadTombstoneColumns2 load tombstone data from file service for TN
@@ -175,8 +182,11 @@ func LoadTombstoneColumns2(
 	location objectio.Location,
 	needCopy bool,
 	vPool *containers.VectorPool,
+	bigStringPool *containers.VectorPool,
 ) (vectors []containers.Vector, release func(), err error) {
-	return LoadColumnsData2(ctx, objectio.SchemaTombstone, cols, typs, fs, location, fileservice.Policy(0), needCopy, vPool)
+	return LoadColumnsData2(
+		ctx, objectio.SchemaTombstone, cols, typs, fs, location, fileservice.Policy(0), needCopy, vPool, bigStringPool,
+	)
 }
 
 func LoadOneBlock(

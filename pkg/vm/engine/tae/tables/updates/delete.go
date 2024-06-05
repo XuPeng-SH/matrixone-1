@@ -282,6 +282,7 @@ func (node *DeleteNode) setPersistedRows() {
 		node.deltaloc,
 		false,
 		nil,
+		nil,
 	)
 	if err != nil {
 		for {
@@ -293,6 +294,7 @@ func (node *DeleteNode) setPersistedRows() {
 				node.chain.Load().mvcc.meta.GetObjectData().GetFs().Service,
 				node.deltaloc,
 				false,
+				nil,
 				nil,
 			)
 			if err == nil {

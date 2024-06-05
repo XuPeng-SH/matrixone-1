@@ -677,6 +677,7 @@ func (tbl *txnTable) addObjsWithMetaLoc(ctx context.Context, stats objectio.Obje
 					fileservice.Policy(0),
 					false,
 					nil,
+					nil,
 				)
 				if err != nil {
 					return err
@@ -1208,6 +1209,7 @@ func (tbl *txnTable) DedupSnapByMetaLocs(ctx context.Context, metaLocs []objecti
 					loc,
 					fileservice.Policy(0),
 					false,
+					nil,
 					nil,
 				)
 				if err != nil {

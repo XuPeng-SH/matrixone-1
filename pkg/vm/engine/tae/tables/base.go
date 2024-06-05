@@ -266,6 +266,7 @@ func (blk *baseObject) LoadPersistedCommitTS(bid uint16) (vec containers.Vector,
 		fileservice.Policy(0),
 		true,
 		blk.rt.VectorPool.Transient,
+		blk.rt.VectorPool.MediumString,
 	)
 	if err != nil {
 		return

@@ -655,6 +655,7 @@ func (h *Handle) HandleWrite(
 				location,
 				false,
 				nil,
+				nil,
 			)
 			if err != nil {
 				return

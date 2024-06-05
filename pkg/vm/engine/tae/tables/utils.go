@@ -51,7 +51,9 @@ func LoadPersistedColumnData(
 		location,
 		fileservice.Policy(0),
 		true,
-		rt.VectorPool.Transient)
+		rt.VectorPool.Transient,
+		rt.VectorPool.MediumString,
+	)
 	if err != nil {
 		return
 	}
@@ -97,7 +99,9 @@ func LoadPersistedColumnDatas(
 		location,
 		fileservice.Policy(0),
 		true,
-		rt.VectorPool.Transient)
+		rt.VectorPool.Transient,
+		rt.VectorPool.MediumString,
+	)
 	if err != nil {
 		return nil, err
 	}
