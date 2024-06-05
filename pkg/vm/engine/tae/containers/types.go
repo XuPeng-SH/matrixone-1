@@ -74,6 +74,7 @@ type Vector interface {
 	Length() int
 	ApproxSize() int
 	Allocated() int
+	Size() int
 	GetAllocator() *mpool.MPool
 
 	IsNull(i int) bool

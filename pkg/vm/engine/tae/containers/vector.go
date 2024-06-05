@@ -124,6 +124,11 @@ func NewVector(typ types.Type, opts ...Options) *vectorWrapper {
 	return vec
 }
 
+func (vec *vectorWrapper) Size() int {
+	return vec.wrapped.Size()
+}
+
+// TODO: remove this function
 func (vec *vectorWrapper) ApproxSize() int {
 	if vec.wrapped.NeedDup() {
 		return 0

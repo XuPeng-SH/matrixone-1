@@ -225,7 +225,11 @@ func (node *memoryNode) GetDataWindowOnWriteSchema(
 			Batch:      inner,
 		}, nil
 	}
-	inner := node.data.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.Transient)
+	inner := node.data.CloneWindowWithPool(
+		int(from), int(to-from),
+		node.object.rt.VectorPool.Transient,
+		node.object.rt.VectorPool.MediumString,
+	)
 	// inner := node.data.CloneWindow(int(from), int(to-from), common.MutMemAllocator)
 	bat = &containers.BatchWithVersion{
 		Version:    node.writeSchema.Version,
@@ -265,7 +269,16 @@ func (node *memoryNode) GetDataWindow(
 		if !ok {
 			vec = containers.NewConstNullVector(colDef.Type, int(to-from), mp)
 		} else {
-			vec = node.data.Vecs[idx].CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.Transient)
+			srcVec := node.data.Vecs[idx]
+			if colDef.Type.IsFixedLen() {
+				vec = srcVec.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.Transient)
+			} else {
+				if srcVec.Size() <= node.object.rt.VectorPool.Transient.MaxLimit() {
+					vec = srcVec.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.Transient)
+				} else {
+					vec = srcVec.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.MediumString)
+				}
+			}
 		}
 		bat.AddVector(colDef.Name, vec)
 	}

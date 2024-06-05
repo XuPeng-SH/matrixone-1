@@ -190,7 +190,9 @@ func (bat *Batch) Window(offset, length int) *Batch {
 	return win
 }
 
-func (bat *Batch) CloneWindowWithPool(offset, length int, pool *VectorPool) (cloned *Batch) {
+func (bat *Batch) CloneWindowWithPool(
+	offset, length int, pool *VectorPool, bigStrPool *VectorPool,
+) (cloned *Batch) {
 	cloned = new(Batch)
 	cloned.Attrs = make([]string, len(bat.Attrs))
 	copy(cloned.Attrs, bat.Attrs)
@@ -201,7 +203,16 @@ func (bat *Batch) CloneWindowWithPool(offset, length int, pool *VectorPool) (clo
 	cloned.Deletes = bat.WindowDeletes(offset, length, true)
 	cloned.Vecs = make([]Vector, len(bat.Vecs))
 	for i := range cloned.Vecs {
-		cloned.Vecs[i] = bat.Vecs[i].CloneWindowWithPool(offset, length, pool)
+		srcVec := bat.Vecs[i]
+		if srcVec.GetType().IsFixedLen() {
+			cloned.Vecs[i] = srcVec.CloneWindowWithPool(offset, length, pool)
+		} else {
+			if srcVec.Size() <= pool.MaxLimit() {
+				cloned.Vecs[i] = srcVec.CloneWindowWithPool(offset, length, pool)
+			} else {
+				cloned.Vecs[i] = srcVec.CloneWindowWithPool(offset, length, bigStrPool)
+			}
+		}
 	}
 	return
 }
