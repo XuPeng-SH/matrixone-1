@@ -22,6 +22,7 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 
+	"github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
@@ -30,32 +31,80 @@ import (
 	"go.uber.org/zap"
 )
 
-func MakeDefaultSmallPool(name string) *containers.VectorPool {
-	var (
-		limit            int
-		memtableCapacity int
-	)
-	memStats, err := mem.VirtualMemory()
+func GetMemoryLimit() uint64 {
+	memoryLimit, err := memlimit.FromCgroup()
 	if err != nil {
 		panic(err)
 	}
-	if memStats.Total > mpool.GB*20 {
+	if memoryLimit == 0 {
+		memStats, err := mem.VirtualMemory()
+		if err != nil {
+			panic(err)
+		}
+		memoryLimit = memStats.Total
+	}
+	return memoryLimit
+}
+
+func MakeDefaultMediumVarcharPool(name string) *containers.VectorPool {
+	var (
+		limit    int
+		capacity int
+	)
+	memoryLimit := GetMemoryLimit()
+
+	if memoryLimit > mpool.GB*64 {
+		limit = mpool.MB * 5
+		capacity = 200
+	} else if memoryLimit > mpool.GB*32 {
+		limit = mpool.MB * 4
+		capacity = 200
+	} else if memoryLimit > mpool.GB*16 {
+		limit = mpool.MB * 4
+		capacity = 100
+	} else if memoryLimit > mpool.GB*8 {
+		limit = mpool.MB * 4
+		capacity = 50
+	} else if memoryLimit > mpool.GB*4 {
+		limit = mpool.MB * 4
+		capacity = 20
+	} else {
+		limit = mpool.MB * 4
+		capacity = 10
+	}
+	return containers.NewVectorPool(
+		name,
+		capacity,
+		containers.WithAllocationLimit(limit),
+		containers.WithFixedSizeRatio(0),
+	)
+}
+
+func MakeDefaultSmallPool(name string) *containers.VectorPool {
+	var (
+		limit    int
+		capacity int
+	)
+	memoryLimit := GetMemoryLimit()
+	logutil.Infof("MemoryLimit:%s", common.HumanReadableBytes(int(memoryLimit)))
+
+	if memoryLimit > mpool.GB*20 {
 		limit = mpool.KB * 64
-		memtableCapacity = 10240
-	} else if memStats.Total > mpool.GB*10 {
+		capacity = 10240
+	} else if memoryLimit > mpool.GB*10 {
 		limit = mpool.KB * 32
-		memtableCapacity = 10240
-	} else if memStats.Total > mpool.GB*5 {
+		capacity = 10240
+	} else if memoryLimit > mpool.GB*5 {
 		limit = mpool.KB * 16
-		memtableCapacity = 10240
+		capacity = 10240
 	} else {
 		limit = mpool.KB * 8
-		memtableCapacity = 10240
+		capacity = 10240
 	}
 
 	return containers.NewVectorPool(
 		name,
-		memtableCapacity,
+		capacity,
 		containers.WithAllocationLimit(limit),
 		containers.WithMPool(common.SmallAllocator),
 	)
@@ -63,30 +112,27 @@ func MakeDefaultSmallPool(name string) *containers.VectorPool {
 
 func MakeDefaultTransientPool(name string) *containers.VectorPool {
 	var (
-		limit            int
-		trasientCapacity int
+		limit    int
+		capacity int
 	)
-	memStats, err := mem.VirtualMemory()
-	if err != nil {
-		panic(err)
-	}
-	if memStats.Total > mpool.GB*20 {
+	memoryLimit := GetMemoryLimit()
+	if memoryLimit > mpool.GB*20 {
 		limit = mpool.MB
-		trasientCapacity = 512
-	} else if memStats.Total > mpool.GB*10 {
+		capacity = 512
+	} else if memoryLimit > mpool.GB*10 {
 		limit = mpool.KB * 512
-		trasientCapacity = 512
-	} else if memStats.Total > mpool.GB*5 {
+		capacity = 512
+	} else if memoryLimit > mpool.GB*5 {
 		limit = mpool.KB * 256
-		trasientCapacity = 512
+		capacity = 512
 	} else {
 		limit = mpool.KB * 256
-		trasientCapacity = 256
+		capacity = 256
 	}
 
 	return containers.NewVectorPool(
 		name,
-		trasientCapacity,
+		capacity,
 		containers.WithAllocationLimit(limit),
 	)
 }
