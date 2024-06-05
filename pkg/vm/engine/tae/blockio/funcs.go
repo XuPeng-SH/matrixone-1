@@ -107,7 +107,7 @@ func LoadColumnsData2(
 		if needCopy {
 			srcVec := obj.(*vector.Vector)
 			pool := vPool
-			if srcVec.Size() > pool.MaxLimit() && !srcVec.GetType().Oid.IsFixedLen() {
+			if !srcVec.GetType().Oid.IsFixedLen() && srcVec.Size() > pool.VarlenMaxLimit() {
 				pool = bigStringPool
 			}
 			if vec, err = containers.CloneVector(

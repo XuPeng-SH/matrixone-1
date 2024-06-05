@@ -273,7 +273,7 @@ func (node *memoryNode) GetDataWindow(
 			if colDef.Type.IsFixedLen() {
 				vec = srcVec.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.Transient)
 			} else {
-				if srcVec.Size() <= node.object.rt.VectorPool.Transient.MaxLimit() {
+				if srcVec.Size() <= node.object.rt.VectorPool.Transient.VarlenMaxLimit() {
 					vec = srcVec.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.Transient)
 				} else {
 					vec = srcVec.CloneWindowWithPool(int(from), int(to-from), node.object.rt.VectorPool.MediumString)

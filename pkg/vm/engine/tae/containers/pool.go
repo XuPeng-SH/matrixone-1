@@ -27,10 +27,12 @@ import (
 
 const (
 	// fix sized / (varlen + fix sized)
-	defaultFixedSizeRatio = 0.6
+	defaultFixedSizeRatio = 0.7
 
 	// default max alloaction size for a vector
-	defaultAllocLimit = 1024 * 1024 * 2 // 2MB
+	defaultFixedSizeMaxLimit = 8192 * 8 * 4
+
+	defaultVarlenMaxLimitTimes = 10
 )
 
 var _vectorPoolAlloactor *mpool.MPool
@@ -50,9 +52,15 @@ func GetDefaultVectorPoolALLocator() *mpool.MPool {
 
 type VectorPoolOption func(*VectorPool)
 
-func WithAllocationLimit(maxv int) VectorPoolOption {
+func WithFixedSizeMaxLimit(maxv int) VectorPoolOption {
 	return func(p *VectorPool) {
-		p.maxAlloc = maxv
+		p.fixedSizeMaxAlloc = maxv
+	}
+}
+
+func WithVarlenMaxLimit(maxv int) VectorPoolOption {
+	return func(p *VectorPool) {
+		p.varlenMaxAlloc = maxv
 	}
 }
 
@@ -69,10 +77,11 @@ func WithMPool(mp *mpool.MPool) VectorPoolOption {
 }
 
 type vectorPoolElement struct {
-	pool  *VectorPool
-	mp    *mpool.MPool
-	vec   *vector.Vector
-	inUse atomic.Bool
+	pool     *VectorPool
+	mp       *mpool.MPool
+	vec      *vector.Vector
+	isFixLen bool
+	inUse    atomic.Bool
 }
 
 func (e *vectorPoolElement) tryReuse(t *types.Type) bool {
@@ -84,7 +93,8 @@ func (e *vectorPoolElement) tryReuse(t *types.Type) bool {
 }
 
 func (e *vectorPoolElement) put() {
-	if e.vec.Allocated() > e.pool.maxAlloc {
+	if (e.isFixLen && e.vec.Allocated() > e.pool.fixedSizeMaxAlloc) ||
+		(!e.isFixLen && e.vec.Allocated() > e.pool.varlenMaxAlloc) {
 		newVec := vector.NewVec(*e.vec.GetType())
 		e.vec.Free(e.mp)
 		e.vec = newVec
@@ -100,16 +110,18 @@ func (e *vectorPoolElement) isIdle() bool {
 }
 
 type VectorPool struct {
-	name           string
-	maxAlloc       int
-	ratio          float64
-	fixSizedPool   []*vectorPoolElement
-	varlenPool     []*vectorPoolElement
-	fixHitStats    stats.Counter
-	varlenHitStats stats.Counter
-	resetStats     stats.Counter
-	totalStats     stats.Counter
-	mp             *mpool.MPool
+	name              string
+	fixedSizeMaxAlloc int
+	varlenMaxAlloc    int
+	ratio             float64
+	maxTry            uint8
+	fixSizedPool      []*vectorPoolElement
+	varlenPool        []*vectorPoolElement
+	fixHitStats       stats.Counter
+	varlenHitStats    stats.Counter
+	resetStats        stats.Counter
+	totalStats        stats.Counter
+	mp                *mpool.MPool
 }
 
 func NewVectorPool(name string, cnt int, opts ...VectorPoolOption) *VectorPool {
@@ -123,11 +135,23 @@ func NewVectorPool(name string, cnt int, opts ...VectorPoolOption) *VectorPool {
 	if p.mp == nil {
 		p.mp = _vectorPoolAlloactor
 	}
-	if p.maxAlloc <= 0 {
-		p.maxAlloc = defaultAllocLimit
+	if p.fixedSizeMaxAlloc <= 0 {
+		p.fixedSizeMaxAlloc = defaultFixedSizeMaxLimit
+	}
+	if p.varlenMaxAlloc <= 0 {
+		p.varlenMaxAlloc = p.fixedSizeMaxAlloc * defaultVarlenMaxLimitTimes
 	}
 	if p.ratio < 0 {
 		p.ratio = defaultFixedSizeRatio
+	}
+	if cnt < 50 {
+		p.maxTry = 7
+	} else if cnt < 100 {
+		p.maxTry = 6
+	} else if cnt < 200 {
+		p.maxTry = 5
+	} else {
+		p.maxTry = 4
 	}
 
 	cnt1 := int(float64(cnt) * p.ratio)
@@ -154,7 +178,8 @@ func (p *VectorPool) String() string {
 	varlenHit := p.varlenHitStats.Load()
 	hit := fixHit + varlenHit
 	str := fmt.Sprintf(
-		"VectorPool[%s][%d/%d]: FixSizedVec[%d/%d] VarlenVec[%d/%d], Reset/Hit/totalStats:[%d/(%d,%d)%d/%d]",
+		"VectorPool[Capacity=%d][%s][%d/%d]: FixSizedVec[%d/%d] VarlenVec[%d/%d], Reset/Hit/totalStats:[%d/(%d,%d)%d/%d]",
+		p.MaxCapacity(),                       /* capacity */
 		p.name,                                /* name */
 		usedCnt,                               /* totalStats used vector cnt */
 		len(p.fixSizedPool)+len(p.varlenPool), /* totalStats vector cnt */
@@ -175,7 +200,7 @@ func (p *VectorPool) GetVector(t *types.Type) *vectorWrapper {
 	p.totalStats.Add(1)
 	if t.IsFixedLen() {
 		if len(p.fixSizedPool) > 0 {
-			for i := 0; i < 4; i++ {
+			for i := uint8(0); i < p.maxTry; i++ {
 				idx := fastrand() % uint32(len(p.fixSizedPool))
 				element := p.fixSizedPool[idx]
 				if element.tryReuse(t) {
@@ -190,7 +215,7 @@ func (p *VectorPool) GetVector(t *types.Type) *vectorWrapper {
 		}
 	} else {
 		if len(p.varlenPool) > 0 {
-			for i := 0; i < 4; i++ {
+			for i := uint8(0); i < p.maxTry; i++ {
 				idx := fastrand() % uint32(len(p.varlenPool))
 				element := p.varlenPool[idx]
 				if element.tryReuse(t) {
@@ -212,7 +237,12 @@ func (p *VectorPool) GetMPool() *mpool.MPool {
 	return p.mp
 }
 
-func (p *VectorPool) MaxLimit() int { return p.maxAlloc }
+func (p *VectorPool) MaxCapacity() int {
+	return len(p.fixSizedPool)*p.fixedSizeMaxAlloc + len(p.varlenPool)*p.varlenMaxAlloc
+}
+
+func (p *VectorPool) FixedSizeMaxLimit() int { return p.fixedSizeMaxAlloc }
+func (p *VectorPool) VarlenMaxLimit() int    { return p.varlenMaxAlloc }
 
 func (p *VectorPool) Allocated() int {
 	size := 0
@@ -296,9 +326,10 @@ func (p *VectorPool) Destory() {
 func newVectorElement(pool *VectorPool, t *types.Type, mp *mpool.MPool) *vectorPoolElement {
 	vec := vector.NewVec(*t)
 	element := &vectorPoolElement{
-		pool: pool,
-		mp:   mp,
-		vec:  vec,
+		pool:     pool,
+		mp:       mp,
+		vec:      vec,
+		isFixLen: t.IsFixedLen(),
 	}
 	return element
 }

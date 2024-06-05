@@ -32,10 +32,7 @@ import (
 )
 
 func GetMemoryLimit() uint64 {
-	memoryLimit, err := memlimit.FromCgroup()
-	if err != nil {
-		panic(err)
-	}
+	memoryLimit, _ := memlimit.FromCgroup()
 	if memoryLimit == 0 {
 		memStats, err := mem.VirtualMemory()
 		if err != nil {
@@ -75,65 +72,93 @@ func MakeDefaultMediumStringPool(name string) *containers.VectorPool {
 	return containers.NewVectorPool(
 		name,
 		capacity,
-		containers.WithAllocationLimit(limit),
+		containers.WithVarlenMaxLimit(limit),
 		containers.WithFixedSizeRatio(0),
 	)
 }
 
 func MakeDefaultSmallPool(name string) *containers.VectorPool {
 	var (
-		limit    int
-		capacity int
+		fixedSizeLimit int
+		varlenLimit    int
+		capacity       int
 	)
 	memoryLimit := GetMemoryLimit()
 	logutil.Infof("MemoryLimit:%s", common.HumanReadableBytes(int(memoryLimit)))
 
-	if memoryLimit > mpool.GB*20 {
-		limit = mpool.KB * 64
+	if memoryLimit >= mpool.GB*64 {
+		fixedSizeLimit = mpool.KB * 64
+		varlenLimit = mpool.KB * 512
 		capacity = 10240
+	} else if memoryLimit >= mpool.GB*32 {
+		fixedSizeLimit = mpool.KB * 64
+		varlenLimit = mpool.KB * 256
+		capacity = 9216
+	} else if memoryLimit > mpool.GB*20 {
+		fixedSizeLimit = mpool.KB * 32
+		varlenLimit = mpool.KB * 256
+		capacity = 8192
 	} else if memoryLimit > mpool.GB*10 {
-		limit = mpool.KB * 32
-		capacity = 10240
+		fixedSizeLimit = mpool.KB * 16
+		varlenLimit = mpool.KB * 128
+		capacity = 8192
 	} else if memoryLimit > mpool.GB*5 {
-		limit = mpool.KB * 16
-		capacity = 10240
+		fixedSizeLimit = mpool.KB * 8
+		varlenLimit = mpool.KB * 64
+		capacity = 8192
 	} else {
-		limit = mpool.KB * 8
-		capacity = 10240
+		fixedSizeLimit = mpool.KB * 4
+		varlenLimit = mpool.KB * 32
+		capacity = 7168
 	}
 
 	return containers.NewVectorPool(
 		name,
 		capacity,
-		containers.WithAllocationLimit(limit),
+		containers.WithFixedSizeMaxLimit(fixedSizeLimit),
+		containers.WithVarlenMaxLimit(varlenLimit),
 		containers.WithMPool(common.SmallAllocator),
 	)
 }
 
 func MakeDefaultTransientPool(name string) *containers.VectorPool {
 	var (
-		limit    int
-		capacity int
+		fixedSizeLimit int
+		varlenLimit    int
+		capacity       int
 	)
 	memoryLimit := GetMemoryLimit()
-	if memoryLimit > mpool.GB*20 {
-		limit = mpool.MB
+	if memoryLimit > mpool.GB*64 {
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 2
+		capacity = 1024
+	} else if memoryLimit > mpool.GB*32 {
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 3 / 2
+		capacity = 768
+	} else if memoryLimit > mpool.GB*20 {
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 3 / 2
 		capacity = 512
 	} else if memoryLimit > mpool.GB*10 {
-		limit = mpool.KB * 512
-		capacity = 512
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 3 / 2
+		capacity = 384
 	} else if memoryLimit > mpool.GB*5 {
-		limit = mpool.KB * 256
-		capacity = 512
-	} else {
-		limit = mpool.KB * 256
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 3 / 2
 		capacity = 256
+	} else {
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 3 / 2
+		capacity = 128
 	}
 
 	return containers.NewVectorPool(
 		name,
 		capacity,
-		containers.WithAllocationLimit(limit),
+		containers.WithFixedSizeMaxLimit(fixedSizeLimit),
+		containers.WithVarlenMaxLimit(varlenLimit),
 	)
 }
 func FormatMemStats(memstats runtime.MemStats) string {

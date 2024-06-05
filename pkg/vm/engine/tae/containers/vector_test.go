@@ -733,7 +733,7 @@ func TestVectorPool(t *testing.T) {
 }
 
 func TestVectorPool2(t *testing.T) {
-	pool := NewVectorPool(t.Name(), 10, WithAllocationLimit(1024))
+	pool := NewVectorPool(t.Name(), 10, WithFixedSizeMaxLimit(1024))
 	typ := types.T_int32.ToType()
 	vec := pool.GetVector(&typ)
 	vec.PreExtend(300)

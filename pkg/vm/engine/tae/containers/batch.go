@@ -207,7 +207,7 @@ func (bat *Batch) CloneWindowWithPool(
 		if srcVec.GetType().IsFixedLen() {
 			cloned.Vecs[i] = srcVec.CloneWindowWithPool(offset, length, pool)
 		} else {
-			if srcVec.Size() <= pool.MaxLimit() {
+			if srcVec.Size() <= pool.VarlenMaxLimit() {
 				cloned.Vecs[i] = srcVec.CloneWindowWithPool(offset, length, pool)
 			} else {
 				cloned.Vecs[i] = srcVec.CloneWindowWithPool(offset, length, bigStrPool)
