@@ -50,7 +50,10 @@ func MakeDefaultMediumStringPool(name string) *containers.VectorPool {
 	)
 	memoryLimit := GetMemoryLimit()
 
-	if memoryLimit > mpool.GB*64 {
+	if memoryLimit > mpool.GB*100 {
+		limit = mpool.MB * 5
+		capacity = 400
+	} else if memoryLimit > mpool.GB*64 {
 		limit = mpool.MB * 5
 		capacity = 200
 	} else if memoryLimit > mpool.GB*32 {
@@ -128,9 +131,13 @@ func MakeDefaultTransientPool(name string) *containers.VectorPool {
 		capacity       int
 	)
 	memoryLimit := GetMemoryLimit()
-	if memoryLimit > mpool.GB*64 {
+	if memoryLimit > mpool.GB*100 {
 		fixedSizeLimit = mpool.KB * 200
 		varlenLimit = mpool.MB * 2
+		capacity = 1280
+	} else if memoryLimit > mpool.GB*64 {
+		fixedSizeLimit = mpool.KB * 200
+		varlenLimit = mpool.MB * 3 / 2
 		capacity = 1024
 	} else if memoryLimit > mpool.GB*32 {
 		fixedSizeLimit = mpool.KB * 200

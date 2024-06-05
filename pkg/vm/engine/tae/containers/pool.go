@@ -23,6 +23,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/util/metric/stats"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 )
 
 const (
@@ -178,8 +179,8 @@ func (p *VectorPool) String() string {
 	varlenHit := p.varlenHitStats.Load()
 	hit := fixHit + varlenHit
 	str := fmt.Sprintf(
-		"VectorPool[Capacity=%d][%s][%d/%d]: FixSizedVec[%d/%d] VarlenVec[%d/%d], Reset/Hit/totalStats:[%d/(%d,%d)%d/%d]",
-		p.MaxCapacity(),                       /* capacity */
+		"VectorPool[Capacity=%s][%s][%d/%d]: FixSizedVec[%d/%d] VarlenVec[%d/%d], Reset/Hit/totalStats:[%d/(%d,%d)%d/%d]",
+		common.HumanReadableBytes(p.MaxCapacity()), /* capacity */
 		p.name,                                /* name */
 		usedCnt,                               /* totalStats used vector cnt */
 		len(p.fixSizedPool)+len(p.varlenPool), /* totalStats vector cnt */
