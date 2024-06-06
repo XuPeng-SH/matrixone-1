@@ -1143,7 +1143,7 @@ func TestFlushTabletail(t *testing.T) {
 		for i := 0; it.Valid(); it.Next() {
 			obj := it.GetObject()
 			for j := uint16(0); j < uint16(obj.BlkCnt()); j++ {
-				views, err := obj.GetColumnDataByIds(context.Background(), j, idxs, common.DefaultAllocator)
+				views, _, err := obj.GetColumnDataByIds(context.Background(), j, idxs, false, common.DefaultAllocator)
 				require.NoError(t, err)
 				defer views.Close()
 				for j, view := range views.Columns {

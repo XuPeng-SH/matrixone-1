@@ -85,13 +85,14 @@ func (obj *object) GetColumnDataByIds(
 	readSchema any,
 	blkID uint16,
 	colIdxes []int,
+	needCopy bool,
 	mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+) (view *containers.BlockView, closer func(), err error) {
 	node := obj.PinNode()
 	defer node.Unref()
 	schema := readSchema.(*catalog.Schema)
 	return obj.ResolvePersistedColumnDatas(
-		ctx, txn, schema, blkID, colIdxes, false, mp,
+		ctx, txn, schema, blkID, colIdxes, false, needCopy, mp,
 	)
 }
 

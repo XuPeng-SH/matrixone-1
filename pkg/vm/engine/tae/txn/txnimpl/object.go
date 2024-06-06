@@ -306,12 +306,12 @@ func (obj *txnObject) GetColumnDataById(
 }
 
 func (obj *txnObject) GetColumnDataByIds(
-	ctx context.Context, blkID uint16, colIdxes []int, mp *mpool.MPool,
-) (*containers.BlockView, error) {
+	ctx context.Context, blkID uint16, colIdxes []int, needCopy bool, mp *mpool.MPool,
+) (*containers.BlockView, func(), error) {
 	if obj.entry.IsLocal {
-		return obj.table.tableSpace.GetColumnDataByIds(obj.entry, colIdxes, mp)
+		return obj.table.tableSpace.GetColumnDataByIds(obj.entry, colIdxes, needCopy, mp)
 	}
-	return obj.entry.GetObjectData().GetColumnDataByIds(ctx, obj.Txn, obj.table.GetLocalSchema(), blkID, colIdxes, mp)
+	return obj.entry.GetObjectData().GetColumnDataByIds(ctx, obj.Txn, obj.table.GetLocalSchema(), blkID, colIdxes, needCopy, mp)
 }
 
 func (obj *txnObject) GetColumnDataByName(

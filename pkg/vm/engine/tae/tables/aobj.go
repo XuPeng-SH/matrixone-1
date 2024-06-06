@@ -147,14 +147,16 @@ func (obj *aobject) GetColumnDataByIds(
 	readSchema any,
 	_ uint16,
 	colIdxes []int,
+	needCopy bool,
 	mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+) (view *containers.BlockView, closer func(), err error) {
 	return obj.resolveColumnDatas(
 		ctx,
 		txn,
 		readSchema.(*catalog.Schema),
 		colIdxes,
 		false,
+		needCopy,
 		mp,
 	)
 }
@@ -183,16 +185,18 @@ func (obj *aobject) resolveColumnDatas(
 	readSchema *catalog.Schema,
 	colIdxes []int,
 	skipDeletes bool,
+	needCopy bool,
 	mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+) (view *containers.BlockView, closer func(), err error) {
 	node := obj.PinNode()
 	defer node.Unref()
 
 	if !node.IsPersisted() {
-		return node.MustMNode().resolveInMemoryColumnDatas(
+		view, err = node.MustMNode().resolveInMemoryColumnDatas(
 			ctx,
 			txn, readSchema, colIdxes, skipDeletes, mp,
 		)
+		return
 	} else {
 		return obj.ResolvePersistedColumnDatas(
 			ctx,
@@ -201,6 +205,7 @@ func (obj *aobject) resolveColumnDatas(
 			0,
 			colIdxes,
 			skipDeletes,
+			needCopy,
 			mp,
 		)
 	}

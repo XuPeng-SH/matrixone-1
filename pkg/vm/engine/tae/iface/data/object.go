@@ -84,8 +84,8 @@ type Object interface {
 		ctx context.Context, txn txnif.AsyncTxn, readSchema any /*avoid import cycle*/, blkID uint16, colIdx int, mp *mpool.MPool,
 	) (*containers.ColumnView, error)
 	GetColumnDataByIds(
-		ctx context.Context, txn txnif.AsyncTxn, readSchema any, blkID uint16, colIdxes []int, mp *mpool.MPool,
-	) (*containers.BlockView, error)
+		ctx context.Context, txn txnif.AsyncTxn, readSchema any, blkID uint16, colIdxes []int, needCopy, mp *mpool.MPool,
+	) (*containers.BlockView, func(), error)
 	Prefetch(idxes []uint16, blkID uint16) error
 	GetMeta() any
 

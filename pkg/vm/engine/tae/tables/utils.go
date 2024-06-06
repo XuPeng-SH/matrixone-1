@@ -58,6 +58,10 @@ func LoadPersistedColumnData(
 	return vectors[0], nil
 }
 
+// Returns a slice of vectors, one for each column index in colIdxs.
+// Returns a function that should be called to release the resources. It will
+// be always nil if the needCopy is false.
+// If an error occurs, the function will return nil.
 func LoadPersistedColumnDatas(
 	ctx context.Context,
 	schema *catalog.Schema,
@@ -65,8 +69,10 @@ func LoadPersistedColumnDatas(
 	id *common.ID,
 	colIdxs []int,
 	location objectio.Location,
+	needCopy bool,
 	mp *mpool.MPool,
-) ([]containers.Vector, error) {
+) ([]containers.Vector, func(), error) {
+	var rowid containers.Vector
 	cols := make([]uint16, 0)
 	typs := make([]types.Type, 0)
 	vectors := make([]containers.Vector, len(colIdxs))
@@ -79,6 +85,7 @@ func LoadPersistedColumnDatas(
 				return nil, err
 			}
 			phyAddIdx = i
+			rowid = vec
 			vectors[phyAddIdx] = vec
 			continue
 		}
@@ -86,21 +93,28 @@ func LoadPersistedColumnDatas(
 		typs = append(typs, def.Type)
 	}
 	if len(cols) == 0 {
-		return vectors, nil
+		return vectors, nil, nil
 	}
 	//Extend lifetime of vectors is without the function.
 	//need to copy. closeFunc will be nil.
-	vecs, _, err := blockio.LoadColumns2(
+	vecs, closer, err := blockio.LoadColumns2(
 		ctx, cols,
 		typs,
 		rt.Fs.Service,
 		location,
 		fileservice.Policy(0),
-		true,
-		rt.VectorPool.Transient)
+		needCopy,
+		rt.VectorPool.Transient,
+	)
+
+	// An error occurred, close the rowid vector and return
 	if err != nil {
-		return nil, err
+		if rowid != nil {
+			rowid.Close()
+		}
+		return nil, nil, err
 	}
+
 	for i, vec := range vecs {
 		idx := i
 		if idx >= phyAddIdx && phyAddIdx > -1 {
@@ -108,7 +122,13 @@ func LoadPersistedColumnDatas(
 		}
 		vectors[idx] = vec
 	}
-	return vectors, nil
+	if closer != nil && rowid != nil {
+		return vectors, func() {
+			rowid.Close()
+			closer()
+		}, nil
+	}
+	return vectors, nil, nil
 }
 
 func ReadPersistedBlockRow(location objectio.Location) int {

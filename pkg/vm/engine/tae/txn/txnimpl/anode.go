@@ -213,8 +213,8 @@ func (n *anode) Window(start, end uint32) (bat *containers.Batch, err error) {
 }
 
 func (n *anode) GetColumnDataByIds(
-	colIdxes []int, mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+	colIdxes []int, needCopy bool, mp *mpool.MPool,
+) (view *containers.BlockView, closer func(), err error) {
 	view = containers.NewBlockView()
 	err = n.FillBlockView(view, colIdxes, mp)
 	return

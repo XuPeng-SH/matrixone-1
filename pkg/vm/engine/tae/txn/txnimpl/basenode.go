@@ -36,7 +36,7 @@ type InsertNode interface {
 	IsRowDeleted(row uint32) bool
 	IsPersisted() bool
 	PrintDeletes() string
-	GetColumnDataByIds([]int, *mpool.MPool) (*containers.BlockView, error)
+	GetColumnDataByIds([]int, bool, *mpool.MPool) (*containers.BlockView, func(), error)
 	GetColumnDataById(context.Context, int, *mpool.MPool) (*containers.ColumnView, error)
 	Prefetch(idxes []uint16) error
 	FillBlockView(view *containers.BlockView, colIdxes []int, mp *mpool.MPool) (err error)

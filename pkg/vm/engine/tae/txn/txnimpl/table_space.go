@@ -475,10 +475,11 @@ func (space *tableSpace) BatchDedup(key containers.Vector) error {
 func (space *tableSpace) GetColumnDataByIds(
 	obj *catalog.ObjectEntry,
 	colIdxes []int,
+	needCopy bool,
 	mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+) (view *containers.BlockView, closer func(), err error) {
 	n := space.nodes[0]
-	return n.GetColumnDataByIds(colIdxes, mp)
+	return n.GetColumnDataByIds(colIdxes, needCopy, mp)
 }
 
 func (space *tableSpace) GetColumnDataById(

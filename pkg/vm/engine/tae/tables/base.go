@@ -546,6 +546,7 @@ func (blk *baseObject) Prefetch(idxes []uint16, blkID uint16) error {
 	}
 }
 
+// The closer returned will always be nil if the needCopy is false.
 func (blk *baseObject) ResolvePersistedColumnDatas(
 	ctx context.Context,
 	txn txnif.TxnReader,
@@ -553,21 +554,22 @@ func (blk *baseObject) ResolvePersistedColumnDatas(
 	blkID uint16,
 	colIdxs []int,
 	skipDeletes bool,
+	needCopy bool,
 	mp *mpool.MPool,
-) (view *containers.BlockView, err error) {
+) (view *containers.BlockView, closer func(), err error) {
 
 	view = containers.NewBlockView()
 	location, err := blk.buildMetalocation(blkID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	id := blk.meta.AsCommonID()
 	id.SetBlockOffset(blkID)
-	vecs, err := LoadPersistedColumnDatas(
-		ctx, readSchema, blk.rt, id, colIdxs, location, mp,
+	vecs, closer, err := LoadPersistedColumnDatas(
+		ctx, readSchema, blk.rt, id, colIdxs, location, needCopy, mp,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for i, vec := range vecs {
 		view.SetData(colIdxs[i], vec)
@@ -579,7 +581,11 @@ func (blk *baseObject) ResolvePersistedColumnDatas(
 
 	defer func() {
 		if err != nil {
-			view.Close()
+			if closer != nil {
+				closer()
+			} else {
+				view.Close()
+			}
 		}
 	}()
 
@@ -587,9 +593,7 @@ func (blk *baseObject) ResolvePersistedColumnDatas(
 	err = blk.fillInMemoryDeletesLocked(txn, blkID, view.BaseView, blk.RWMutex)
 	blk.RUnlock()
 
-	if err = blk.FillPersistedDeletes(ctx, blkID, txn, view.BaseView, mp); err != nil {
-		return
-	}
+	err = blk.FillPersistedDeletes(ctx, blkID, txn, view.BaseView, mp)
 	return
 }
 
