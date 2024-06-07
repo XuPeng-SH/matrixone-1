@@ -36,6 +36,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/db/dbutils"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/data"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/handle"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/mergesort"
@@ -164,7 +165,11 @@ func NewFlushTableTailTask(
 	}
 	task.schema = rel.Schema(false).(*catalog.Schema)
 
+	objSeen := make(map[*catalog.ObjectEntry]struct{})
 	for _, obj := range objs {
+		if _, ok := objSeen[obj]; ok {
+			continue
+		}
 		task.scopes = append(task.scopes, *obj.AsCommonID())
 		var hdl handle.Object
 		hdl, err = rel.GetObject(&obj.ID, false)
@@ -186,15 +191,14 @@ func NewFlushTableTailTask(
 		}
 		task.aObjMetas = append(task.aObjMetas, obj)
 		task.aObjHandles = append(task.aObjHandles, hdl)
-		if obj.GetObjectData().CheckFlushTaskRetry(txn.GetStartTS()) {
-			logutil.Infof("[FlushTabletail] obj %v needs retry", obj.ID.String())
-			return nil, txnif.ErrTxnNeedRetry
-		}
 	}
 
 	task.tombstoneSchema = rel.Schema(true).(*catalog.Schema)
 
 	for _, obj := range tombStones {
+		if _, ok := objSeen[obj]; ok {
+			continue
+		}
 		task.scopes = append(task.scopes, *obj.AsCommonID())
 		var hdl handle.Object
 		hdl, err = rel.GetObject(&obj.ID, true)
