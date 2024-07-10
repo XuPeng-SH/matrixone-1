@@ -256,6 +256,7 @@ func (tbl *txnTable) Size(ctx context.Context, columnName string) (uint64, error
 }
 
 func ForeachVisibleDataObject(
+	info string,
 	state *logtailreplay.PartitionState,
 	ts types.TS,
 	fn func(obj logtailreplay.ObjectEntry) error,
@@ -277,9 +278,7 @@ func ForeachVisibleDataObject(
 	start := time.Now()
 	defer func() {
 		duration := time.Since(start)
-		if duration > time.Second*10 {
-			logutil.Infof("liubo: start at %v, duration %v, obj num %d", start, duration, count)
-		}
+		logutil.Infof("liubo: %s start at %v, duration %v, obj num %d", info, start, duration, count)
 	}()
 	err = ce.Exec()
 	return
@@ -350,6 +349,7 @@ func (tbl *txnTable) MaxAndMinValues(ctx context.Context) ([][2]any, []uint8, er
 	}
 
 	if err = ForeachVisibleDataObject(
+		"",
 		part,
 		types.TimestampToTS(tbl.db.op.SnapshotTS()),
 		onObjFn); err != nil {
@@ -461,7 +461,7 @@ func (tbl *txnTable) GetColumMetadataScanInfo(ctx context.Context, name string) 
 		return nil
 	}
 
-	if err = ForeachVisibleDataObject(state, types.TimestampToTS(tbl.db.op.SnapshotTS()), onObjFn); err != nil {
+	if err = ForeachVisibleDataObject("", state, types.TimestampToTS(tbl.db.op.SnapshotTS()), onObjFn); err != nil {
 		return nil, err
 	}
 

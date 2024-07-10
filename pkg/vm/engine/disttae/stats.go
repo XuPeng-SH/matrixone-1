@@ -17,11 +17,12 @@ package disttae
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"math"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -513,13 +514,6 @@ func (gs *GlobalStats) updateTableStats(key pb.StatsInfoKey) {
 		approxObjectNum,
 		stats,
 	)
-	start := time.Now()
-	defer func() {
-		duration := time.Since(start)
-		if duration > time.Second*10 {
-			logutil.Infof("liubo: get stats start at %v, duration %v, table id %d", start, duration, key.TableID)
-		}
-	}()
 	if err := UpdateStats(gs.ctx, req); err != nil {
 		logutil.Errorf("failed to init stats info for table %v, err: %v", key, err)
 		return
@@ -701,7 +695,8 @@ func updateInfoFromZoneMap(ctx context.Context, req *updateStatsRequest, info *p
 		}
 		return nil
 	}
-	if err = ForeachVisibleDataObject(req.partitionState, req.ts, onObjFn); err != nil {
+	str := fmt.Sprintf("%d-%s", req.tableDef.TblId, req.tableDef.Name)
+	if err = ForeachVisibleDataObject(str, req.partitionState, req.ts, onObjFn); err != nil {
 		return err
 	}
 
