@@ -16,6 +16,8 @@ package disttae
 
 import (
 	"context"
+	"fmt"
+	"github.com/pkg/errors"
 	"math"
 	"runtime"
 	"sync"
@@ -232,6 +234,11 @@ func (gs *GlobalStats) Get(ctx context.Context, key pb.StatsInfoKey, sync bool) 
 				// as possible.
 				gs.triggerUpdate(key, true)
 			}()
+
+			info, ok = gs.mu.statsInfoMap[key]
+			if ok {
+				break
+			}
 
 			// Wait until stats info of the key is updated.
 			gs.mu.cond.Wait()
@@ -506,6 +513,13 @@ func (gs *GlobalStats) updateTableStats(key pb.StatsInfoKey) {
 		approxObjectNum,
 		stats,
 	)
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		if duration > time.Second*10 {
+			logutil.Infof("liubo: get stats start at %v, duration %v, table id %d", start, duration, key.TableID)
+		}
+	}()
 	if err := UpdateStats(gs.ctx, req); err != nil {
 		logutil.Errorf("failed to init stats info for table %v, err: %v", key, err)
 		return
@@ -626,7 +640,7 @@ func updateInfoFromZoneMap(ctx context.Context, req *updateStatsRequest, info *p
 	onObjFn := func(obj logtailreplay.ObjectEntry) error {
 		location := obj.Location()
 		if objMeta, err = objectio.FastLoadObjectMeta(ctx, &location, false, fs); err != nil {
-			return err
+			return errors.Wrap(err, fmt.Sprintf("object name: %s", obj.ObjectName().String()))
 		}
 		updateMu.Lock()
 		defer updateMu.Unlock()

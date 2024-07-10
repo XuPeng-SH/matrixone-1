@@ -266,12 +266,21 @@ func ForeachVisibleDataObject(
 	}
 	defer iter.Close()
 	ce := newConcurrentExecutor(runtime.GOMAXPROCS(0) * 8)
+	var count int
 	for iter.Next() {
 		entry := iter.Entry()
+		count++
 		ce.AppendTask(func() error {
 			return fn(entry)
 		})
 	}
+	start := time.Now()
+	defer func() {
+		duration := time.Since(start)
+		if duration > time.Second*10 {
+			logutil.Infof("liubo: start at %v, duration %v, obj num %d", start, duration, count)
+		}
+	}()
 	err = ce.Exec()
 	return
 }
