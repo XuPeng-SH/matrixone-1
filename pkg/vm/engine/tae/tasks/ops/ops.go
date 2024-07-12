@@ -90,7 +90,7 @@ func (op *Op) PostExecute(context.Context) error {
 	return nil
 }
 
-func (op *Op) Execute() error {
+func (op *Op) Execute(context.Context) error {
 	return nil
 }
 
