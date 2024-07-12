@@ -47,7 +47,7 @@ func newTaskScheduler(db *DB, asyncWorkers int, ioWorkers int) *taskScheduler {
 		db:            db,
 	}
 	jobDispatcher := newAsyncJobDispatcher()
-	jobHandler := tasks.NewPoolHandler(db.Opts.Ctx, asyncWorkers)
+	jobHandler := tasks.NewPoolHandler(db.Opts.Ctx, asyncWorkers, "FLUSH-MERGE-WORKER")
 	jobHandler.Start()
 	jobDispatcher.RegisterHandler(tasks.DataCompactionTask, jobHandler)
 	// jobDispatcher.RegisterHandler(tasks.GCTask, jobHandler)

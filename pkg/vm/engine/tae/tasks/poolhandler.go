@@ -16,6 +16,7 @@ package tasks
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/logutil"
@@ -24,26 +25,29 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
-var (
-	poolHandlerName = "PoolHandler"
-)
-
 type poolHandler struct {
 	BaseTaskHandler
 	opExec ops.OpExecFunc
 	pool   *ants.Pool
 	wg     *sync.WaitGroup
+	names  chan string
 }
 
-func NewPoolHandler(ctx context.Context, num int) *poolHandler {
+func NewPoolHandler(
+	ctx context.Context, num int, name string,
+) *poolHandler {
 	pool, err := ants.NewPool(num)
 	if err != nil {
 		panic(err)
 	}
 	h := &poolHandler{
-		BaseTaskHandler: *NewBaseEventHandler(ctx, poolHandlerName),
+		BaseTaskHandler: *NewBaseEventHandler(ctx, name),
 		pool:            pool,
 		wg:              &sync.WaitGroup{},
+		names:           make(chan string, num),
+	}
+	for i := 0; i < num; i++ {
+		h.names <- fmt.Sprintf("%s-%d", name, i)
 	}
 	h.opExec = h.ExecFunc
 	h.ExecFunc = h.doHandle
@@ -55,14 +59,19 @@ func (h *poolHandler) Execute(task Task) {
 }
 
 func (h *poolHandler) doHandle(op iops.IOp) {
-	closure := func(o iops.IOp, wg *sync.WaitGroup) func() {
+	closure := func(o iops.IOp, worker string, wg *sync.WaitGroup) func() {
 		return func() {
+			logutil.Infof(
+				"[%s] is running", worker,
+			)
 			h.opExec(o)
 			wg.Done()
+			h.names <- worker
 		}
 	}
 	h.wg.Add(1)
-	err := h.pool.Submit(closure(op, h.wg))
+	name := <-h.names
+	err := h.pool.Submit(closure(op, name, h.wg))
 	if err != nil {
 		logutil.Warnf("%v", err)
 		op.SetError(err)
