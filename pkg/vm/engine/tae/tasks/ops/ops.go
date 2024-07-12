@@ -96,16 +96,14 @@ func (op *Op) Execute() error {
 
 func (op *Op) OnExec(ctx context.Context) error {
 	op.StartTime = time.Now()
-	err := op.Impl.PreExecute()
+	err := op.Impl.PreExecute(ctx)
 	if err != nil {
 		return err
 	}
-	err = op.Impl.Execute(ctx)
-	if err != nil {
+	if err = op.Impl.Execute(ctx); err != nil {
 		return err
 	}
-	err = op.Impl.PostExecute()
-	return err
+	return op.Impl.PostExecute(ctx)
 }
 
 func (op *Op) GetCreateTime() time.Time {

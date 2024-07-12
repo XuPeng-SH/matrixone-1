@@ -24,9 +24,9 @@ type Observer interface {
 }
 
 type IOpInternal interface {
-	PreExecute() error
+	PreExecute(ctx context.Context) error
 	Execute(ctx context.Context) error
-	PostExecute() error
+	PostExecute(ctx context.Context) error
 }
 
 type IOp interface {
