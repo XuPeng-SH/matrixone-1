@@ -82,11 +82,11 @@ func (op *Op) WaitDone(ctx context.Context) error {
 	}
 }
 
-func (op *Op) PreExecute() error {
+func (op *Op) PreExecute(context.Context) error {
 	return nil
 }
 
-func (op *Op) PostExecute() error {
+func (op *Op) PostExecute(context.Context) error {
 	return nil
 }
 
