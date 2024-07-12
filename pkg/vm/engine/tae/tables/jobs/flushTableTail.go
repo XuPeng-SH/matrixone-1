@@ -267,8 +267,15 @@ var (
 )
 
 func (task *flushTableTailTask) Execute(ctx context.Context) (err error) {
+	var executor string
+	if v := ctx.Value("executor"); v != nil {
+		executor = v.(string)
+	} else {
+		executor = "[anonymous]"
+	}
 	logutil.Info(
 		"[FLUSH-START]",
+		zap.String("executor", executor),
 		zap.String("task", task.Name()),
 		zap.Any("extra-info", task),
 		common.AnyField("txn-info", task.txn.String()),

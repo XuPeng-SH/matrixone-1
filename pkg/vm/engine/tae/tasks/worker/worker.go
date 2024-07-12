@@ -109,9 +109,11 @@ func NewOpWorker(ctx context.Context, name string, args ...int) *OpWorker {
 			l = QueueSize
 		}
 	}
-	if name == "" {
-		name = fmt.Sprintf("[worker-%d]", common.NextGlobalSeqNum())
+	executor := name
+	if executor == "" {
+		executor = fmt.Sprintf("[executor-%d]", common.NextGlobalSeqNum())
 	}
+	ctx = context.WithValue(ctx, "executor", name)
 	worker := &OpWorker{
 		Ctx:      ctx,
 		Name:     name,

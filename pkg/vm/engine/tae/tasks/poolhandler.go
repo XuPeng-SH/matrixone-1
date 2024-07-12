@@ -61,9 +61,6 @@ func (h *poolHandler) Execute(task Task) {
 func (h *poolHandler) doHandle(op iops.IOp) {
 	closure := func(o iops.IOp, worker string, wg *sync.WaitGroup) func() {
 		return func() {
-			logutil.Infof(
-				"[%s] is running", worker,
-			)
 			h.opExec(o)
 			wg.Done()
 			h.names <- worker

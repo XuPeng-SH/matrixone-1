@@ -120,8 +120,15 @@ func DoMergeAndWrite(
 		obj := objectio.ObjectStats(o)
 		fromObjsDesc = fmt.Sprintf("%s%s,", fromObjsDesc, common.ShortObjId(*obj.ObjectName().ObjectId()))
 	}
+	var executor string
+	if v := ctx.Value("executor"); v != nil {
+		executor = v.(string)
+	} else {
+		executor = "[anonymous]"
+	}
 	logutil.Info(
 		"[MERGE-START]",
+		zap.String("executor", executor),
 		zap.String("task", mergehost.Name()),
 		common.AnyField("txn-info", txnInfo),
 		common.AnyField("host", mergehost.HostHintName()),
