@@ -42,83 +42,63 @@ type ObjectEntry struct {
 	table    uint64
 }
 
-type TombstoneEntry struct {
-	objects  map[string]struct{}
-	commitTS types.TS
-}
-
 // GCTable is a data structure in memory after consuming checkpoint
 type GCTable struct {
 	sync.Mutex
 	objects    map[string]*ObjectEntry
-	tombstones map[string]*TombstoneEntry
+	tombstones map[string]*ObjectEntry
 }
 
 func NewGCTable() *GCTable {
 	table := GCTable{
 		objects:    make(map[string]*ObjectEntry),
-		tombstones: make(map[string]*TombstoneEntry),
+		tombstones: make(map[string]*ObjectEntry),
 	}
 	return &table
 }
 
-func (t *GCTable) addObject(name string, objEntry *ObjectEntry, commitTS types.TS) {
+func (t *GCTable) addObject(
+	name string,
+	objEntry *ObjectEntry,
+	commitTS types.TS,
+	objects map[string]*ObjectEntry,
+) {
 	t.Lock()
 	defer t.Unlock()
-	object := t.objects[name]
+	t.addObjectLocked(name, objEntry, commitTS, objects)
+}
+
+func (t *GCTable) addObjectLocked(
+	name string,
+	objEntry *ObjectEntry,
+	commitTS types.TS,
+	objects map[string]*ObjectEntry,
+) {
+	object := objects[name]
 	if object == nil {
-		t.objects[name] = objEntry
+		objects[name] = objEntry
 		return
 	}
-	t.objects[name] = objEntry
+	objects[name] = objEntry
 	if object.commitTS.Less(&commitTS) {
-		t.objects[name].commitTS = commitTS
+		objects[name].commitTS = commitTS
 	}
 }
 
-func (t *GCTable) addTombstone(name, objectName string, commitTS types.TS) {
+func (t *GCTable) deleteObject(name string, objects map[string]*ObjectEntry) {
 	t.Lock()
 	defer t.Unlock()
-	tombstone := t.tombstones[name]
-	if tombstone == nil {
-		t.tombstones[name] = &TombstoneEntry{
-			objects:  make(map[string]struct{}),
-			commitTS: commitTS,
-		}
-	}
-	if t.tombstones[name].commitTS.Less(&commitTS) {
-		t.tombstones[name].commitTS = commitTS
-	}
-	if _, ok := t.tombstones[name].objects[objectName]; !ok {
-		t.tombstones[name].objects[objectName] = struct{}{}
-	}
-}
-
-func (t *GCTable) deleteObject(name string) {
-	t.Lock()
-	defer t.Unlock()
-	delete(t.objects, name)
-}
-
-func (t *GCTable) deleteTombstone(name string) {
-	t.Lock()
-	defer t.Unlock()
-	for obj := range t.tombstones[name].objects {
-		delete(t.tombstones[name].objects, obj)
-	}
-	delete(t.tombstones, name)
+	delete(objects, name)
 }
 
 // Merge can merge two GCTables
 func (t *GCTable) Merge(GCTable *GCTable) {
 	for name, entry := range GCTable.objects {
-		t.addObject(name, entry, entry.commitTS)
+		t.addObject(name, entry, entry.commitTS, t.objects)
 	}
 
 	for name, entry := range GCTable.tombstones {
-		for obj := range entry.objects {
-			t.addTombstone(name, obj, entry.commitTS)
-		}
+		t.addObject(name, entry, entry.commitTS, t.tombstones)
 	}
 }
 
@@ -128,7 +108,17 @@ func (t *GCTable) getObjects() map[string]*ObjectEntry {
 	return t.objects
 }
 
-func (t *GCTable) getTombstones() map[string]*TombstoneEntry {
+func (t *GCTable) getObjectsLocked() map[string]*ObjectEntry {
+	return t.objects
+}
+
+func (t *GCTable) getTombstones() map[string]*ObjectEntry {
+	t.Lock()
+	defer t.Unlock()
+	return t.tombstones
+}
+
+func (t *GCTable) getTombstonesLocked() map[string]*ObjectEntry {
 	t.Lock()
 	defer t.Unlock()
 	return t.tombstones
@@ -141,67 +131,45 @@ func (t *GCTable) SoftGC(
 	snapShotList map[uint32]containers.Vector,
 	meta *logtail.SnapshotMeta,
 ) ([]string, map[uint32][]types.TS) {
-	gc := make([]string, 0)
+	var gc []string
 	snapList := make(map[uint32][]types.TS)
-	objects := t.getObjects()
 	for acct, snap := range snapShotList {
 		snapList[acct] = vector.MustFixedCol[types.TS](snap.GetDownstreamVector())
 	}
+	t.Lock()
+	meta.Lock()
+	defer func() {
+		meta.Unlock()
+		t.Unlock()
+	}()
+	gc = t.objectsComparedAndDeleteLocked(t.objects, table.objects, meta, snapList, ts)
+	gc = append(gc, t.objectsComparedAndDeleteLocked(t.tombstones, table.tombstones, meta, snapList, ts)...)
+	return gc, snapList
+}
+
+func (t *GCTable) objectsComparedAndDeleteLocked(
+	objects, comparedObjects map[string]*ObjectEntry,
+	meta *logtail.SnapshotMeta,
+	snapList map[uint32][]types.TS,
+	ts types.TS,
+) []string {
+	gc := make([]string, 0)
 	for name, entry := range objects {
-		objectEntry := table.objects[name]
-		tsList := meta.GetSnapshotList(snapList, entry.table)
+		objectEntry := comparedObjects[name]
+		tsList := meta.GetSnapshotListLocked(snapList, entry.table)
 		if tsList == nil {
 			if objectEntry == nil && entry.commitTS.Less(&ts) {
 				gc = append(gc, name)
-				t.deleteObject(name)
+				delete(t.objects, name)
 			}
 			continue
 		}
 		if objectEntry == nil && entry.commitTS.Less(&ts) && !isSnapshotRefers(entry, tsList, name) {
 			gc = append(gc, name)
-			t.deleteObject(name)
+			delete(t.objects, name)
 		}
 	}
-
-	objects = t.getObjects()
-	tombstones := t.getTombstones()
-	for name, tombstone := range tombstones {
-		ok := true
-		sameName := false
-		if tombstone.commitTS.GreaterEq(&ts) {
-			continue
-		}
-		for obj := range tombstone.objects {
-			if obj == name {
-				// tombstone for aObject is same as aObject, skip it
-				sameName = true
-			}
-			objectEntry := objects[obj]
-			if objectEntry != nil {
-				// TODO: remove log
-				logutil.Debug("[soft GC] Refers object",
-					zap.String("tombstone", name),
-					zap.String("obj", obj),
-					zap.Bool("objectEntry", objectEntry != nil))
-				ok = false
-				break
-			}
-		}
-		if ok {
-			if !sameName {
-				gc = append(gc, name)
-			}
-			// TODO: remove log
-			logutil.Debug("[soft GC] Delete tombstone",
-				zap.String("tombstone", name),
-				zap.Int("tombstone", len(t.tombstones)),
-				zap.Int("object", len(tombstone.objects)),
-				zap.Bool("same", sameName),
-				zap.Int("data", len(objects)))
-			t.deleteTombstone(name)
-		}
-	}
-	return gc, snapList
+	return gc
 }
 
 func isSnapshotRefers(obj *ObjectEntry, snapVec []types.TS, name string) bool {
@@ -227,6 +195,14 @@ func isSnapshotRefers(obj *ObjectEntry, snapVec []types.TS, name string) bool {
 
 func (t *GCTable) UpdateTable(data *logtail.CheckpointData) {
 	ins := data.GetObjectBatchs()
+	tombstoneIns := data.GetTombstoneObjectBatchs()
+	t.Lock()
+	defer t.Unlock()
+	t.updateObjectListLocked(ins, t.objects)
+	t.updateObjectListLocked(tombstoneIns, t.tombstones)
+}
+
+func (t *GCTable) updateObjectListLocked(ins *containers.Batch, objects map[string]*ObjectEntry) {
 	insCommitTSVec := ins.GetVectorByName(txnbase.SnapshotAttr_CommitTS).GetDownstreamVector()
 	insDeleteTSVec := ins.GetVectorByName(catalog.EntryNode_DeleteAt).GetDownstreamVector()
 	insCreateTSVec := ins.GetVectorByName(catalog.EntryNode_CreateAt).GetDownstreamVector()
@@ -247,18 +223,8 @@ func (t *GCTable) UpdateTable(data *logtail.CheckpointData) {
 			db:       vector.GetFixedAt[uint64](dbid, i),
 			table:    vector.GetFixedAt[uint64](tid, i),
 		}
-		t.addObject(objectStats.ObjectName().String(), object, commitTS)
+		t.addObjectLocked(objectStats.ObjectName().String(), object, commitTS, objects)
 	}
-
-	// tombstone, _, _, _ := data.GetBlkBatchs()
-	// tombstoneBlockIDVec := vector.MustFixedCol[types.Blockid](tombstone.GetVectorByName(catalog2.BlockMeta_ID).GetDownstreamVector())
-	// tombstoneCommitTSVec := vector.MustFixedCol[types.TS](tombstone.GetVectorByName(catalog2.BlockMeta_CommitTs).GetDownstreamVector())
-	// for i := 0; i < tombstone.Length(); i++ {
-	// 	blockID := tombstoneBlockIDVec[i]
-	// 	commitTS := tombstoneCommitTSVec[i]
-	// 	deltaLoc := objectio.Location(tombstone.GetVectorByName(catalog2.BlockMeta_DeltaLoc).Get(i).([]byte))
-	// 	t.addTombstone(deltaLoc.Name().String(), blockID.ObjectNameString(), commitTS)
-	// }
 }
 
 func (t *GCTable) makeBatchWithGCTable() []*containers.Batch {
@@ -294,8 +260,8 @@ func (t *GCTable) collectData(files []string) []*containers.Batch {
 	for i, attr := range BlockSchemaAttr {
 		bats[ObjectList].AddVector(attr, containers.MakeVector(BlockSchemaTypes[i], common.DefaultAllocator))
 	}
-	for i, attr := range TombstoneSchemaAttr {
-		bats[TombstoneList].AddVector(attr, containers.MakeVector(TombstoneSchemaTypes[i], common.DefaultAllocator))
+	for i, attr := range BlockSchemaAttr {
+		bats[TombstoneList].AddVector(attr, containers.MakeVector(BlockSchemaTypes[i], common.DefaultAllocator))
 	}
 	for i, attr := range VersionsSchemaAttr {
 		bats[Versions].AddVector(attr, containers.MakeVector(VersionsSchemaTypes[i], common.DefaultAllocator))
@@ -310,11 +276,11 @@ func (t *GCTable) collectData(files []string) []*containers.Batch {
 	}
 
 	for name, entry := range t.tombstones {
-		for obj := range entry.objects {
-			bats[TombstoneList].GetVectorByName(GCAttrObjectName).Append([]byte(obj), false)
-			bats[TombstoneList].GetVectorByName(GCAttrTombstone).Append([]byte(name), false)
-			bats[TombstoneList].GetVectorByName(GCAttrCommitTS).Append(entry.commitTS, false)
-		}
+		bats[TombstoneList].GetVectorByName(GCAttrObjectName).Append([]byte(name), false)
+		bats[TombstoneList].GetVectorByName(GCCreateTS).Append(entry.createTS, false)
+		bats[TombstoneList].GetVectorByName(GCDeleteTS).Append(entry.dropTS, false)
+		bats[TombstoneList].GetVectorByName(GCAttrCommitTS).Append(entry.commitTS, false)
+		bats[TombstoneList].GetVectorByName(GCAttrTableId).Append(entry.table, false)
 	}
 
 	return bats
@@ -388,16 +354,13 @@ func (t *GCTable) SaveFullTable(start, end types.TS, fs *objectio.ObjectFS, file
 }
 
 func (t *GCTable) rebuildTableV3(bats []*containers.Batch) {
-	t.rebuildTableV2(bats, ObjectList)
-	for i := 0; i < bats[TombstoneList].Length(); i++ {
-		name := string(bats[TombstoneList].GetVectorByName(GCAttrObjectName).Get(i).([]byte))
-		tombstone := string(bats[TombstoneList].GetVectorByName(GCAttrTombstone).Get(i).([]byte))
-		commitTS := bats[TombstoneList].GetVectorByName(GCAttrCommitTS).Get(i).(types.TS)
-		t.addTombstone(tombstone, name, commitTS)
-	}
+	t.Lock()
+	defer t.Unlock()
+	t.rebuildTableV2(bats, ObjectList, t.objects)
+	t.rebuildTableV2(bats, TombstoneList, t.tombstones)
 }
 
-func (t *GCTable) rebuildTableV2(bats []*containers.Batch, idx BatchType) {
+func (t *GCTable) rebuildTableV2(bats []*containers.Batch, idx BatchType, objects map[string]*ObjectEntry) {
 	for i := 0; i < bats[idx].Length(); i++ {
 		name := string(bats[idx].GetVectorByName(GCAttrObjectName).Get(i).([]byte))
 		creatTS := bats[idx].GetVectorByName(GCCreateTS).Get(i).(types.TS)
@@ -413,7 +376,7 @@ func (t *GCTable) rebuildTableV2(bats []*containers.Batch, idx BatchType) {
 			commitTS: commitTS,
 			table:    tid,
 		}
-		t.addObject(name, object, commitTS)
+		t.addObjectLocked(name, object, commitTS, objects)
 	}
 }
 
@@ -427,7 +390,7 @@ func (t *GCTable) rebuildTable(bats []*containers.Batch, ts types.TS) {
 			createTS: ts,
 			commitTS: ts,
 		}
-		t.addObject(name, object, ts)
+		t.addObject(name, object, ts, t.objects)
 	}
 	for i := 0; i < bats[DeleteBlock].Length(); i++ {
 		name := string(bats[DeleteBlock].GetVectorByName(GCAttrObjectName).Get(i).([]byte))
@@ -438,7 +401,7 @@ func (t *GCTable) rebuildTable(bats []*containers.Batch, ts types.TS) {
 			dropTS:   ts,
 			commitTS: ts,
 		}
-		t.addObject(name, object, ts)
+		t.addObject(name, object, ts, t.objects)
 	}
 }
 
@@ -521,7 +484,7 @@ func (t *GCTable) ReadTable(ctx context.Context, name string, size int64, fs *ob
 		if err != nil {
 			return err
 		}
-		t.rebuildTableV2(bats, CreateBlock)
+		t.rebuildTableV2(bats, CreateBlock, t.objects)
 		return nil
 	}
 	bats := t.makeBatchWithGCTableV1()
