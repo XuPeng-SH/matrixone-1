@@ -506,9 +506,22 @@ func getVersion(bat *containers.Batch) uint16 {
 }
 
 // For test
+
 func (t *GCTable) Compare(table *GCTable) bool {
-	for name, entry := range table.objects {
-		object := t.objects[name]
+	if !t.compareObjects(t.objects, table.objects) {
+		logutil.Infof("objects are not equal")
+		return false
+	}
+	if !t.compareObjects(t.tombstones, table.tombstones) {
+		logutil.Infof("tombstones are not equal")
+		return false
+	}
+	return true
+}
+
+func (t *GCTable) compareObjects(objects, compareObjects map[string]*ObjectEntry) bool {
+	for name, entry := range objects {
+		object := compareObjects[name]
 		if object == nil {
 			logutil.Infof("object %s is nil, create %v, drop %v", name, entry.createTS.ToString(), entry.dropTS.ToString())
 			return false
@@ -519,7 +532,7 @@ func (t *GCTable) Compare(table *GCTable) bool {
 		}
 	}
 
-	return len(t.objects) == len(table.objects)
+	return len(compareObjects) == len(objects)
 }
 
 func (t *GCTable) String() string {
@@ -529,6 +542,11 @@ func (t *GCTable) String() string {
 	var w bytes.Buffer
 	_, _ = w.WriteString("objects:[\n")
 	for name, entry := range t.objects {
+		_, _ = w.WriteString(fmt.Sprintf("name: %s, commitTS: %v ", name, entry.commitTS.ToString()))
+	}
+	_, _ = w.WriteString("]\n")
+	_, _ = w.WriteString("tombstones:[\n")
+	for name, entry := range t.tombstones {
 		_, _ = w.WriteString(fmt.Sprintf("name: %s, commitTS: %v ", name, entry.commitTS.ToString()))
 	}
 	_, _ = w.WriteString("]\n")
