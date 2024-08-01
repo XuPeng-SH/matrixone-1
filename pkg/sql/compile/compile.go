@@ -4181,6 +4181,21 @@ func (c *Compile) expandRanges(
 
 }
 
+func getCnList() engine.Nodes {
+	// 127.0.0.1:18100
+	n1 := engine.Node{
+		Id:   "127.0.0.1",
+		Mcpu: 1,
+		Addr: "18100",
+	}
+	n2 := engine.Node{
+		Id:   "127.0.0.1",
+		Mcpu: 1,
+		Addr: "18200",
+	}
+	return engine.Nodes{n1, n2}
+}
+
 func (c *Compile) generateNodes(n *plan.Node) (engine.Nodes, []any, []types.T, error) {
 	var err error
 	var db engine.Database
@@ -4286,12 +4301,16 @@ func (c *Compile) generateNodes(n *plan.Node) (engine.Nodes, []any, []types.T, e
 	// for multi cn in launch mode, put all payloads in current CN, maybe delete this in the future
 	// for an ordered scan, put all paylonds in current CN
 	// or sometimes force on one CN
-	if isLaunchMode(c.cnList) || len(n.OrderBy) > 0 || relData.DataCnt() < plan2.BlockThresholdForOneCN || n.Stats.ForceOneCN {
+
+	if len(n.OrderBy) > 0 || relData.DataCnt() < plan2.BlockThresholdForOneCN || n.Stats.ForceOneCN {
 		return putBlocksInCurrentCN(c, relData, n), partialResults, partialResultTypes, nil
 	}
+
+	cnList := getCnList()
+
 	// disttae engine
 	if engineType == engine.Disttae {
-		nodes, err := shuffleBlocksToMultiCN(c, rel, relData, n)
+		nodes, err := shuffleBlocksToMultiCN(c, rel, relData, n, cnList)
 		return nodes, partialResults, partialResultTypes, err
 	}
 	// maybe temp table on memengine , just put payloads in average
@@ -4374,7 +4393,7 @@ func putBlocksInAverage(c *Compile, relData engine.RelData, n *plan.Node) engine
 	return nodes
 }
 
-func shuffleBlocksToMultiCN(c *Compile, rel engine.Relation, relData engine.RelData, n *plan.Node) (engine.Nodes, error) {
+func shuffleBlocksToMultiCN(c *Compile, rel engine.Relation, relData engine.RelData, n *plan.Node, cnList engine.Nodes) (engine.Nodes, error) {
 	var nodes engine.Nodes
 	// add current CN
 	nodes = append(nodes, engine.Node{
@@ -4389,7 +4408,7 @@ func shuffleBlocksToMultiCN(c *Compile, rel engine.Relation, relData engine.RelD
 		return nodes, nil
 	}
 	// only one cn
-	if len(c.cnList) == 1 {
+	if len(cnList) == 1 {
 		engine.ForRangeBlockInfo(1, relData.DataCnt(), relData,
 			func(blk objectio.BlockInfoInProgress) (bool, error) {
 				nodes[0].Data.AppendBlockInfo(blk)
@@ -4401,14 +4420,14 @@ func shuffleBlocksToMultiCN(c *Compile, rel engine.Relation, relData engine.RelD
 
 	// add the rest of CNs in list
 	for i := range c.cnList {
-		if c.cnList[i].Addr != c.addr {
-			nodes = append(nodes, engine.Node{
-				Id:   c.cnList[i].Id,
-				Addr: c.cnList[i].Addr,
-				Mcpu: c.generateCPUNumber(c.cnList[i].Mcpu, int(n.Stats.BlockNum)),
-				Data: relData.BuildEmptyRelData(),
-			})
-		}
+		// if c.cnList[i].Addr != c.addr {
+		nodes = append(nodes, engine.Node{
+			Id:   c.cnList[i].Id,
+			Addr: c.cnList[i].Addr,
+			Mcpu: c.generateCPUNumber(c.cnList[i].Mcpu, int(n.Stats.BlockNum)),
+			Data: relData.BuildEmptyRelData(),
+		})
+		// }
 	}
 
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Addr < nodes[j].Addr })
@@ -4452,8 +4471,8 @@ func shuffleBlocksToMultiCN(c *Compile, rel engine.Relation, relData engine.RelD
 			maxWorkLoad,
 			minWorkLoad)
 		logstring = logstring + " cnlist: "
-		for i := range c.cnList {
-			logstring = logstring + c.cnList[i].Addr + " "
+		for i := range cnList {
+			logstring = logstring + cnList[i].Addr + " "
 		}
 		c.proc.Warnf(c.proc.Ctx, logstring)
 	}
