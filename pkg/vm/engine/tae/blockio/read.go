@@ -56,6 +56,7 @@ func ReadDataByFilter(
 	fs fileservice.FileService,
 	mp *mpool.MPool,
 	tableName string,
+	doTrace bool,
 ) (sels []int32, err error) {
 	bat, release, err := LoadColumns(ctx, columns, colTypes, fs, info.MetaLocation(), mp, fileservice.Policy(0))
 	if err != nil {
@@ -64,10 +65,26 @@ func ReadDataByFilter(
 	defer release()
 
 	sels = searchFunc(bat.Vecs)
+	if doTrace {
+		logutil.Info(
+			"TPCH-DEBUG-READ-WITH-FILTER-2",
+			zap.Int("len-sels", len(sels)),
+			zap.String("name", tableName),
+			zap.String("location", info.MetaLocation().String()),
+		)
+	}
 	//sels, err = ds.ApplyTombstones(ctx, info.BlockID, sels)
 	sels, err = ds.ApplyTombstonesInProgress(ctx, info.BlockID, sels)
 	if err != nil {
 		return
+	}
+	if doTrace {
+		logutil.Info(
+			"TPCH-DEBUG-READ-WITH-FILTER-3",
+			zap.Int("len-sels", len(sels)),
+			zap.String("name", tableName),
+			zap.String("location", info.MetaLocation().String()),
+		)
 	}
 	return
 }
@@ -176,7 +193,7 @@ func BlockDataRead(
 	if searchFunc != nil {
 		if sels, err = ReadDataByFilter(
 			ctx, sid, info, ds, filterSeqnums, filterColTypes,
-			types.TimestampToTS(ts), searchFunc, fs, mp, tableName,
+			types.TimestampToTS(ts), searchFunc, fs, mp, tableName, doTrace,
 		); err != nil {
 			return nil, err
 		}
@@ -190,7 +207,7 @@ func BlockDataRead(
 
 		if doTrace {
 			logutil.Info(
-				"TPCH-DEBUG-READ-WITH-FILTER",
+				"TPCH-DEBUG-READ-WITH-FILTER-1",
 				zap.Int("len-sels", len(sels)),
 				zap.String("name", tableName),
 				zap.String("location", info.MetaLocation().String()),
