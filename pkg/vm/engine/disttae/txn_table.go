@@ -2298,7 +2298,7 @@ func (tbl *txnTable) readNewRowid(
 		bat, err := blockio.BlockDataRead(
 			tbl.proc.Load().Ctx, tbl.proc.Load().GetService(), &blk, ds, columns, colTypes, tbl.db.op.SnapshotTS(),
 			nil, nil, blockio.BlockReadFilter{},
-			tbl.getTxn().engine.fs, tbl.proc.Load().Mp(), tbl.proc.Load(), fileservice.Policy(0), "",
+			tbl.getTxn().engine.fs, tbl.proc.Load().Mp(), tbl.proc.Load(), fileservice.Policy(0), "", false,
 		)
 		if err != nil {
 			return rowid, false, err

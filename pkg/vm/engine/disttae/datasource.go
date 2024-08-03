@@ -579,6 +579,8 @@ func NewRemoteDataSource(
 	}
 }
 
+func (rs *RemoteDataSource) Type() int { return 1 }
+
 func (rs *RemoteDataSource) Next(
 	_ context.Context,
 	_ []string,
@@ -804,6 +806,7 @@ func NewLocalDataSource(
 
 	return source, nil
 }
+func (ls *LocalDataSource) Type() int { return 2 }
 
 func (ls *LocalDataSource) String() string {
 	blks := make([]*objectio.BlockInfoInProgress, ls.rangeSlice.Len())

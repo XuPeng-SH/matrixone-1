@@ -694,6 +694,7 @@ const (
 )
 
 type DataSource interface {
+	Type() int
 	Next(
 		ctx context.Context,
 		cols []string,

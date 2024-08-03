@@ -316,10 +316,10 @@ func (r *reader) Read(
 	vp engine.VectorPool,
 ) (bat *batch.Batch, err error) {
 
+	doTrace := strings.Contains(r.tableDef.Name, "orders")
 	var blkInfo *objectio.BlockInfoInProgress
 	start := time.Now()
 	defer func() {
-		doTrace := strings.Contains(r.tableDef.Name, "orders")
 		if doTrace {
 			var dataStr string
 			var blockStr string
@@ -406,6 +406,7 @@ func (r *reader) Read(
 		filter,
 		r.fs, mp, vp, policy,
 		r.tableDef.Name,
+		doTrace && r.source.Type() == 1,
 	)
 	if err != nil {
 		return nil, err

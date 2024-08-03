@@ -168,6 +168,8 @@ func NewDeltaLocDataSource(
 	}
 }
 
+func (d *DeltaLocDataSource) Type() int { return 3 }
+
 func (d *DeltaLocDataSource) Next(
 	_ context.Context,
 	_ []string,
@@ -466,7 +468,7 @@ func (sm *SnapshotMeta) GetSnapshot(ctx context.Context, sid string, fs fileserv
 					MetaLoc: objectio.ObjectLocation(loc),
 				}
 				bat, err := blockio.BlockDataRead(ctx, sid, &blk, ds, idxes, colTypes, checkpointTS.ToTimestamp(),
-					nil, nil, blockio.BlockReadFilter{}, fs, mp, nil, fileservice.Policy(0), "")
+					nil, nil, blockio.BlockReadFilter{}, fs, mp, nil, fileservice.Policy(0), "", false)
 				if err != nil {
 					return nil, err
 				}

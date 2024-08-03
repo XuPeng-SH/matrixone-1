@@ -25,6 +25,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -1807,7 +1808,7 @@ func doFormatExpr(expr *plan.Expr, out *bytes.Buffer, depth int) {
 	case *plan.Expr_T:
 		out.WriteString(fmt.Sprintf("%sExpr_T(%s)", prefix, t.T.String()))
 	case *plan.Expr_Vec:
-		out.WriteString(fmt.Sprintf("%sExpr_Vec(len=%d)", prefix, t.Vec.Len))
+		out.WriteString(fmt.Sprintf("%sExpr_Vec(len=%d,hash=%d)", prefix, t.Vec.Len, xxhash.Sum64(t.Vec.Data)))
 	default:
 		out.WriteString(fmt.Sprintf("%sExpr_Unknown(%s)", prefix, expr.String()))
 	}

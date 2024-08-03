@@ -155,6 +155,7 @@ func BlockDataRead(
 	vp engine.VectorPool,
 	policy fileservice.Policy,
 	tableName string,
+	doTrace bool,
 ) (*batch.Batch, error) {
 	if logutil.GetSkip1Logger().Core().Enabled(zap.DebugLevel) {
 		logutil.Debugf("read block %s, columns %v, types %v", info.BlockID.String(), columns, colTypes)
@@ -185,6 +186,15 @@ func BlockDataRead(
 			v2.TaskSelReadFilterHit.Inc()
 		} else {
 			RecordReadFilterSelectivity(sid, 0, 1)
+		}
+
+		if doTrace {
+			logutil.Info(
+				"TPCH-DEBUG-READ-WITH-FILTER",
+				zap.Int("len-sels", len(sels)),
+				zap.String("name", tableName),
+				zap.String("location", info.MetaLocation().String()),
+			)
 		}
 
 		if len(sels) == 0 {
