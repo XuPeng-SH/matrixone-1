@@ -262,7 +262,7 @@ func (tomb *tombstoneDataWithDeltaLoc) ApplyPersistedTombstones(
 	) (left []int32, err error),
 ) (left []int32, err error) {
 
-	leff = rowsOffset
+	left = rowsOffset
 	if locs, ok := tomb.blk2UncommitLoc[bid]; ok {
 		for _, loc := range locs {
 			left, err = apply(ctx, loc, types.TS{}, rowsOffset, mask)
