@@ -40,6 +40,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"go.uber.org/zap"
 )
 
 type tombstoneDataWithDeltaLoc struct {
@@ -565,6 +566,10 @@ func NewRemoteDataSource(
 	snapshotTS timestamp.Timestamp,
 	relData engine.RelData,
 ) (source *RemoteDataSource) {
+	logutil.Info(
+		"TPCH-DEBUG-NEW-REMOTE",
+		zap.String("data", relData.String()),
+	)
 	return &RemoteDataSource{
 		data: relData,
 		ctx:  ctx,

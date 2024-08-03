@@ -316,20 +316,28 @@ func (r *reader) Read(
 	vp engine.VectorPool,
 ) (bat *batch.Batch, err error) {
 
+	var blkInfo *objectio.BlockInfoInProgress
 	start := time.Now()
 	defer func() {
 		doTrace := strings.Contains(r.tableDef.Name, "orders")
 		if doTrace {
 			var dataStr string
+			var blockStr string
 			if bat == nil {
 				dataStr = "<empty:end>"
 			} else {
 				dataStr = fmt.Sprintf("[%d]:%s", bat.RowCount(), common.MoBatchToString(bat, 10))
 			}
+			if blkInfo == nil {
+				blockStr = "no-blk"
+			} else {
+				blockStr = blkInfo.String()
+			}
 			logutil.Info(
 				"TPCH-DEBUG-READ-BLOCK",
 				zap.String("name", r.tableDef.Name),
 				zap.String("data", dataStr),
+				zap.String("block", blockStr),
 			)
 		}
 		v2.TxnBlockReaderDurationHistogram.Observe(time.Since(start).Seconds())
