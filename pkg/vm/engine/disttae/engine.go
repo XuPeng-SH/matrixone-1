@@ -667,7 +667,7 @@ func (e *Engine) BuildBlockReaders(
 		exprStr = plan2.FormatExpr(expr)
 	}
 	logutil.Info(
-		"TXN-FILTER-READER-REMOTE",
+		"TPCH-DEBUG-TXN-FILTER-READER-REMOTE",
 		zap.String("name", def.Name),
 		zap.String("expr", exprStr),
 	)

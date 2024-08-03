@@ -16,6 +16,7 @@ package disttae
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -316,6 +318,20 @@ func (r *reader) Read(
 
 	start := time.Now()
 	defer func() {
+		doTrace := strings.Contains(r.tableDef.Name, "orders")
+		if doTrace {
+			var dataStr string
+			if bat == nil {
+				dataStr = "<empty:end>"
+			} else {
+				dataStr = fmt.Sprintf("[%d]:%s", bat.RowCount(), common.MoBatchToString(bat, 10))
+			}
+			logutil.Info(
+				"TPCH-DEBUG-READ-BLOCK",
+				zap.String("name", r.tableDef.Name),
+				zap.String("data", dataStr),
+			)
+		}
 		v2.TxnBlockReaderDurationHistogram.Observe(time.Since(start).Seconds())
 		if bat == nil {
 			r.Close()

@@ -682,7 +682,7 @@ func (tbl *txnTable) Ranges(
 
 		if tbl.enableLogFilterExpr.Load() {
 			logutil.Info(
-				"TXN-FILTER-RANGE-LOG",
+				"TPCH-DEBUG-TXN-FILTER-RANGE-LOG",
 				zap.String("name", tbl.tableDef.Name),
 				zap.String("exprs", plan2.FormatExprs(exprs)),
 				zap.Int("ranges-len", blocks.Len()),
@@ -1797,7 +1797,7 @@ func (tbl *txnTable) BuildReaders(
 		exprStr = plan2.FormatExpr(expr)
 	}
 	logutil.Info(
-		"TXN-FILTER-READER-LOCAL",
+		"TPCH-DEBUG-TXN-FILTER-READER-LOCAL",
 		zap.String("name", tbl.tableName),
 		zap.String("expr", exprStr),
 	)
