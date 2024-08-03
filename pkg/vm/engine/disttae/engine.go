@@ -45,6 +45,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
 	client2 "github.com/matrixorigin/matrixone/pkg/queryservice/client"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec"
+	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	"github.com/matrixorigin/matrixone/pkg/txn/client"
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/util/stack"
@@ -660,6 +661,16 @@ func (e *Engine) BuildBlockReaders(
 	if err != nil {
 		return nil, err
 	}
+
+	exprStr := "nil"
+	if expr != nil {
+		exprStr = plan2.FormatExpr(expr)
+	}
+	logutil.Info(
+		"TXN-FILTER-READER-REMOTE",
+		zap.String("name", def.Name),
+		zap.String("expr", exprStr),
+	)
 
 	var (
 		rds   []engine.Reader

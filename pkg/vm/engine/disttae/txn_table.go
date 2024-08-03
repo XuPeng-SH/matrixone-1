@@ -676,7 +676,7 @@ func (tbl *txnTable) Ranges(
 			tbl.enableLogFilterExpr.Store(true)
 		}
 
-		if rangesLen >= 50 {
+		if rangesLen >= 5 {
 			tbl.enableLogFilterExpr.Store(true)
 		}
 
@@ -1791,6 +1791,16 @@ func (tbl *txnTable) BuildReaders(
 	if plan2.IsFalseExpr(expr) {
 		return []engine.Reader{new(emptyReader)}, nil
 	}
+
+	exprStr := "nil"
+	if expr != nil {
+		exprStr = plan2.FormatExpr(expr)
+	}
+	logutil.Info(
+		"TXN-FILTER-READER-LOCAL",
+		zap.String("name", tbl.tableName),
+		zap.String("expr", exprStr),
+	)
 
 	if orderBy && num != 1 {
 		return nil, moerr.NewInternalErrorNoCtx("orderBy only support one reader")

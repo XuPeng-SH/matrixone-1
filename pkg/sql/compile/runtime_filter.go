@@ -16,8 +16,11 @@ package compile
 
 import (
 	"context"
+	"strings"
 
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/message"
+	"go.uber.org/zap"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
@@ -159,5 +162,17 @@ func ApplyRuntimeFilters(
 		curr++
 	}
 
-	return relData.DataSlice(0, curr), nil
+	blocks := relData.DataSlice(0, curr)
+
+	if strings.Contains(tableDef.Name, "orders") {
+		blockList := blocks.GetBlockInfoSlice()
+		logutil.Info(
+			"TXN-FILTER-RANGE-LOG-2",
+			zap.String("name", tableDef.Name),
+			zap.String("exprs", plan2.FormatExprs(exprs)),
+			zap.Int("ranges-len", blockList.Len()),
+		)
+	}
+
+	return blocks, nil
 }
