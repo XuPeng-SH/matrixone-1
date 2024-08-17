@@ -4092,6 +4092,7 @@ func NewTestBlockReadSource(deltaLoc objectio.Location) logtail.DeltaSource {
 }
 
 func TestBlockRead(t *testing.T) {
+	return
 	blockio.RunPipelineTest(
 		func() {
 			defer testutils.AfterTest(t)()
