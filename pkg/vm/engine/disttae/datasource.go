@@ -70,7 +70,7 @@ func NewRemoteDataSource(
 ) (source *RemoteDataSource) {
 	logutil.Info(
 		"SSB-DEBUG-2",
-		zap.String("rel-data", relData.String()),
+		zap.Int("block-list-cnt", relData.DataCnt()),
 	)
 	return &RemoteDataSource{
 		data: relData,
