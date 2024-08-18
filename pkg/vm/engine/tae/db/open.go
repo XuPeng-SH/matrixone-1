@@ -81,7 +81,6 @@ func Open(ctx context.Context, dirname string, opts *options.Options) (db *DB, e
 			common.AnyField("cost", time.Since(totalTime)),
 			common.AnyField("err", err))
 	}()
-
 	opts = opts.FillDefaults(dirname)
 	fillRuntimeOptions(opts)
 

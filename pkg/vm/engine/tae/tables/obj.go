@@ -49,7 +49,6 @@ func newObject(
 func (obj *object) Init() (err error) {
 	return
 }
-
 func (obj *object) PrepareCompact() bool {
 	prepareCompact := obj.meta.Load().PrepareCompact()
 	if !prepareCompact && obj.meta.Load().CheckPrintPrepareCompact() {
