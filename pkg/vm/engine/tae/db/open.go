@@ -64,7 +64,6 @@ func fillRuntimeOptions(opts *options.Options) {
 
 func Open(ctx context.Context, dirname string, opts *options.Options) (db *DB, err error) {
 	dbLocker, err := createDBLock(dirname)
-
 	logutil.Info("open-tae", common.OperationField("Start"),
 		common.OperandField("open"))
 	totalTime := time.Now()
