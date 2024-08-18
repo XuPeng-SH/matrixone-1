@@ -83,7 +83,6 @@ func Open(ctx context.Context, dirname string, opts *options.Options) (db *DB, e
 	}()
 	opts = opts.FillDefaults(dirname)
 	fillRuntimeOptions(opts)
-
 	wbuf := &bytes.Buffer{}
 	werr := toml.NewEncoder(wbuf).Encode(opts)
 	logutil.Info("open-tae", common.OperationField("Config"),
