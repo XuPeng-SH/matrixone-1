@@ -78,7 +78,6 @@ type Service interface {
 	GetSQLExecutor() executor.SQLExecutor
 	GetBootstrapService() bootstrap.Service
 }
-
 type EngineType string
 
 const (
