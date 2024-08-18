@@ -171,12 +171,6 @@ func (tomb *tombstoneData) HasAnyTombstoneFile() bool {
 	return tomb != nil && len(tomb.files) > 0
 }
 
-func (tomb *tombstoneData) HasBlockTombstone(
-	ctx context.Context, bid objectio.Blockid, fs fileservice.FileService,
-) (bool, error) {
-	panic("Not Support")
-}
-
 // false positive check
 func (tomb *tombstoneData) HasBlockTombstone(
 	ctx context.Context,
