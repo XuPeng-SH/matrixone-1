@@ -16,10 +16,11 @@ package disttae
 
 import (
 	"context"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -76,7 +77,6 @@ func (e *Engine) init(ctx context.Context) error {
 		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_TABLES_ID}] = logtailreplay.NewPartition(e.service, 2)
 		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_COLUMNS_ID}] = logtailreplay.NewPartition(e.service, 3)
 	}
-
 	{ // mo_catalog
 		part := e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_DATABASE_ID}]
 		bat, err := catalog.GenCreateDatabaseTuple("", 0, 0, 0, catalog.MO_CATALOG, catalog.MO_CATALOG_ID, "", m, packer)
