@@ -67,7 +67,6 @@ func Open(ctx context.Context, dirname string, opts *options.Options) (db *DB, e
 	logutil.Info("open-tae", common.OperationField("Start"),
 		common.OperandField("open"))
 	totalTime := time.Now()
-
 	if err != nil {
 		return nil, err
 	}
