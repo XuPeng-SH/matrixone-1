@@ -71,7 +71,6 @@ func (obj *aobject) FreezeAppend() {
 func (obj *aobject) IsAppendFrozen() bool {
 	return obj.frozen.Load()
 }
-
 func (obj *aobject) IsAppendable() bool {
 	if obj.IsAppendFrozen() {
 		return false
