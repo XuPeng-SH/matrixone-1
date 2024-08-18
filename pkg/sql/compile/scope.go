@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/value_scan"
 
@@ -1203,6 +1204,12 @@ func (s *Scope) buildReaders(c *Compile, maxProvidedCpuNumber int) (readers []en
 		if err != nil {
 			return
 		}
+		logutil.Info(
+			"SSB-DEBUG-1",
+			zap.Int("readers", len(readers)),
+			zap.String("table-name", s.DataSource.TableDef.Name),
+			zap.Uint64("table-id", s.DataSource.TableDef.TblId),
+		)
 	// Reader can be generated from local relation.
 	case s.DataSource.Rel != nil && s.DataSource.TableDef.Partition == nil:
 		switch s.DataSource.Rel.GetEngineType() {
