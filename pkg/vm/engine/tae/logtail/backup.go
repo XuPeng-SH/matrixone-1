@@ -209,7 +209,10 @@ func trimObjectsData(
 				(*objectsData)[name].sortKey = sortKey
 			}
 			bat = formatData(bat)
-			(*objectsData)[name].blocks[uint16(id)].data = bat
+			(*objectsData)[name].blocks[uint16(id)] = &blockData{
+				num:  uint16(id),
+				data: bat,
+			}
 		}
 
 		for id := range (*objectsData)[name].blocks {
