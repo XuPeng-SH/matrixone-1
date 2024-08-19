@@ -48,7 +48,6 @@ import (
 )
 
 func Test_InsertRows(t *testing.T) {
-	t.Skip("need fix me")
 	catalog.SetupDefines("")
 
 	var (
@@ -730,7 +729,6 @@ func TestInProgressTransfer(t *testing.T) {
 }
 
 func TestCacheGC(t *testing.T) {
-	t.Skip("need fix me")
 	opts := config.WithLongScanAndCKPOpts(nil)
 	p := testutil.InitEnginePack(testutil.TestOptions{TaeEngineOptions: opts}, t)
 	defer p.Close()
