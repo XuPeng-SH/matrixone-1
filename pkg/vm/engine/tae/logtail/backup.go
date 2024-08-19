@@ -272,49 +272,6 @@ func trimObjectsData(
 	return isCkpChange, nil
 }
 
-func updateBlockMeta(blkMeta, blkMetaTxn *containers.Batch, row int, blockID types.Blockid, location objectio.Location, sort bool) {
-	blkMeta.GetVectorByName(catalog2.PhyAddrColumnName).Update(
-		row,
-		objectio.HackBlockid2Rowid(&blockID),
-		false)
-	blkMeta.GetVectorByName(catalog.BlockMeta_ID).Update(
-		row,
-		blockID,
-		false)
-	blkMeta.GetVectorByName(catalog.BlockMeta_EntryState).Update(
-		row,
-		false,
-		false)
-	blkMeta.GetVectorByName(catalog.BlockMeta_Sorted).Update(
-		row,
-		sort,
-		false)
-	blkMeta.GetVectorByName(catalog.BlockMeta_SegmentID).Update(
-		row,
-		*blockID.Segment(),
-		false)
-	blkMeta.GetVectorByName(catalog.BlockMeta_MetaLoc).Update(
-		row,
-		[]byte(location),
-		false)
-	blkMeta.GetVectorByName(catalog.BlockMeta_DeltaLoc).Update(
-		row,
-		nil,
-		true)
-	blkMetaTxn.GetVectorByName(catalog.BlockMeta_MetaLoc).Update(
-		row,
-		[]byte(location),
-		false)
-	blkMetaTxn.GetVectorByName(catalog.BlockMeta_DeltaLoc).Update(
-		row,
-		nil,
-		true)
-
-	if !sort {
-		logutil.Infof("block %v is not sorted", blockID.String())
-	}
-}
-
 func appendValToBatch(src, dst *containers.Batch, row int) {
 	for v, vec := range src.Vecs {
 		val := vec.Get(row)
@@ -328,12 +285,12 @@ func appendValToBatch(src, dst *containers.Batch, row int) {
 
 // Need to format the loaded batch, otherwise panic may occur when WriteBatch.
 func formatData(data *batch.Batch) *batch.Batch {
+	for i := range data.Vecs {
+		att := fmt.Sprintf("col_%d", i)
+		data.Attrs = append(data.Attrs, att)
+	}
 	if data.Vecs[0].Length() > 0 {
 		data.Attrs = make([]string, 0)
-		for i := range data.Vecs {
-			att := fmt.Sprintf("col_%d", i)
-			data.Attrs = append(data.Attrs, att)
-		}
 		tmp := containers.ToTNBatch(data, common.CheckpointAllocator)
 		data = containers.ToCNBatch(tmp)
 	}
@@ -547,7 +504,7 @@ func ReWriteCheckpointAndBlockFromKey(
 	// Rewrite object file
 	for _, objectData := range objectsData {
 		if !objectData.isChange && !objectData.delete {
-			continue
+			panic(any("objectData is not change and not delete"))
 		}
 		dataBlocks := make([]*blockData, 0)
 		var blocks []objectio.BlockObject
