@@ -116,7 +116,11 @@ func (w *BlockWriter) WriteBatch(batch *batch.Batch) (objectio.BlockObject, erro
 	}
 	seqnums := w.writer.GetSeqnums()
 	if w.sortKeyIdx != math.MaxUint16 {
-		w.writer.SetSortKeySeqnum(seqnums[w.sortKeyIdx])
+		if uint16(len(seqnums)) < w.sortKeyIdx {
+			w.writer.SetSortKeySeqnum(seqnums[w.sortKeyIdx])
+		} else {
+			w.writer.SetSortKeySeqnum(seqnums[w.sortKeyIdx])
+		}
 	}
 	for i, vec := range batch.Vecs {
 		isPK := false
