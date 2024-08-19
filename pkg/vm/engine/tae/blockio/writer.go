@@ -119,7 +119,7 @@ func (w *BlockWriter) WriteBatch(batch *batch.Batch) (objectio.BlockObject, erro
 		if uint16(len(seqnums)) < w.sortKeyIdx {
 			w.writer.SetSortKeySeqnum(seqnums[w.sortKeyIdx])
 		} else {
-			w.writer.SetSortKeySeqnum(seqnums[w.sortKeyIdx])
+			w.writer.SetSortKeySeqnum(w.sortKeyIdx)
 		}
 	}
 	for i, vec := range batch.Vecs {
