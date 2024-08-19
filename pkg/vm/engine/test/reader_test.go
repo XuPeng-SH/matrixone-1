@@ -236,7 +236,6 @@ func TestReaderCanReadUncommittedInMemInsertAndDeletes(t *testing.T) {
 }
 
 func Test_ReaderCanReadCommittedInMemInsertAndDeletes(t *testing.T) {
-	t.Skip("todo")
 	var (
 		//err          error
 		mp           *mpool.MPool
