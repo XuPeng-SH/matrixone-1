@@ -503,7 +503,7 @@ func ReWriteCheckpointAndBlockFromKey(
 
 	blkMetaInsert := data.bats[TombstoneObjectInfoIDX]
 	blkMetaInsertStats := blkMetaInsert.GetVectorByName(ObjectAttr_ObjectStats)
-	blkMetaInsertEntryState := blkMetaInsert.GetVectorByName(catalog.BlockMeta_EntryState)
+	blkMetaInsertEntryState := blkMetaInsert.GetVectorByName(ObjectAttr_State)
 	blkMetaInsertDelete := blkMetaInsert.GetVectorByName(EntryNode_DeleteAt)
 	blkMetaInsertCommit := blkMetaInsert.GetVectorByName(txnbase.SnapshotAttr_CommitTS)
 	blkMetaInsertTid := blkMetaInsert.GetVectorByName(SnapshotAttr_TID)
