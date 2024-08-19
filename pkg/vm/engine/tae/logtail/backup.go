@@ -560,9 +560,7 @@ func ReWriteCheckpointAndBlockFromKey(
 		})
 
 		if objectData.isChange &&
-			(!objectData.delete || (objectData.blocks[0] != nil &&
-				objectData.dataType == objectio.SchemaTombstone &&
-				objectData.appendable)) {
+			!objectData.delete {
 			// Rewrite the insert block/delete block file.
 			panic(any("rewrite insert block/delete block file"))
 		}
