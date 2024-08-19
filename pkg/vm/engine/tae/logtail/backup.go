@@ -402,7 +402,7 @@ func LoadCheckpointEntriesFromKey(
 
 	for i := 0; i < data.bats[TombstoneObjectInfoIDX].Length(); i++ {
 		var objectStats objectio.ObjectStats
-		buf := data.bats[ObjectInfoIDX].GetVectorByName(ObjectAttr_ObjectStats).Get(i).([]byte)
+		buf := data.bats[TombstoneObjectInfoIDX].GetVectorByName(ObjectAttr_ObjectStats).Get(i).([]byte)
 		objectStats.UnMarshal(buf)
 		commitTS := data.bats[TombstoneObjectInfoIDX].GetVectorByName(txnbase.SnapshotAttr_CommitTS).Get(i).(types.TS)
 		if objectStats.ObjectLocation().IsEmpty() {
