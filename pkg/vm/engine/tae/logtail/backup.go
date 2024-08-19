@@ -170,7 +170,7 @@ func trimObjectsData(
 			if (*objectsData)[name].dataType == objectio.SchemaTombstone {
 				deleteRow := make([]int64, 0)
 				for v := 0; v < bat.Vecs[0].Length(); v++ {
-					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-3].GetRawBytesAt(v))
+					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-1].GetRawBytesAt(v))
 					if err != nil {
 						return isCkpChange, err
 					}
