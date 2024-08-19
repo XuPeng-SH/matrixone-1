@@ -283,12 +283,12 @@ func appendValToBatch(src, dst *containers.Batch, row int) {
 
 // Need to format the loaded batch, otherwise panic may occur when WriteBatch.
 func formatData(data *batch.Batch) *batch.Batch {
+	data.Attrs = make([]string, 0)
 	for i := range data.Vecs {
 		att := fmt.Sprintf("col_%d", i)
 		data.Attrs = append(data.Attrs, att)
 	}
 	if data.Vecs[0].Length() > 0 {
-		data.Attrs = make([]string, 0)
 		tmp := containers.ToTNBatch(data, common.CheckpointAllocator)
 		data = containers.ToCNBatch(tmp)
 	}
