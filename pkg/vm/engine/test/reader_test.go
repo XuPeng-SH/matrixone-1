@@ -40,7 +40,6 @@ import (
 )
 
 func Test_ReaderCanReadRangesBlocksWithoutDeletes(t *testing.T) {
-	t.Skip("TODO")
 	var (
 		err          error
 		mp           *mpool.MPool
