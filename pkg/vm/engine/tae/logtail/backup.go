@@ -548,6 +548,8 @@ func ReWriteCheckpointAndBlockFromKey(
 						result.Vecs[i] = dataBlocks[0].data.Vecs[i]
 					}
 					dataBlocks[0].data = result
+				} else {
+					logutil.Infof("resultresult %v len is 0", objectName.String())
 				}
 
 				fileNum := uint16(1000) + objectName.Num()
@@ -561,16 +563,18 @@ func ReWriteCheckpointAndBlockFromKey(
 				if objectData.sortKey != math.MaxUint16 {
 					if objectData.dataType == objectio.SchemaData {
 						writer.SetPrimaryKey(objectData.sortKey)
-					} else {
-						writer.SetDataType(objectio.SchemaTombstone)
-						writer.SetPrimaryKeyWithType(
-							uint16(catalog.TombstonePrimaryKeyIdx),
-							index.HBF,
-							index.ObjectPrefixFn,
-							index.BlockPrefixFn,
-						)
-						logutil.Infof("SetPrimaryKeyWithType  %v", name)
 					}
+					logutil.Infof("SetPrimaryKeyWithType SchemaData %v", name)
+				}
+				if objectData.dataType == objectio.SchemaTombstone {
+					writer.SetDataType(objectio.SchemaTombstone)
+					writer.SetPrimaryKeyWithType(
+						uint16(catalog.TombstonePrimaryKeyIdx),
+						index.HBF,
+						index.ObjectPrefixFn,
+						index.BlockPrefixFn,
+					)
+					logutil.Infof("SetPrimaryKeyWithTypeSchemaTombstone  %v", name)
 				}
 				_, err = writer.WriteBatch(dataBlocks[0].data)
 				if err != nil {
