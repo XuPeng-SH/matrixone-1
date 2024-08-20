@@ -157,10 +157,11 @@ func trimObjectsData(
 		sortKey := uint16(math.MaxUint16)
 		if dataMeta.BlockHeader().Appendable() {
 			sortKey = meta.MustDataMeta().BlockHeader().SortKey()
+			logutil.Infof(fmt.Sprintf(".Appendable %s hs, %d", name, sortKey))
 		}
 		dataM2 := meta.MustGetMeta(objectio.SchemaData)
 		if dataM2.BlockHeader().ColumnCount() > 3 {
-			logutil.Infof(fmt.Sprintf("object %s has more than 3 columns, %d, %d", name, dataM2.BlockHeader().ColumnCount(), dataMeta.BlockHeader().ColumnCount()))
+			logutil.Infof(fmt.Sprintf("object %s has more than 3 columns, %d, %d, sortKey is %d", name, dataM2.BlockHeader().ColumnCount(), dataMeta.BlockHeader().ColumnCount(), sortKey))
 		}
 		for id := uint32(0); id < dataMeta.BlockCount(); id++ {
 			var bat *batch.Batch
@@ -206,8 +207,8 @@ func trimObjectsData(
 						break
 					}
 				}
-				(*objectsData)[name].sortKey = sortKey
 			}
+			(*objectsData)[name].sortKey = sortKey
 			bat = formatData(bat)
 			(*objectsData)[name].blocks[uint16(id)] = &blockData{
 				num:  uint16(id),
@@ -262,8 +263,8 @@ func trimObjectsData(
 						break
 					}
 				}
-				(*objectsData)[name].sortKey = sortKey
 			}
+			(*objectsData)[name].sortKey = sortKey
 			bat = formatData(bat)
 			(*objectsData)[name].blocks[id].data = bat
 		}
