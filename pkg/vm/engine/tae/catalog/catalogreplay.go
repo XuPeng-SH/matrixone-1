@@ -490,6 +490,9 @@ func (catalog *Catalog) onReplayCheckpointObject(
 				entryNode.DeletedAt.ToString(), txnNode.End.ToString()))
 		}
 	}
+	if obj == nil {
+		logutil.Infof("obj %v, tbl %v-%d create %v, delete %v, end %v", objid.String())
+	}
 	if obj.objData == nil {
 		obj.objData = dataFactory.MakeObjectFactory()(obj)
 	} else {
