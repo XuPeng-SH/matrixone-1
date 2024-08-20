@@ -187,10 +187,6 @@ func trimObjectsData(
 			} else {
 				// As long as there is an aBlk to be deleted, isCkpChange must be set to true.
 				isCkpChange = true
-				bat, err = blockio.LoadOneBlock(ctx, fs, location, objectio.SchemaData)
-				if err != nil {
-					return isCkpChange, err
-				}
 				for v := 0; v < bat.Vecs[0].Length(); v++ {
 					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-2].GetRawBytesAt(v))
 					if err != nil {
