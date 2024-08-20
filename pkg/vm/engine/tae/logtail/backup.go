@@ -522,7 +522,7 @@ func ReWriteCheckpointAndBlockFromKey(
 		objectName := objectData.stats.ObjectName()
 		if objectData.delete {
 			var blockLocation objectio.Location
-			if objectData.isChange {
+			if objectData.isChange && dataBlocks[0].data.Vecs[0].Length() > 0 {
 				// For the aBlock that needs to be retained,
 				// the corresponding NBlock is generated and inserted into the corresponding batch.
 				if len(dataBlocks) > 2 {
@@ -565,18 +565,32 @@ func ReWriteCheckpointAndBlockFromKey(
 				files = append(files, name.String())
 				blockLocation = objectio.BuildLocation(name, extent, blocks[0].GetRows(), blocks[0].GetID())
 				objectio.SetObjectStatsLocation(objectData.stats, blockLocation)
-			}
-			if insertObjBatch[objectData.tid] == nil {
-				insertObjBatch[objectData.tid] = &iObjects{
-					rowObjects: make([]*insertObject, 0),
+				if insertObjBatch[objectData.tid] == nil {
+					insertObjBatch[objectData.tid] = &iObjects{
+						rowObjects: make([]*insertObject, 0),
+					}
 				}
+				io := &insertObject{
+					apply:     false,
+					deleteRow: objectData.infoDel[len(objectData.infoDel)-1],
+					data:      objectData,
+				}
+				insertObjBatch[objectData.tid].rowObjects = append(insertObjBatch[objectData.tid].rowObjects, io)
 			}
-			io := &insertObject{
-				apply:     false,
-				deleteRow: objectData.infoDel[len(objectData.infoDel)-1],
-				data:      objectData,
+
+			if !objectData.isChange {
+				if insertObjBatch[objectData.tid] == nil {
+					insertObjBatch[objectData.tid] = &iObjects{
+						rowObjects: make([]*insertObject, 0),
+					}
+				}
+				io := &insertObject{
+					apply:     false,
+					deleteRow: objectData.infoDel[len(objectData.infoDel)-1],
+					data:      objectData,
+				}
+				insertObjBatch[objectData.tid].rowObjects = append(insertObjBatch[objectData.tid].rowObjects, io)
 			}
-			insertObjBatch[objectData.tid].rowObjects = append(insertObjBatch[objectData.tid].rowObjects, io)
 		}
 	}
 
