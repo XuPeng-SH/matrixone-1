@@ -671,7 +671,7 @@ func ReWriteCheckpointAndBlockFromKey(
 		}
 
 		for i := 0; i < tombstoneInfoMeta.Vecs[0].Length(); i++ {
-			tid := objectInfoMeta.GetVectorByName(SnapshotAttr_TID).Get(i).(uint64)
+			tid := tombstoneInfoMeta.GetVectorByName(SnapshotAttr_TID).Get(i).(uint64)
 			if tableTombstoneOff[tid] == nil {
 				tableTombstoneOff[tid] = &tableOffset{
 					offset: i,
