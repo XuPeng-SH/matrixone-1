@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"sync/atomic"
+	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -46,6 +48,31 @@ import (
 const (
 	batchPrefetchSize = 1000
 )
+
+var exactCnt atomic.Int64
+var exactLoopCnt atomic.Int64
+var prefixCnt atomic.Int64
+var prefixLoopCnt atomic.Int64
+
+func init() {
+	go func() {
+		ticker := time.NewTicker(time.Second * 10)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				logutil.Info(
+					"DEBUG-TOMBSTONE-2",
+					zap.Int64("exact-cnt", exactCnt.Load()),
+					zap.Int64("exact-loop-cnt", exactLoopCnt.Load()),
+					zap.Int64("prefix-cnt", prefixCnt.Load()),
+					zap.Int64("prefix-loop-cnt", prefixLoopCnt.Load()),
+				)
+			}
+		}
+
+	}()
+}
 
 func NewRemoteDataSource(
 	ctx context.Context,
@@ -698,10 +725,21 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 		}
 	}
 
+	if ls.memPKFilter.op == 0 {
+		exactCnt.Add(1)
+	} else if ls.memPKFilter.op == 146 {
+		prefixCnt.Add(1)
+	}
+
 	var removedByPersisted bool
 	for appendedRows < int(options.DefaultBlockMaxRows) && ls.pStateRows.insIter.Next() {
 		entry := ls.pStateRows.insIter.Entry()
 		b, o := entry.RowID.Decode()
+		if ls.memPKFilter.op == 0 {
+			exactLoopCnt.Add(1)
+		} else if ls.memPKFilter.op == 146 {
+			prefixLoopCnt.Add(1)
+		}
 
 		sel, removedByPersisted, err = ls.ApplyTombstones(ls.ctx, b, []int64{int64(o)})
 		if err != nil {
