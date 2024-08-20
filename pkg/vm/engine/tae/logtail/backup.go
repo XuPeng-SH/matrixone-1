@@ -540,11 +540,13 @@ func ReWriteCheckpointAndBlockFromKey(
 					}
 				}
 				dataBlocks[0].data = containers.ToCNBatch(sortData)
-				result := batch.NewWithSize(len(dataBlocks[0].data.Vecs) - 2)
-				for i := range result.Vecs {
-					result.Vecs[i] = dataBlocks[0].data.Vecs[i]
+				if objectData.dataType == objectio.SchemaData {
+					result := batch.NewWithSize(len(dataBlocks[0].data.Vecs) - 2)
+					for i := range result.Vecs {
+						result.Vecs[i] = dataBlocks[0].data.Vecs[i]
+					}
+					dataBlocks[0].data = result
 				}
-				dataBlocks[0].data = result
 
 				fileNum := uint16(1000) + objectName.Num()
 				segment := objectName.SegmentId()
