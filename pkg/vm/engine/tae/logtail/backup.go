@@ -569,6 +569,7 @@ func ReWriteCheckpointAndBlockFromKey(
 							index.ObjectPrefixFn,
 							index.BlockPrefixFn,
 						)
+						logutil.Infof("SetPrimaryKeyWithType  %v", name)
 					}
 				}
 				_, err = writer.WriteBatch(dataBlocks[0].data)
@@ -582,7 +583,7 @@ func ReWriteCheckpointAndBlockFromKey(
 				files = append(files, name.String())
 				blockLocation = objectio.BuildLocation(name, extent, blocks[0].GetRows(), blocks[0].GetID())
 				objectio.SetObjectStatsLocation(objectData.stats, blockLocation)
-				logutil.Infof("delete object %v len is not  0, row is %v ,extent is %v", blockLocation.String(), blocks[0].GetRows(), extent.String())
+				logutil.Infof("delete object %v len is not  0, row is %v ,extent is %v, dataBlocks is %d", blockLocation.String(), blocks[0].GetRows(), extent.String(), len(dataBlocks))
 				if insertObjBatch[objectData.tid] == nil {
 					insertObjBatch[objectData.tid] = &iObjects{
 						rowObjects: make([]*insertObject, 0),
