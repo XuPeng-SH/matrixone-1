@@ -491,6 +491,12 @@ func (catalog *Catalog) onReplayCheckpointObject(
 		}
 	}
 	if obj == nil {
+		obj, err = rel.GetObjectByID(objid, isTombstone)
+		if err != nil {
+			panic(fmt.Sprintf("obj %v(%v), [%v %v %v] not existed, table:\n%v", objid.String(),
+				entryNode.String(), isTombstone, objNode.String(),
+				txnNode.String(), rel.StringWithLevel(3)))
+		}
 		logutil.Infof("obj %v, tbl %v-%d create %v, delete %v, end %v", objid.String())
 	}
 	if obj.objData == nil {
