@@ -537,7 +537,7 @@ func ReWriteCheckpointAndBlockFromKey(
 					}
 				}
 				dataBlocks[0].data = containers.ToCNBatch(sortData)
-				result := batch.NewWithSize(len(dataBlocks[0].data.Vecs) - 3)
+				result := batch.NewWithSize(len(dataBlocks[0].data.Vecs) - 2)
 				for i := range result.Vecs {
 					result.Vecs[i] = dataBlocks[0].data.Vecs[i]
 				}
