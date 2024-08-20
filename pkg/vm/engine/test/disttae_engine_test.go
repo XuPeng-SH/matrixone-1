@@ -234,7 +234,6 @@ func totsp(ts types.TS) *timestamp.Timestamp {
 }
 
 func TestLogtailBasic(t *testing.T) {
-	t.Skip("need fix me")
 	opts := config.WithLongScanAndCKPOpts(nil)
 	opts.LogtailCfg = &options.LogtailCfg{PageSize: 30}
 	p := testutil.InitEnginePack(testutil.TestOptions{TaeEngineOptions: opts}, t)
@@ -356,19 +355,19 @@ func TestLogtailBasic(t *testing.T) {
 		Table:  &api.TableID{DbId: catalog.MO_CATALOG_ID, TbId: catalog.MO_DATABASE_ID},
 	}, true)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(resp.Commands)) // insert and delete
+	require.Equal(t, 4, len(resp.Commands)) // insert and delete
 
-	require.Equal(t, api.Entry_Insert, resp.Commands[0].EntryType)
-	require.Equal(t, len(catalog2.SystemDBSchema.ColDefs)+1 /*commit ts*/, len(resp.Commands[0].Bat.Vecs))
-	check_same_rows(resp.Commands[0].Bat, 2)                                 // 2 db
-	datname, err := vector.ProtoVectorToVector(resp.Commands[0].Bat.Vecs[3]) // datname column
+	require.Equal(t, api.Entry_Insert, resp.Commands[2].EntryType)
+	require.Equal(t, len(catalog2.SystemDBSchema.ColDefs)+1 /*commit ts*/, len(resp.Commands[2].Bat.Vecs))
+	check_same_rows(resp.Commands[2].Bat, 2)                                 // 2 db
+	datname, err := vector.ProtoVectorToVector(resp.Commands[2].Bat.Vecs[3]) // datname column
 	require.NoError(t, err)
 	require.Equal(t, "todrop", datname.UnsafeGetStringAt(0))
 	require.Equal(t, "db", datname.UnsafeGetStringAt(1))
 
-	require.Equal(t, api.Entry_Delete, resp.Commands[1].EntryType)
-	require.Equal(t, fixedColCnt+1, len(resp.Commands[1].Bat.Vecs))
-	check_same_rows(resp.Commands[1].Bat, 1) // 1 drop db
+	require.Equal(t, api.Entry_Delete, resp.Commands[3].EntryType)
+	require.Equal(t, fixedColCnt+2, len(resp.Commands[3].Bat.Vecs))
+	check_same_rows(resp.Commands[3].Bat, 1) // 1 drop db
 
 	close()
 
@@ -379,18 +378,18 @@ func TestLogtailBasic(t *testing.T) {
 		Table:  &api.TableID{DbId: catalog.MO_CATALOG_ID, TbId: catalog.MO_TABLES_ID},
 	}, true)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(resp.Commands)) // insert + delete
-	require.Equal(t, api.Entry_Insert, resp.Commands[0].EntryType)
-	require.Equal(t, len(catalog2.SystemTableSchema.ColDefs)+1, len(resp.Commands[0].Bat.Vecs))
-	check_same_rows(resp.Commands[0].Bat, 2)                                 // 2 tables
-	relname, err := vector.ProtoVectorToVector(resp.Commands[0].Bat.Vecs[3]) // relname column
+	require.Equal(t, 4, len(resp.Commands)) // insert + delete
+	require.Equal(t, api.Entry_Insert, resp.Commands[2].EntryType)
+	require.Equal(t, len(catalog2.SystemTableSchema.ColDefs)+1, len(resp.Commands[2].Bat.Vecs))
+	check_same_rows(resp.Commands[2].Bat, 2)                                 // 2 tables
+	relname, err := vector.ProtoVectorToVector(resp.Commands[2].Bat.Vecs[3]) // relname column
 	require.NoError(t, err)
 	require.Equal(t, schema.Name, relname.UnsafeGetStringAt(0))
 	require.Equal(t, schema.Name, relname.UnsafeGetStringAt(1))
 
-	require.Equal(t, api.Entry_Delete, resp.Commands[1].EntryType)
-	require.Equal(t, fixedColCnt+1, len(resp.Commands[1].Bat.Vecs))
-	check_same_rows(resp.Commands[1].Bat, 1) // 1 drop table
+	require.Equal(t, api.Entry_Delete, resp.Commands[3].EntryType)
+	require.Equal(t, fixedColCnt+2, len(resp.Commands[3].Bat.Vecs))
+	check_same_rows(resp.Commands[3].Bat, 1) // 1 drop table
 	close()
 
 	// get columns catalog change
@@ -400,10 +399,10 @@ func TestLogtailBasic(t *testing.T) {
 		Table:  &api.TableID{DbId: catalog.MO_CATALOG_ID, TbId: catalog.MO_COLUMNS_ID},
 	}, true)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(resp.Commands)) // insert + delete
-	require.Equal(t, api.Entry_Insert, resp.Commands[0].EntryType)
-	require.Equal(t, len(catalog2.SystemColumnSchema.ColDefs)+1, len(resp.Commands[0].Bat.Vecs))
-	check_same_rows(resp.Commands[0].Bat, len(schema.ColDefs)*2) // column count of 2 tables
+	require.Equal(t, 4, len(resp.Commands)) // insert + delete
+	require.Equal(t, api.Entry_Insert, resp.Commands[2].EntryType)
+	require.Equal(t, len(catalog2.SystemColumnSchema.ColDefs)+1, len(resp.Commands[2].Bat.Vecs))
+	check_same_rows(resp.Commands[2].Bat, len(schema.ColDefs)*2) // column count of 2 tables
 	close()
 
 	// get user table change
@@ -413,10 +412,10 @@ func TestLogtailBasic(t *testing.T) {
 		Table:  &api.TableID{DbId: dbID, TbId: tableID},
 	}, true)
 	require.NoError(t, err)
-	require.Equal(t, 2, len(resp.Commands)) // 2 insert data and delete data
+	require.Equal(t, 4, len(resp.Commands)) // 2 insert data and delete data
 
 	// check data change
-	insDataEntry := resp.Commands[0]
+	insDataEntry := resp.Commands[2]
 	require.Equal(t, api.Entry_Insert, insDataEntry.EntryType)
 	require.Equal(t, len(schema.ColDefs)+1, len(insDataEntry.Bat.Vecs)) // 5 columns, rowid + commit ts + 2 visibile
 	check_same_rows(insDataEntry.Bat, 99)                               // 99 rows, because the first write is excluded.
@@ -426,9 +425,9 @@ func TestLogtailBasic(t *testing.T) {
 	require.Equal(t, types.T_int8, firstCol.GetType().Oid)
 	require.NoError(t, err)
 
-	delDataEntry := resp.Commands[1]
+	delDataEntry := resp.Commands[3]
 	require.Equal(t, api.Entry_Delete, delDataEntry.EntryType)
-	require.Equal(t, fixedColCnt+1, len(delDataEntry.Bat.Vecs)) // 3 columns, rowid + commit_ts + aborted
+	require.Equal(t, fixedColCnt+2, len(delDataEntry.Bat.Vecs)) // 3 columns, rowid + commit_ts + aborted
 	check_same_rows(delDataEntry.Bat, 10)
 
 	// check delete rowids are exactly what we want
