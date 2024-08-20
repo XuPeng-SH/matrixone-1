@@ -120,6 +120,7 @@ func (w *BlockWriter) WriteBatch(batch *batch.Batch) (objectio.BlockObject, erro
 			w.writer.SetSortKeySeqnum(seqnums[w.sortKeyIdx])
 		} else {
 			w.writer.SetSortKeySeqnum(w.sortKeyIdx)
+			logutil.Infof("name is %v, sort key idx %d is out of range, seqnums: %v", w.nameStr, w.sortKeyIdx, seqnums)
 		}
 	}
 	for i, vec := range batch.Vecs {
