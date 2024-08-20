@@ -17,6 +17,8 @@ package logtail
 import (
 	"context"
 	"fmt"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"math"
 	"sort"
 
@@ -557,7 +559,17 @@ func ReWriteCheckpointAndBlockFromKey(
 					return nil, nil, nil, err
 				}
 				if objectData.sortKey != math.MaxUint16 {
-					writer.SetPrimaryKey(objectData.sortKey)
+					if objectData.dataType == objectio.SchemaData {
+						writer.SetPrimaryKey(objectData.sortKey)
+					} else {
+						writer.SetDataType(objectio.SchemaTombstone)
+						writer.SetPrimaryKeyWithType(
+							uint16(catalog.TombstonePrimaryKeyIdx),
+							index.HBF,
+							index.ObjectPrefixFn,
+							index.BlockPrefixFn,
+						)
+					}
 				}
 				_, err = writer.WriteBatch(dataBlocks[0].data)
 				if err != nil {
