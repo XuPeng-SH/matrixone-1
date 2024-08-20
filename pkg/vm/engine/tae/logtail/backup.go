@@ -156,6 +156,10 @@ func trimObjectsData(
 		if dataMeta.BlockHeader().Appendable() {
 			sortKey = meta.MustDataMeta().BlockHeader().SortKey()
 		}
+		dataM2 := meta.MustGetMeta(objectio.SchemaData)
+		if dataM2.BlockHeader().ColumnCount() > 3 {
+			logutil.Infof(fmt.Sprintf("object %s has more than 3 columns, %d, %d", name, dataM2.BlockHeader().ColumnCount(), dataMeta.BlockHeader().ColumnCount()))
+		}
 		for id := uint32(0); id < dataMeta.BlockCount(); id++ {
 			var bat *batch.Batch
 			var err error
