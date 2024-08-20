@@ -630,7 +630,7 @@ func ReWriteCheckpointAndBlockFromKey(
 					tombstoneInfoMeta.GetVectorByName(EntryNode_DeleteAt).Update(row, types.TS{}, false)
 				} else {
 					appendValToBatch(blkMetaInsert, tombstoneInfoMeta, i)
-					tombstoneInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Update(row, infoInsert[i].stats[:], false)
+					tombstoneInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Update(row, infoInsertTombstone[i].stats[:], false)
 					tombstoneInfoMeta.GetVectorByName(ObjectAttr_State).Update(row, false, false)
 					tombstoneInfoMeta.GetVectorByName(EntryNode_DeleteAt).Update(row, types.TS{}, false)
 				}
