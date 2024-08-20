@@ -568,6 +568,10 @@ func ReWriteCheckpointAndBlockFromKey(
 				files = append(files, name.String())
 				blockLocation = objectio.BuildLocation(name, extent, blocks[0].GetRows(), blocks[0].GetID())
 				objectio.SetObjectStatsLocation(objectData.stats, blockLocation)
+				if blockLocation.Rows() == 0 {
+					logutil.Infof("delete object %v len is 0", objectName.String())
+					panic(any("delete object len is 0"))
+				}
 				if insertObjBatch[objectData.tid] == nil {
 					insertObjBatch[objectData.tid] = &iObjects{
 						rowObjects: make([]*insertObject, 0),
