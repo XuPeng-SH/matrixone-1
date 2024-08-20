@@ -188,10 +188,10 @@ func (d *DeltaLocDataSource) ApplyTombstones(
 	ctx context.Context,
 	bid objectio.Blockid,
 	rowsOffset []int64,
-) ([]int64, error) {
+) ([]int64, bool, error) {
 	deleteMask, err := d.getAndApplyTombstones(ctx, bid)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var rows []int64
 	if !deleteMask.IsEmpty() {
@@ -201,7 +201,7 @@ func (d *DeltaLocDataSource) ApplyTombstones(
 			}
 		}
 	}
-	return rows, nil
+	return rows, false, nil
 }
 
 func (d *DeltaLocDataSource) GetTombstones(

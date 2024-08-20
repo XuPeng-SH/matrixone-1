@@ -743,7 +743,7 @@ type DataSource interface {
 		ctx context.Context,
 		bid objectio.Blockid,
 		rowsOffset []int64,
-	) ([]int64, error)
+	) ([]int64, bool, error)
 
 	GetTombstones(
 		ctx context.Context, bid objectio.Blockid,

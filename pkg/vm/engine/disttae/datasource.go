@@ -216,7 +216,7 @@ func (rs *RemoteDataSource) ApplyTombstones(
 	ctx context.Context,
 	bid objectio.Blockid,
 	rowsOffset []int64,
-) (left []int64, err error) {
+) (left []int64, _ bool, err error) {
 
 	slices.SortFunc(rowsOffset, func(a, b int64) int {
 		return int(a - b)
@@ -630,7 +630,7 @@ func (ls *LocalDataSource) filterInMemUnCommittedInserts(
 		offsets := rowIdsToOffset(retainedRowIds, int64(0)).([]int64)
 
 		b, _ := retainedRowIds[0].Decode()
-		sels, err := ls.ApplyTombstones(ls.ctx, b, offsets)
+		sels, _, err := ls.ApplyTombstones(ls.ctx, b, offsets)
 		if err != nil {
 			return err
 		}
@@ -698,22 +698,28 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 		}
 	}
 
+	var removedByPersisted bool
 	for appendedRows < int(options.DefaultBlockMaxRows) && ls.pStateRows.insIter.Next() {
 		entry := ls.pStateRows.insIter.Entry()
 		b, o := entry.RowID.Decode()
 
-		sel, err = ls.ApplyTombstones(ls.ctx, b, []int64{int64(o)})
+		sel, removedByPersisted, err = ls.ApplyTombstones(ls.ctx, b, []int64{int64(o)})
 		if err != nil {
 			return err
 		}
 
 		if len(sel) == 0 {
-			logutil.Warn(
-				"DEBUG-INMEMORY-TOMBSTONE",
-				zap.String("rowid", entry.RowID.String()),
-				zap.String("table-name", ls.table.tableName),
-				zap.Any("op", ls.memPKFilter.op),
-			)
+			if removedByPersisted {
+				logutil.Warn(
+					"DEBUG-INMEMORY-TOMBSTONE",
+					zap.String("rowid", entry.RowID.String()),
+					zap.String("table-name", ls.table.tableName),
+					zap.Any("op", ls.memPKFilter.op),
+					zap.String("entry.ts", entry.Time.ToString()),
+					zap.Any("entry.is-deleted", entry.Deleted),
+					zap.String("txn", ls.table.db.op.Txn().DebugString()),
+				)
+			}
 			continue
 		}
 
@@ -811,7 +817,7 @@ func (ls *LocalDataSource) ApplyTombstones(
 	ctx context.Context,
 	bid objectio.Blockid,
 	rowsOffset []int64,
-) ([]int64, error) {
+) ([]int64, bool, error) {
 
 	slices.SortFunc(rowsOffset, func(a, b int64) int {
 		return int(a - b)
@@ -825,7 +831,7 @@ func (ls *LocalDataSource) ApplyTombstones(
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedS3 == 0 {
 		rowsOffset, err = ls.applyWorkspaceFlushedS3Deletes(bid, rowsOffset, nil)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
@@ -835,15 +841,20 @@ func (ls *LocalDataSource) ApplyTombstones(
 	if ls.tombstonePolicy&engine.Policy_SkipCommittedInMemory == 0 {
 		rowsOffset = ls.applyPStateInMemDeletes(bid, rowsOffset, nil)
 	}
+	var removedByPersisted bool
 	if ls.tombstonePolicy&engine.Policy_SkipCommittedS3 == 0 {
+		pLen := len(rowsOffset)
 		rowsOffset, err = ls.applyPStateTombstoneObjects(bid, rowsOffset, nil)
+		if pLen != len(rowsOffset) {
+			removedByPersisted = true
+		}
 		//rowsOffset, err = ls.applyPStatePersistedDeltaLocation(bid, rowsOffset, nil)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 	}
 
-	return rowsOffset, nil
+	return rowsOffset, removedByPersisted, nil
 }
 
 func (ls *LocalDataSource) GetTombstones(
@@ -1121,9 +1132,9 @@ func (ls *LocalDataSource) applyPStateTombstoneObjects(
 	deletedRows *nulls.Nulls,
 ) ([]int64, error) {
 
-	if ls.rc.SkipPStateDeletes {
-		return offsets, nil
-	}
+	// if ls.rc.SkipPStateDeletes {
+	// 	return offsets, nil
+	// }
 
 	if ls.pState.ApproxTombstoneObjectsNum() == 0 {
 		return offsets, nil
