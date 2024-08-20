@@ -725,7 +725,7 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 		}
 	}
 
-	if ls.memPKFilter.op == 0 {
+	if ls.memPKFilter.op == 0 && ls.memPKFilter.SpecFactory != nil {
 		exactCnt.Add(1)
 	} else if ls.memPKFilter.op == 146 {
 		prefixCnt.Add(1)
@@ -735,7 +735,7 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 	for appendedRows < int(options.DefaultBlockMaxRows) && ls.pStateRows.insIter.Next() {
 		entry := ls.pStateRows.insIter.Entry()
 		b, o := entry.RowID.Decode()
-		if ls.memPKFilter.op == 0 {
+		if ls.memPKFilter.op == 0 && ls.memPKFilter.SpecFactory != nil {
 			exactLoopCnt.Add(1)
 		} else if ls.memPKFilter.op == 146 {
 			prefixLoopCnt.Add(1)
