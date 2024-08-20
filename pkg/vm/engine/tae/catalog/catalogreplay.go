@@ -474,7 +474,7 @@ func (catalog *Catalog) onReplayCheckpointObject(
 		obj.DeleteNode = *txnNode
 		obj.ObjectState = ObjectState_Delete_ApplyCommit
 	}
-	if !entryNode.CreatedAt.Equal(&txnNode.End) && !entryNode.DeletedAt.Equal(&txnNode.End) {
+	if !entryNode.CreatedAt.Equal(&txnNode.End) && !entryNode.DeletedAt.Equal(&txnNode.End) && !entryNode.DeletedAt.IsEmpty() {
 		// In back up, aobj is replaced with naobj and its DeleteAt is removed.
 		// Before back up, txnNode.End equals DeleteAt of naobj.
 		// After back up, DeleteAt is empty.
