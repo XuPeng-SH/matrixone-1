@@ -522,6 +522,9 @@ func ReWriteCheckpointAndBlockFromKey(
 		objectName := objectData.stats.ObjectName()
 		if objectData.delete {
 			var blockLocation objectio.Location
+			if objectData.isChange && dataBlocks[0].data.Vecs[0].Length() == 0 {
+				logutil.Infof("delete object %v len is 0", objectName.String())
+			}
 			if objectData.isChange && dataBlocks[0].data.Vecs[0].Length() > 0 {
 				// For the aBlock that needs to be retained,
 				// the corresponding NBlock is generated and inserted into the corresponding batch.
