@@ -40,6 +40,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"go.uber.org/zap"
 )
 
 const (
@@ -707,6 +708,12 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 		}
 
 		if len(sel) == 0 {
+			logutil.Warn(
+				"DEBUG-INMEMORY-TOMBSTONE",
+				zap.String("rowid", entry.RowID.String()),
+				zap.String("table-name", ls.table.tableName),
+				zap.Any("op", ls.memPKFilter.op),
+			)
 			continue
 		}
 
