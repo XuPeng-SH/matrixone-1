@@ -1114,9 +1114,9 @@ func (ls *LocalDataSource) applyPStateTombstoneObjects(
 	deletedRows *nulls.Nulls,
 ) ([]int64, error) {
 
-	//if ls.rc.SkipPStateDeletes {
-	//	return offsets, nil
-	//}
+	if ls.rc.SkipPStateDeletes {
+		return offsets, nil
+	}
 
 	if ls.pState.ApproxTombstoneObjectsNum() == 0 {
 		return offsets, nil
