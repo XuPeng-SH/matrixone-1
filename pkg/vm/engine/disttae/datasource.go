@@ -1298,6 +1298,9 @@ func GetTombstonesByBlockId(
 		totalBlk += int(obj.BlkCnt())
 		for idx := 0; idx < int(obj.BlkCnt()); idx++ {
 			buf := bf.GetBloomFilter(uint32(idx))
+			if len(buf) == 0 {
+				logutil.Infof("empty bloom filter for block %d, loaction %v", idx, obj.Location().String())
+			}
 			bfIndex = index.NewEmptyBloomFilterWithType(index.HBF)
 			if err = index.DecodeBloomFilter(bfIndex, buf); err != nil {
 				return false, err
