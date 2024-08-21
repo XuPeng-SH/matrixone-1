@@ -26,15 +26,30 @@ type Iterator interface {
 }
 
 const (
-	kEmptyFlagEmpty    = 0
+	kEmptyFlagEmpty    = 1
 	kEmptyFlagNotEmpty = -1
-	kEmptyFlagUnknown  = 1
+	kEmptyFlagUnknown  = 0
 )
 
 const (
-	FastBitmapBits     = 8192
-	FastBitmapBytes    = FastBitmapBits / 8
-	FastBitmapTypeSize = unsafe.Sizeof(FastBitmap{})
+	// Why define FastBitmap_Empty|FastBitmap_NotEmpty|FastBitmap_Unknown?
+	// when Reset the FastBitmap, it is expected the whole buffer is reset to all zero,
+	// but the kEmptyFlagEmpty defined by bitmap.Bitmap is -1, which is not zero.
+	// We cannot change the kEmptyFlagEmpty to 0, because it is persisted in the storage.
+
+	// For example:
+	// var buf []byte
+	// put := bufPool.Get(&buf) // get buf from pool and buf is all zero
+	// defer bufPool.Put(put) // put back to pool
+	// bm := types.DecodeFixed[bitmap.FastBitmap](buf) // bm.IsEmpty() should be true
+	// bm.Reset() // reset all bytes to zero
+
+	FastBitmap_Empty    = 0
+	FastBitmap_NotEmpty = -1
+	FastBitmap_Unknown  = 1
+	FastBitmapBits      = 8192
+	FastBitmapBytes     = FastBitmapBits / 8
+	FastBitmapTypeSize  = unsafe.Sizeof(FastBitmap{})
 )
 
 type IBitmapData interface {
