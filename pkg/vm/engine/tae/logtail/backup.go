@@ -469,6 +469,7 @@ func ReWriteCheckpointAndBlockFromKey(
 	blkMetaInsertStats := blkMetaInsert.GetVectorByName(ObjectAttr_ObjectStats)
 	blkMetaInsertEntryState := blkMetaInsert.GetVectorByName(ObjectAttr_State)
 	blkMetaInsertDelete := blkMetaInsert.GetVectorByName(EntryNode_DeleteAt)
+	blkMetaInsertCreate := blkMetaInsert.GetVectorByName(EntryNode_CreateAt)
 	blkMetaInsertCommit := blkMetaInsert.GetVectorByName(txnbase.SnapshotAttr_CommitTS)
 	blkMetaInsertTid := blkMetaInsert.GetVectorByName(SnapshotAttr_TID)
 
@@ -477,15 +478,17 @@ func ReWriteCheckpointAndBlockFromKey(
 		stats.UnMarshal(blkMetaInsertStats.Get(i).([]byte))
 		deleteAt := blkMetaInsertDelete.Get(i).(types.TS)
 		commitTS := blkMetaInsertCommit.Get(i).(types.TS)
+		createAT := blkMetaInsertCreate.Get(i).(types.TS)
 		appendable := blkMetaInsertEntryState.Get(i).(bool)
 		tid := blkMetaInsertTid.Get(i).(uint64)
 		if commitTS.Less(&ts) {
 			panic(any(fmt.Sprintf("commitTs less than ts: %v-%v", commitTS.ToString(), ts.ToString())))
 		}
 		if deleteAt.IsEmpty() {
-			logutil.Infof("block %v deleteAt is empty", stats.ObjectName().String())
+			logutil.Infof("tombstone %v deleteAt is empty, stat is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString())
 			continue
 		}
+		logutil.Infof("tombstone %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString())
 		addObjectToObjectData(stats, appendable, !deleteAt.IsEmpty(), i, tid, objectio.SchemaTombstone, &objectsData)
 	}
 
