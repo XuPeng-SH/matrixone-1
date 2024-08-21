@@ -722,11 +722,11 @@ func ReWriteCheckpointAndBlockFromKey(
 
 		for tid, table := range tableInsertOff {
 			logutil.Infof("object tid %d offset %d end %d", tid, table.offset, table.end)
-			data.UpdateDataObjectMeta(tid, int32(table.offset), int32(table.end))
+			data.UpdateObjectInsertMeta(tid, int32(table.offset), int32(table.end))
 		}
 		for tid, table := range tableTombstoneOff {
 			logutil.Infof("tombstone tid %d offset %d end %d", tid, table.offset, table.end)
-			data.UpdateTombstoneObjectMeta(tid, int32(table.offset), int32(table.end))
+			data.UpdateTombstoneInsertMeta(tid, int32(table.offset), int32(table.end))
 		}
 	}
 	cnLocation, dnLocation, checkpointFiles, err := data.WriteTo(dstFs, DefaultCheckpointBlockRows, DefaultCheckpointSize)

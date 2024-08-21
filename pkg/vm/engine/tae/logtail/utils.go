@@ -974,17 +974,13 @@ func (data *CheckpointData) updateTableMeta(tid uint64, metaIdx int, start, end 
 		meta = NewCheckpointMeta()
 		data.meta[tid] = meta
 	}
+
 	if end > start {
 		if meta.tables[metaIdx] == nil {
 			meta.tables[metaIdx] = NewTableMeta()
 			meta.tables[metaIdx].Start = uint64(start)
 			meta.tables[metaIdx].End = uint64(end)
 		} else {
-			if meta.tables[metaIdx].Start == 0 && meta.tables[metaIdx].End == 0 {
-				meta.tables[metaIdx].Start = uint64(start)
-				meta.tables[metaIdx].End = uint64(end)
-				return
-			}
 			if !meta.tables[metaIdx].TryMerge(common.ClosedInterval{Start: uint64(start), End: uint64(end)}) {
 				panic(fmt.Sprintf("logic error interval %v, start %d, end %d", meta.tables[metaIdx].ClosedInterval, start, end))
 			}
@@ -1014,12 +1010,31 @@ func (data *CheckpointData) UpdateTombstoneObjectMeta(tid uint64, delStart, delE
 	data.updateTableMeta(tid, TombstoneObject, delStart, delEnd)
 }
 
+func (data *CheckpointData) UpdateObjectInsertMeta(tid uint64, delStart, delEnd int32) {
+	if delEnd <= delStart {
+		return
+	}
+	data.resetTableMeta(tid, DataObject, delStart, delEnd)
+}
+
+func (data *CheckpointData) UpdateTombstoneInsertMeta(tid uint64, delStart, delEnd int32) {
+	if delEnd <= delStart {
+		return
+	}
+	data.resetTableMeta(tid, TombstoneObject, delStart, delEnd)
+}
+
 func (data *CheckpointData) resetTableMeta(tid uint64, metaIdx int, start, end int32) {
 	meta, ok := data.meta[tid]
 	if !ok {
 		meta = NewCheckpointMeta()
 		data.meta[tid] = meta
 	}
+	defer func() {
+		if metaIdx == DataObject || metaIdx == TombstoneObject {
+			logutil.Infof("updateTableMeta tid %d, metaIdx %d, start %d, end %d, metaIdx %d, meta %v", tid, metaIdx, start, end, metaIdx, meta.tables[metaIdx].String())
+		}
+	}()
 	if end > start {
 		if meta.tables[metaIdx] == nil {
 			meta.tables[metaIdx] = NewTableMeta()
