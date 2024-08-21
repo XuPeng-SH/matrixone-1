@@ -56,7 +56,10 @@ type BitmapIterator struct {
 	has_next bool
 }
 
-// 8192 bits
+// compared with Bitmap
+// 1. FastBitmap is fixed size: 8192 bits
+// 2. Reset only clear data
+// 3. Cannot expand
 type FastBitmap struct {
 	emptyFlag int8
 	data      [FastBitmapBytes / 8]uint64
