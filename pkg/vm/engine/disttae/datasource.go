@@ -1313,6 +1313,7 @@ func GetTombstonesByBlockId(
 				blBreak++
 				continue
 			}
+			logutil.Infof("PrefixMayContainsKey blockid %v exist %v", bid.String(), exist)
 
 			loaded++
 			location = catalog2.BuildLocation(obj.ObjectStats, uint16(idx), options.DefaultBlockMaxRows)
@@ -1321,6 +1322,8 @@ func GetTombstonesByBlockId(
 				ctx, fs, bid, location, snapshot); err != nil {
 				return false, err
 			}
+
+			logutil.Infof("loadBlockDeletesByLocation blockid %v location %v, mask is %v", bid.String(), location.String(), mask.String())
 
 			deleteMask.Merge(mask)
 		}
