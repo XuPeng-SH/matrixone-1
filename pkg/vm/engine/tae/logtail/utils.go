@@ -510,7 +510,7 @@ func NewBackupCollector(
 		},
 	}
 	// TODO
-	collector.TombstoneFn = collector.VisitObj
+	collector.TombstoneFn = collector.VisitObjForBackup
 	collector.ObjectFn = collector.VisitObjForBackup
 	return collector
 }

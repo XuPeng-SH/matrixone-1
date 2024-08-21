@@ -488,6 +488,10 @@ func ReWriteCheckpointAndBlockFromKey(
 			logutil.Infof("tombstone %v deleteAt is empty, stat is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString())
 			continue
 		}
+
+		if createAT.Equal(&ts) {
+			panic(any(fmt.Sprintf("createAt equal to ts: %v-%v", createAT.ToString(), ts.ToString())))
+		}
 		logutil.Infof("tombstone %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString())
 		addObjectToObjectData(stats, appendable, !deleteAt.IsEmpty(), i, tid, objectio.SchemaTombstone, &objectsData)
 	}
