@@ -37,6 +37,11 @@ const (
 	FastBitmapTypeSize = unsafe.Sizeof(FastBitmap{})
 )
 
+type IBitmapData interface {
+	Word(i uint64) uint64
+	Len() int64
+}
+
 // Bitmap represents line numbers of tuple's is null
 type Bitmap struct {
 	emptyFlag atomic.Int32 //default 0, not sure  when set to 1, must be empty. when set to -1, must be not empty
@@ -47,7 +52,7 @@ type Bitmap struct {
 
 type BitmapIterator struct {
 	i        uint64
-	bm       *Bitmap
+	bm       IBitmapData
 	has_next bool
 }
 

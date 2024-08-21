@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 const (
@@ -180,4 +181,19 @@ func TestFastBitmap(t *testing.T) {
 		require.Equal(t, FastBitmapBits-i-1, bm.Count())
 	}
 	require.True(t, bm.IsEmpty())
+
+	var expects []uint64
+	step := rand.Intn(10) + 1
+	for i := 0; i < FastBitmapBits; i += step {
+		bm.Add(uint64(i))
+		expects = append(expects, uint64(i))
+	}
+
+	require.Equal(t, len(expects), bm.Count())
+	actualUints := bm.ToArray()
+	require.Equal(t, expects, actualUints)
+	actualInts := bm.ToI64Arrary()
+	for i, v := range actualInts {
+		require.Equal(t, int64(expects[i]), v)
+	}
 }

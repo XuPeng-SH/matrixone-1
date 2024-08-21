@@ -73,3 +73,46 @@ func (bm *FastBitmap) Count() int {
 	}
 	return cnt
 }
+
+func (bm *FastBitmap) Iterator() Iterator {
+	it := BitmapIterator{
+		bm: bm,
+		i:  0,
+	}
+	if first_1_pos, has_next := it.hasNext(0); has_next {
+		it.i = first_1_pos
+		it.has_next = true
+		return &it
+	}
+	it.has_next = false
+
+	return &it
+}
+
+func (bm *FastBitmap) Word(i uint64) uint64 {
+	return bm.data[i]
+}
+
+func (bm *FastBitmap) Len() int64 {
+	return FastBitmapBits
+}
+
+func (bm *FastBitmap) ToArray() []uint64 {
+	return ToArrary[uint64](bm)
+}
+
+func (bm *FastBitmap) ToI64Arrary() []int64 {
+	return ToArrary[int64](bm)
+}
+
+func ToArrary[T int64 | uint64](bm *FastBitmap) (rows []T) {
+	if bm.IsEmpty() {
+		return
+	}
+	rows = make([]T, 0, bm.Count())
+	it := bm.Iterator()
+	for it.HasNext() {
+		rows = append(rows, T(it.Next()))
+	}
+	return
+}

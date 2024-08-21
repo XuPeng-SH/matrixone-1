@@ -78,6 +78,10 @@ func (n *Bitmap) Clone() *Bitmap {
 	return &ret
 }
 
+func (n *Bitmap) Word(i uint64) uint64 {
+	return n.data[i]
+}
+
 func (n *Bitmap) Iterator() Iterator {
 	// When initialization, the itr.i is set to the first rightmost_one position.
 	itr := BitmapIterator{i: 0, bm: n}
@@ -113,13 +117,13 @@ func (itr *BitmapIterator) hasNext(i uint64) (uint64, bool) {
 	// if the uint64 is not 0, then calculate the rightest_one position in a word, add up prev result and return.
 	// when there is 1 in bitmap, return true, otherwise bitmap is empty and return false.
 	// either case loop over words not bits
-	nwords := (itr.bm.len + 63) / 64
+	nwords := (itr.bm.Len() + 63) / 64
 	current_word := i >> 6
 	mask := (^(bitmask)(0)) << (i & 0x3F) // ignore bits check before
 	var result uint64
 
 	for ; current_word < uint64(nwords); current_word++ {
-		word := itr.bm.data[current_word]
+		word := itr.bm.Word(current_word)
 		word &= mask
 
 		if word != 0 {
