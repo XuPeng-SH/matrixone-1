@@ -818,7 +818,7 @@ func (data *CNCheckpointData) ReadFromData(
 				logutil.Infof("ReadFromData2 block.GetEndOffset() == 0, block %v, tid %d", block.String(), tableID)
 				continue
 			}
-			logutil.Infof("ReadFromData3 block %v, tid %d, idx %d, version %d", block.String(), tableID, idx, version)
+			logutil.Infof("ReadFromData3 block %v, tid %d, idx %d, version %d ,start %d, end %d", block.String(), tableID, idx, version, block.GetStartOffset(), block.GetEndOffset())
 			windowCNBatch(bat, block.GetStartOffset(), block.GetEndOffset())
 			if dataBats[uint32(i)] == nil {
 				cnBatch := batch.NewWithSize(len(bat.Vecs))
@@ -842,6 +842,13 @@ func (data *CNCheckpointData) ReadFromData(
 				dataBats[uint32(i)], err = dataBats[uint32(i)].Append(ctx, m, bat)
 				if err != nil {
 					return
+				}
+				if idx == DataObject || idx == TombstoneObject {
+					for y := 0; y < bat.Vecs[2].Length(); y++ {
+						stats := objectio.NewObjectStats()
+						stats.UnMarshal(bat.Vecs[2].GetBytesAt(y))
+						logutil.Info("ReadFromData5", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID), zap.Uint64("start", uint64(block.GetStartOffset())), zap.Uint64("end", block.GetStartOffset()))
+					}
 				}
 			}
 
