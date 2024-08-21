@@ -795,6 +795,7 @@ func (data *CNCheckpointData) ReadFromData(
 	}
 	dataBats = make([]*batch.Batch, MetaMaxIdx)
 	for i, table := range meta.tables {
+		logutil.Infof("ReadFromData1 tableID %d, version %d, table %v", tableID, version, table.String())
 		if table == nil {
 			continue
 		}
@@ -814,9 +815,10 @@ func (data *CNCheckpointData) ReadFromData(
 				return
 			}
 			if block.GetEndOffset() == 0 {
-				logutil.Infof("ReadFromData block.GetEndOffset() == 0, block %v, tid %d", block.String(), tableID)
+				logutil.Infof("ReadFromData2 block.GetEndOffset() == 0, block %v, tid %d", block.String(), tableID)
 				continue
 			}
+			logutil.Infof("ReadFromData3 block %v, tid %d, idx %d, version %d", block.String(), tableID, idx, version)
 			windowCNBatch(bat, block.GetStartOffset(), block.GetEndOffset())
 			if dataBats[uint32(i)] == nil {
 				cnBatch := batch.NewWithSize(len(bat.Vecs))
@@ -833,7 +835,7 @@ func (data *CNCheckpointData) ReadFromData(
 					for y := 0; y < cnBatch.Vecs[2].Length(); y++ {
 						stats := objectio.NewObjectStats()
 						stats.UnMarshal(cnBatch.Vecs[2].GetBytesAt(y))
-						logutil.Info("ReadFromData", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID), zap.Uint64("start", uint64(block.GetStartOffset())), zap.Uint64("end", block.GetStartOffset()))
+						logutil.Info("ReadFromData4", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID), zap.Uint64("start", uint64(block.GetStartOffset())), zap.Uint64("end", block.GetStartOffset()))
 					}
 				}
 			} else {
