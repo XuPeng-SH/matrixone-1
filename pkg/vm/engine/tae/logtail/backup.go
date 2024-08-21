@@ -17,6 +17,7 @@ package logtail
 import (
 	"context"
 	"fmt"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"math"
@@ -552,8 +553,8 @@ func ReWriteCheckpointAndBlockFromKey(
 						return nil, nil, nil, err
 					}
 				}
-				dataBlocks[0].data = containers.ToCNBatch(sortData)
 				if objectData.dataType == objectio.SchemaData {
+					dataBlocks[0].data = containers.ToCNBatch(sortData)
 					result := batch.NewWithSize(len(dataBlocks[0].data.Vecs) - 2)
 					for i := range result.Vecs {
 						result.Vecs[i] = dataBlocks[0].data.Vecs[i]
@@ -561,6 +562,23 @@ func ReWriteCheckpointAndBlockFromKey(
 					dataBlocks[0].data = result
 				} else {
 					logutil.Infof("resultresult %v len is 0", objectName.String())
+					rowIDVec := vector.MustFixedCol[types.Rowid](sortData.Vecs[0].GetDownstreamVector())
+					for i := 0; i < dataBlocks[0].data.Vecs[0].Length(); i++ {
+						blockID := rowIDVec[i].CloneBlockID()
+						obj := objectsData[blockID.ObjectNameString()]
+						if obj != nil && obj.appendable {
+							newBlockID := objectio.NewBlockid(blockID.Segment(), 1000, blockID.Sequence())
+							newRowID := objectio.NewRowid(newBlockID, rowIDVec[i].GetRowOffset())
+							rowIDVec[i] = newRowID
+							sortData.Vecs[0].Update(i, newRowID, false)
+							logutil.Infof("update rowid %v to %v", blockID.String(), newRowID.String())
+						}
+					}
+					_, err = mergesort.SortBlockColumns(sortData.Vecs, catalog.TombstonePrimaryKeyIdx, backupPool)
+					if err != nil {
+						return nil, nil, nil, err
+					}
+					dataBlocks[0].data = containers.ToCNBatch(sortData)
 				}
 
 				fileNum := uint16(1000) + objectName.Num()
