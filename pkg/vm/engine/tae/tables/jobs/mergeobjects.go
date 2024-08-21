@@ -23,7 +23,6 @@ import (
 	pkgcatalog "github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
@@ -181,12 +180,12 @@ func (task *mergeObjectsTask) GetMPool() *mpool.MPool {
 
 func (task *mergeObjectsTask) HostHintName() string { return "DN" }
 
-func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, *nulls.Nulls, func(), error) {
+func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableFixedSizeBitmap, func(), error) {
 	if objIdx >= uint32(len(task.mergedObjs)) {
 		panic("invalid objIdx")
 	}
 	if task.nMergedBlk[objIdx] >= task.blkCnt[objIdx] {
-		return nil, nil, nil, mergesort.ErrNoMoreBlocks
+		return nil, objectio.ReusableFixedSizeBitmap{}, nil, mergesort.ErrNoMoreBlocks
 	}
 	var err error
 	var view *containers.Batch
@@ -204,7 +203,7 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 	obj := task.mergedObjsHandle[objIdx]
 	view, err = obj.GetColumnDataByIds(ctx, uint16(task.nMergedBlk[objIdx]), task.idxs, common.MergeAllocator)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
 	}
 	if len(task.attrs) != len(view.Vecs) {
 		panic(fmt.Sprintf("mismatch %v, %v, %v", task.attrs, len(task.attrs), len(view.Vecs)))
@@ -216,7 +215,15 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 		bat.Vecs[i] = col.GetDownstreamVector()
 	}
 	bat.SetRowCount(view.Vecs[0].Length())
-	return bat, view.Deletes, releaseF, nil
+
+	// FIXME later
+	// avoid transfer bitmap. use ReusableFixedSizeBitmap in batch instead
+	var deletes objectio.ReusableFixedSizeBitmap
+	if view.Deletes != nil && !view.Deletes.IsEmpty() {
+		deletes = objectio.GetFixedSizeBitmap()
+		deletes.OrBitmap(view.Deletes.GetBitmap())
+	}
+	return bat, deletes, releaseF, nil
 }
 
 func (task *mergeObjectsTask) GetCommitEntry() *api.MergeCommitEntry {

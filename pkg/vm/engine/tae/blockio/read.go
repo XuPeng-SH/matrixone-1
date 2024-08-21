@@ -23,7 +23,6 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
@@ -79,14 +78,16 @@ func ReadDataByFilter(
 		return
 	}
 	defer release()
+	defer deleteMask.Release()
 	if rowidIdx >= 0 {
 		panic("use rowid to filter, seriouslly?")
 	}
 
 	sels = searchFunc(bat.Vecs)
 	if !deleteMask.IsEmpty() {
+		bm := deleteMask.Bitmap()
 		sels = removeIf(sels, func(i int64) bool {
-			return deleteMask.Contains(uint64(i))
+			return bm.Contains(uint64(i))
 		})
 	}
 	sels, err = ds.ApplyTombstones(ctx, info.BlockID, sels)
@@ -109,14 +110,14 @@ func BlockDataReadNoCopy(
 	mp *mpool.MPool,
 	vp engine.VectorPool,
 	policy fileservice.Policy,
-) (*batch.Batch, *nulls.Bitmap, func(), error) {
+) (*batch.Batch, objectio.ReusableFixedSizeBitmap, func(), error) {
 	if logutil.GetSkip1Logger().Core().Enabled(zap.DebugLevel) {
 		logutil.Debugf("read block %s, columns %v, types %v", info.BlockID.String(), columns, colTypes)
 	}
 
 	var (
 		rowidPos   int
-		deleteMask nulls.Bitmap
+		deleteMask objectio.ReusableFixedSizeBitmap
 		loaded     *batch.Batch
 		release    func()
 		err        error
@@ -134,23 +135,27 @@ func BlockDataReadNoCopy(
 	if loaded, rowidPos, deleteMask, release, err = readBlockData(
 		ctx, columns, colTypes, info, ts, fs, mp, vp, policy,
 	); err != nil {
-		return nil, nil, nil, err
+		return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
 	}
+	defer deleteMask.Release()
 	tombstones, err := ds.GetTombstones(ctx, info.BlockID)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
 	}
+	defer tombstones.Release()
 
-	// merge deletes from tombstones
-	deleteMask.Merge(tombstones)
-
+	if !deleteMask.IsValid() {
+		deleteMask = tombstones
+	} else {
+		deleteMask.Or(tombstones)
+	}
 	// build rowid column if needed
 	if rowidPos >= 0 {
 		if loaded.Vecs[rowidPos], err = buildRowidColumn(
 			info, nil, mp, vp,
 		); err != nil {
 
-			return nil, nil, nil, err
+			return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
 		}
 		release = func() {
 			release()
@@ -158,7 +163,14 @@ func BlockDataReadNoCopy(
 		}
 	}
 	loaded.SetRowCount(loaded.Vecs[0].Length())
-	return loaded, &deleteMask, release, nil
+	// FIXME later
+	// Temporarily clone the delete mask to avoid the delete mask being released by the caller
+	if deleteMask.IsValid() {
+		retMask := objectio.GetFixedSizeBitmap()
+		retMask.Or(deleteMask)
+		return loaded, retMask, release, nil
+	}
+	return loaded, objectio.ReusableFixedSizeBitmap{}, release, nil
 }
 
 // BlockDataRead only read block data from storage, don't apply deletes.
@@ -293,7 +305,7 @@ func BlockDataReadInner(
 	var (
 		rowidPos    int
 		deletedRows []int64
-		deleteMask  nulls.Bitmap
+		deleteMask  objectio.ReusableFixedSizeBitmap
 		loaded      *batch.Batch
 		release     func()
 	)
@@ -305,6 +317,7 @@ func BlockDataReadInner(
 		return
 	}
 	defer release()
+	defer deleteMask.Release()
 	// assemble result batch for return
 	result = batch.NewWithSize(len(loaded.Vecs))
 
@@ -354,16 +367,22 @@ func BlockDataReadInner(
 	if err != nil {
 		return
 	}
+	// release tombstones to bitmap pool
+	defer tombstones.Release()
 
 	// merge deletes from tombstones
-	deleteMask.Merge(tombstones)
+	if !deleteMask.IsValid() {
+		deleteMask = tombstones
+	} else {
+		deleteMask.Or(tombstones)
+	}
 
 	// Note: it always goes here if no filter or the block is not sorted
 
 	// transform delete mask to deleted rows
 	// TODO: avoid this transformation
 	if !deleteMask.IsEmpty() {
-		deletedRows = deleteMask.ToI64Arrary()
+		deletedRows = deleteMask.Bitmap().ToI64Arrary()
 		// logutil.Debugf("deleted/length: %d/%d=%f",
 		// 	len(deletedRows),
 		// 	loaded.Vecs[0].Length(),
@@ -479,7 +498,7 @@ func readBlockData(
 	m *mpool.MPool,
 	vp engine.VectorPool,
 	policy fileservice.Policy,
-) (bat *batch.Batch, rowidPos int, deleteMask nulls.Bitmap, release func(), err error) {
+) (bat *batch.Batch, rowidPos int, deleteMask objectio.ReusableFixedSizeBitmap, release func(), err error) {
 	rowidPos, idxes, typs := getRowsIdIndex(colIndexes, colTypes)
 
 	readColumns := func(cols []uint16) (result *batch.Batch, loaded *batch.Batch, err error) {
@@ -505,7 +524,7 @@ func readBlockData(
 		return
 	}
 
-	readABlkColumns := func(cols []uint16) (result *batch.Batch, deletes nulls.Bitmap, err error) {
+	readABlkColumns := func(cols []uint16) (result *batch.Batch, deletes objectio.ReusableFixedSizeBitmap, err error) {
 		var loaded *batch.Batch
 		// appendable block should be filtered by committs
 		cols = append(cols, objectio.SEQNUM_COMMITTS, objectio.SEQNUM_ABORT) // committs, aborted
@@ -515,17 +534,19 @@ func readBlockData(
 			return
 		}
 
+		deletes = objectio.GetReusableFixedSizeBitmap()
+		bm := deletes.Bitmap()
 		t0 := time.Now()
 		aborts := vector.MustFixedCol[bool](loaded.Vecs[len(loaded.Vecs)-1])
 		commits := vector.MustFixedCol[types.TS](loaded.Vecs[len(loaded.Vecs)-2])
 		for i := 0; i < len(commits); i++ {
 			if aborts[i] || commits[i].Greater(&ts) {
-				deletes.Add(uint64(i))
+				bm.Add(uint64(i))
 			}
 		}
 		logutil.Debugf(
 			"blockread %s scan filter cost %v: base %s filter out %v\n ",
-			info.BlockID.String(), time.Since(t0), ts.ToString(), deletes.Count())
+			info.BlockID.String(), time.Since(t0), ts.ToString(), deletes.Bitmap().Count())
 		return
 	}
 
@@ -580,12 +601,12 @@ func IsPersistedByCN(
 
 func EvalDeleteRowsByTimestamp(
 	deletes *batch.Batch, ts types.TS, blockid *types.Blockid,
-) (rows *nulls.Bitmap) {
+) (rows objectio.ReusableFixedSizeBitmap) {
 	if deletes == nil {
 		return
 	}
 	// record visible delete rows
-	rows = nulls.NewWithSize(64)
+	rows = objectio.GetReusableFixedSizeBitmap()
 
 	rowids := vector.MustFixedCol[types.Rowid](deletes.Vecs[0])
 	tss := vector.MustFixedCol[types.TS](deletes.Vecs[1])
@@ -593,30 +614,33 @@ func EvalDeleteRowsByTimestamp(
 
 	start, end := FindIntervalForBlock(rowids, blockid)
 
+	bm := rows.Bitmap()
+
 	for i := start; i < end; i++ {
 		abort := vector.GetFixedAt[bool](aborts, i)
 		if abort || tss[i].Greater(&ts) {
 			continue
 		}
 		row := rowids[i].GetRowOffset()
-		rows.Add(uint64(row))
+		bm.Add(uint64(row))
 	}
 	return
 }
 
 func EvalDeleteRowsByTimestampForDeletesPersistedByCN(
 	deletes *batch.Batch, ts types.TS, committs types.TS,
-) (rows *nulls.Bitmap) {
+) (rows objectio.ReusableFixedSizeBitmap) {
 	if deletes == nil || ts.Less(&committs) {
 		return
 	}
 	// record visible delete rows
-	rows = nulls.NewWithSize(0)
+	rows = objectio.GetReusableFixedSizeBitmap()
 	rowids := vector.MustFixedCol[types.Rowid](deletes.Vecs[0])
 
+	bm := rows.Bitmap()
 	for _, rowid := range rowids {
 		row := rowid.GetRowOffset()
-		rows.Add(uint64(row))
+		bm.Add(uint64(row))
 	}
 	return
 }

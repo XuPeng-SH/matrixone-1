@@ -96,6 +96,28 @@ func (bm *FixedSizeBitmap) Iterator() Iterator {
 	return &it
 }
 
+func (bm *FixedSizeBitmap) OrBitmap(o *Bitmap) {
+	if o.IsEmpty() {
+		return
+	}
+	if o.Len() > FixedSizeBitmapBits {
+		logutil.Fatalf("bitmap length %d is out of range", o.Len())
+	}
+	wordsCnt := int(o.Len()) / 64
+	empty := true
+	for i := 0; i < wordsCnt; i++ {
+		bm.data[i] |= o.data[i]
+		if bm.data[i] != 0 {
+			empty = false
+		}
+	}
+	if empty {
+		bm.emptyFlag = FixedSizeBitmap_Empty
+	} else {
+		bm.emptyFlag = FixedSizeBitmap_NotEmpty
+	}
+}
+
 func (bm *FixedSizeBitmap) Or(o *FixedSizeBitmap) {
 	empty := true
 	for i := 0; i < len(bm.data); i++ {

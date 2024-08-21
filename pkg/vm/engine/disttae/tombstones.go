@@ -21,7 +21,6 @@ import (
 	"sort"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
@@ -195,7 +194,7 @@ func (tomb *tombstoneData) PrefetchTombstones(
 func (tomb *tombstoneData) ApplyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deleted *nulls.Nulls,
+	deleted objectio.ReusableFixedSizeBitmap,
 ) (left []int64) {
 
 	left = rowsOffset
@@ -218,13 +217,13 @@ func (tomb *tombstoneData) ApplyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask *nulls.Nulls,
+	mask objectio.ReusableFixedSizeBitmap,
 	apply func(
 		ctx context.Context,
 		loc objectio.Location,
 		cts types.TS,
 		rowsOffset []int64,
-		deleted *nulls.Nulls,
+		deleted objectio.ReusableFixedSizeBitmap,
 	) (left []int64, err error),
 ) (left []int64, err error) {
 
@@ -500,7 +499,7 @@ func (tomb *tombstoneDataWithDeltaLoc) MarshalBinaryWithBuffer(w *bytes.Buffer) 
 func (tomb *tombstoneDataWithDeltaLoc) ApplyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deleted *nulls.Nulls,
+	deleted objectio.ReusableFixedSizeBitmap,
 ) (left []int64) {
 	left = rowsOffset
 
@@ -517,13 +516,13 @@ func (tomb *tombstoneDataWithDeltaLoc) ApplyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask *nulls.Nulls,
+	mask objectio.ReusableFixedSizeBitmap,
 	apply func(
 		ctx context.Context,
 		loc objectio.Location,
 		cts types.TS,
 		rowsOffset []int64,
-		deleted *nulls.Nulls,
+		deleted objectio.ReusableFixedSizeBitmap,
 	) (left []int64, err error),
 ) (left []int64, err error) {
 

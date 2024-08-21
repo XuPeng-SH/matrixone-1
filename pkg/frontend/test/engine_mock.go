@@ -12,7 +12,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	mpool "github.com/matrixorigin/matrixone/pkg/common/mpool"
 	batch "github.com/matrixorigin/matrixone/pkg/container/batch"
-	nulls "github.com/matrixorigin/matrixone/pkg/container/nulls"
 	types "github.com/matrixorigin/matrixone/pkg/container/types"
 	vector "github.com/matrixorigin/matrixone/pkg/container/vector"
 	fileservice "github.com/matrixorigin/matrixone/pkg/fileservice"
@@ -215,7 +214,7 @@ func (m *MockTombstoner) EXPECT() *MockTombstonerMockRecorder {
 }
 
 // ApplyInMemTombstones mocks base method.
-func (m *MockTombstoner) ApplyInMemTombstones(bid types.Blockid, rowsOffset []int64, deleted *nulls.Nulls) []int64 {
+func (m *MockTombstoner) ApplyInMemTombstones(bid types.Blockid, rowsOffset []int64, deleted objectio.ReusableFixedSizeBitmap) []int64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyInMemTombstones", bid, rowsOffset, deleted)
 	ret0, _ := ret[0].([]int64)
@@ -229,7 +228,13 @@ func (mr *MockTombstonerMockRecorder) ApplyInMemTombstones(bid, rowsOffset, dele
 }
 
 // ApplyPersistedTombstones mocks base method.
-func (m *MockTombstoner) ApplyPersistedTombstones(ctx context.Context, bid types.Blockid, rowsOffset []int64, mask *nulls.Nulls, apply func(context.Context, objectio.Location, types.TS, []int64, *nulls.Nulls) ([]int64, error)) ([]int64, error) {
+func (m *MockTombstoner) ApplyPersistedTombstones(
+	ctx context.Context,
+	bid types.Blockid,
+	rowsOffset []int64,
+	mask objectio.ReusableFixedSizeBitmap,
+	apply func(context.Context, objectio.Location, types.TS, []int64, objectio, ReusableFixedSizeBitmap) ([]int64, error),
+) ([]int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyPersistedTombstones", ctx, bid, rowsOffset, mask, apply)
 	ret0, _ := ret[0].([]int64)
@@ -731,10 +736,10 @@ func (mr *MockDataSourceMockRecorder) GetOrderBy() *gomock.Call {
 }
 
 // GetTombstones mocks base method.
-func (m *MockDataSource) GetTombstones(ctx context.Context, bid objectio.Blockid) (*nulls.Nulls, error) {
+func (m *MockDataSource) GetTombstones(ctx context.Context, bid objectio.Blockid) (objectio.ReusableFixedSizeBitmap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTombstones", ctx, bid)
-	ret0, _ := ret[0].(*nulls.Nulls)
+	ret0, _ := ret[0].(objectio.ReusableFixedSizeBitmap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

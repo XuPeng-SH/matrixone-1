@@ -24,7 +24,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
@@ -177,7 +176,7 @@ func (rs *RemoteDataSource) Close() {
 func (rs *RemoteDataSource) applyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64) {
 	tombstones := rs.data.GetTombstones()
 	if tombstones == nil || !tombstones.HasAnyInMemoryTombstone() {
@@ -193,7 +192,7 @@ func (rs *RemoteDataSource) applyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask *nulls.Nulls,
+	mask objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64, err error) {
 	tombstones := rs.data.GetTombstones()
 	if tombstones == nil || !tombstones.HasAnyTombstoneFile() {
@@ -205,23 +204,27 @@ func (rs *RemoteDataSource) applyPersistedTombstones(
 		loc objectio.Location,
 		cts types.TS,
 		rowsOffset []int64,
-		deleted *nulls.Nulls) (left []int64, err error) {
+		deleted objectio.ReusableFixedSizeBitmap,
+	) (left []int64, err error) {
 
 		deletes, err := loadBlockDeletesByDeltaLoc(ctx, rs.fs, bid, loc, rs.ts, cts)
 		if err != nil {
 			return nil, err
 		}
 
+		bm := deletes.Bitmap()
+
 		if rowsOffset != nil {
 			for _, offset := range rowsOffset {
-				if deletes.Contains(uint64(offset)) {
+				if bm.Contains(uint64(offset)) {
 					continue
 				}
 				left = append(left, offset)
 			}
-		} else if deleted != nil {
-			deleted.Merge(deletes)
+		} else if deleted.IsValid() {
+			deleted.Bitmap().Or(bm)
 		}
+		deletes.Release()
 
 		return
 	}
@@ -244,9 +247,9 @@ func (rs *RemoteDataSource) ApplyTombstones(
 		return int(a - b)
 	})
 
-	left = rs.applyInMemTombstones(bid, rowsOffset, nil)
+	left = rs.applyInMemTombstones(bid, rowsOffset, objectio.ReusableFixedSizeBitmap{})
 
-	left, err = rs.applyPersistedTombstones(ctx, bid, left, nil)
+	left, err = rs.applyPersistedTombstones(ctx, bid, left, objectio.ReusableFixedSizeBitmap{})
 	if err != nil {
 		return
 	}
@@ -255,10 +258,9 @@ func (rs *RemoteDataSource) ApplyTombstones(
 
 func (rs *RemoteDataSource) GetTombstones(
 	ctx context.Context, bid objectio.Blockid,
-) (mask *nulls.Nulls, err error) {
+) (mask objectio.ReusableFixedSizeBitmap, err error) {
 
-	mask = &nulls.Nulls{}
-	mask.InitWithSize(8192)
+	mask = objectio.GetReusableFixedSizeBitmap()
 
 	rs.applyInMemTombstones(bid, nil, mask)
 
@@ -777,43 +779,29 @@ func loadBlockDeletesByDeltaLoc(
 	blockId types.Blockid,
 	deltaLoc objectio.Location,
 	snapshotTS, blockCommitTS types.TS,
-) (deleteMask *nulls.Nulls, err error) {
+) (deleteMask objectio.ReusableFixedSizeBitmap, err error) {
 
 	var (
-		rows *nulls.Nulls
-		//bisect           time.Duration
 		release          func()
 		persistedByCN    bool
 		persistedDeletes *batch.Batch
 	)
-
-	if !deltaLoc.IsEmpty() {
-		//t1 := time.Now()
-
-		if persistedDeletes, persistedByCN, release, err = blockio.ReadBlockDelete(ctx, deltaLoc, fs); err != nil {
-			return nil, err
-		}
-		defer release()
-
-		//readCost := time.Since(t1)
-
-		if persistedByCN {
-			rows = blockio.EvalDeleteRowsByTimestampForDeletesPersistedByCN(persistedDeletes, snapshotTS, blockCommitTS)
-		} else {
-			//t2 := time.Now()
-			rows = blockio.EvalDeleteRowsByTimestamp(persistedDeletes, snapshotTS, &blockId)
-			//bisect = time.Since(t2)
-		}
-
-		if rows != nil {
-			deleteMask = rows
-		}
-
-		//readTotal := time.Since(t1)
-		//blockio.RecordReadDel(readTotal, readCost, bisect)
+	if deltaLoc.IsEmpty() {
+		return
 	}
 
-	return deleteMask, nil
+	if persistedDeletes, persistedByCN, release, err = blockio.ReadBlockDelete(ctx, deltaLoc, fs); err != nil {
+		return
+	}
+	defer release()
+
+	if persistedByCN {
+		deleteMask = blockio.EvalDeleteRowsByTimestampForDeletesPersistedByCN(persistedDeletes, snapshotTS, blockCommitTS)
+	} else {
+		deleteMask = blockio.EvalDeleteRowsByTimestamp(persistedDeletes, snapshotTS, &blockId)
+	}
+
+	return
 }
 
 // ApplyTombstones check if any deletes exist in
@@ -833,26 +821,29 @@ func (ls *LocalDataSource) ApplyTombstones(
 		return int(a - b)
 	})
 
-	var err error
+	var (
+		err         error
+		emptyBitmap objectio.ReusableFixedSizeBitmap
+	)
 
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 {
-		rowsOffset = ls.applyWorkspaceEntryDeletes(bid, rowsOffset, nil)
+		rowsOffset = ls.applyWorkspaceEntryDeletes(bid, rowsOffset, emptyBitmap)
 	}
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedS3 == 0 {
-		rowsOffset, err = ls.applyWorkspaceFlushedS3Deletes(bid, rowsOffset, nil)
+		rowsOffset, err = ls.applyWorkspaceFlushedS3Deletes(bid, rowsOffset, emptyBitmap)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 {
-		rowsOffset = ls.applyWorkspaceRawRowIdDeletes(bid, rowsOffset, nil)
+		rowsOffset = ls.applyWorkspaceRawRowIdDeletes(bid, rowsOffset, emptyBitmap)
 	}
 	if ls.tombstonePolicy&engine.Policy_SkipCommittedInMemory == 0 {
-		rowsOffset = ls.applyPStateInMemDeletes(bid, rowsOffset, nil)
+		rowsOffset = ls.applyPStateInMemDeletes(bid, rowsOffset, emptyBitmap)
 	}
 	if ls.tombstonePolicy&engine.Policy_SkipCommittedS3 == 0 {
-		rowsOffset, err = ls.applyPStatePersistedDeltaLocation(bid, rowsOffset, nil)
+		rowsOffset, err = ls.applyPStatePersistedDeltaLocation(bid, rowsOffset, emptyBitmap)
 		if err != nil {
 			return nil, err
 		}
@@ -863,10 +854,9 @@ func (ls *LocalDataSource) ApplyTombstones(
 
 func (ls *LocalDataSource) GetTombstones(
 	ctx context.Context, bid objectio.Blockid,
-) (deletedRows *nulls.Nulls, err error) {
+) (deletedRows objectio.ReusableFixedSizeBitmap, err error) {
 
-	deletedRows = &nulls.Nulls{}
-	deletedRows.InitWithSize(8192)
+	deletedRows = objectio.GetReusableFixedSizeBitmap()
 
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 {
 		ls.applyWorkspaceEntryDeletes(bid, nil, deletedRows)
@@ -874,7 +864,8 @@ func (ls *LocalDataSource) GetTombstones(
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedS3 == 0 {
 		_, err = ls.applyWorkspaceFlushedS3Deletes(bid, nil, deletedRows)
 		if err != nil {
-			return nil, err
+			deletedRows.Release()
+			return
 		}
 	}
 
@@ -888,17 +879,17 @@ func (ls *LocalDataSource) GetTombstones(
 
 	_, err = ls.applyPStatePersistedDeltaLocation(bid, nil, deletedRows)
 	if err != nil {
-		return nil, err
+		deletedRows.Release()
 	}
 
-	return deletedRows, nil
+	return
 }
 
 // will return the rows which applied deletes if the `leftRows` is not empty,
 // or the deletes will only record into the `deleteRows` bitmap.
 func fastApplyDeletedRows(
 	leftRows []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 	o uint32,
 ) []int64 {
 	if len(leftRows) != 0 {
@@ -907,8 +898,8 @@ func fastApplyDeletedRows(
 		}); found {
 			leftRows = append(leftRows[:x], leftRows[x+1:]...)
 		}
-	} else if deletedRows != nil {
-		deletedRows.Add(uint64(o))
+	} else if deletedRows.IsValid() {
+		deletedRows.Bitmap().Add(uint64(o))
 	}
 
 	return leftRows
@@ -917,7 +908,7 @@ func fastApplyDeletedRows(
 func (ls *LocalDataSource) applyWorkspaceEntryDeletes(
 	bid objectio.Blockid,
 	offsets []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64) {
 
 	leftRows = offsets
@@ -969,7 +960,7 @@ func applyDeletesWithinDeltaLocations(
 	snapshotTS types.TS,
 	blkCommitTS types.TS,
 	offsets []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 	locations ...objectio.Location,
 ) (leftRows []int64, err error) {
 
@@ -977,24 +968,25 @@ func applyDeletesWithinDeltaLocations(
 		leftRows = make([]int64, 0, len(offsets))
 	}
 
-	var mask *nulls.Nulls
-
 	for _, loc := range locations {
-		if mask, err = loadBlockDeletesByDeltaLoc(
+		var loopBM objectio.ReusableFixedSizeBitmap
+		if loopBM, err = loadBlockDeletesByDeltaLoc(
 			ctx, fs, bid, loc[:], snapshotTS, blkCommitTS); err != nil {
 			return nil, err
 		}
+		bm := loopBM.Bitmap()
 
 		if offsets != nil {
 			for _, offset := range offsets {
-				if mask.Contains(uint64(offset)) {
+				if bm.Contains(uint64(offset)) {
 					continue
 				}
 				leftRows = append(leftRows, offset)
 			}
-		} else if deletedRows != nil {
-			deletedRows.Merge(mask)
+		} else if deletedRows.IsValid() {
+			deletedRows.Bitmap().Or(bm)
 		}
+		loopBM.Release()
 	}
 
 	return leftRows, nil
@@ -1003,7 +995,7 @@ func applyDeletesWithinDeltaLocations(
 func (ls *LocalDataSource) applyWorkspaceFlushedS3Deletes(
 	bid objectio.Blockid,
 	offsets []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64, err error) {
 
 	leftRows = offsets
@@ -1048,7 +1040,7 @@ func (ls *LocalDataSource) applyWorkspaceFlushedS3Deletes(
 func (ls *LocalDataSource) applyWorkspaceRawRowIdDeletes(
 	bid objectio.Blockid,
 	offsets []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64) {
 
 	leftRows = offsets
@@ -1070,7 +1062,7 @@ func (ls *LocalDataSource) applyWorkspaceRawRowIdDeletes(
 func (ls *LocalDataSource) applyPStateInMemDeletes(
 	bid objectio.Blockid,
 	offsets []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64) {
 
 	if ls.rc.SkipPStateDeletes {
@@ -1105,7 +1097,7 @@ func (ls *LocalDataSource) applyPStateInMemDeletes(
 func (ls *LocalDataSource) applyPStatePersistedDeltaLocation(
 	bid objectio.Blockid,
 	offsets []int64,
-	deletedRows *nulls.Nulls,
+	deletedRows objectio.ReusableFixedSizeBitmap,
 ) (leftRows []int64, err error) {
 
 	if ls.rc.SkipPStateDeletes {
