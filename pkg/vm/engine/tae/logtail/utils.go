@@ -831,7 +831,7 @@ func (data *CNCheckpointData) ReadFromData(
 					}
 				}
 				dataBats[uint32(i)] = cnBatch
-				if idx == DataObject || idx == TombstoneObject {
+				if idx == ObjectInfoIDX || idx == TombstoneObjectInfoIDX {
 					for y := 0; y < cnBatch.Vecs[2].Length(); y++ {
 						stats := objectio.NewObjectStats()
 						stats.UnMarshal(cnBatch.Vecs[2].GetBytesAt(y))
@@ -843,7 +843,7 @@ func (data *CNCheckpointData) ReadFromData(
 				if err != nil {
 					return
 				}
-				if idx == DataObject || idx == TombstoneObject {
+				if idx == ObjectInfoIDX || idx == TombstoneObjectInfoIDX {
 					for y := 0; y < bat.Vecs[2].Length(); y++ {
 						stats := objectio.NewObjectStats()
 						stats.UnMarshal(bat.Vecs[2].GetBytesAt(y))
