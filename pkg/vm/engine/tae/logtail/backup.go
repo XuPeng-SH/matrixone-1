@@ -436,6 +436,7 @@ func ReWriteCheckpointAndBlockFromKey(
 	objInfoState := objInfoData.GetVectorByName(ObjectAttr_State)
 	objInfoTid := objInfoData.GetVectorByName(SnapshotAttr_TID)
 	objInfoDelete := objInfoData.GetVectorByName(EntryNode_DeleteAt)
+	objInfoCreate := objInfoData.GetVectorByName(EntryNode_CreateAt)
 	objInfoCommit := objInfoData.GetVectorByName(txnbase.SnapshotAttr_CommitTS)
 
 	for i := 0; i < objInfoData.Length(); i++ {
@@ -444,14 +445,16 @@ func ReWriteCheckpointAndBlockFromKey(
 		appendable := objInfoState.Get(i).(bool)
 		deleteAt := objInfoDelete.Get(i).(types.TS)
 		commitTS := objInfoCommit.Get(i).(types.TS)
+		createAT := objInfoCreate.Get(i).(types.TS)
 		tid := objInfoTid.Get(i).(uint64)
 		if commitTS.Less(&ts) {
 			panic(any(fmt.Sprintf("commitTs less than ts: %v-%v", commitTS.ToString(), ts.ToString())))
 		}
 		if deleteAt.IsEmpty() {
-			logutil.Infof("block %v deleteAt is empty", stats.ObjectName().String())
+			logutil.Infof("block %v deleteAt is empty, stat is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString())
 			continue
 		}
+		logutil.Infof("block %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString())
 		//if appendable && deleteAt.IsEmpty() {
 		//	logutil.Infof("block %v deleteAt is empty", stats.ObjectName().String())
 		//	continue
