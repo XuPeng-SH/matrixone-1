@@ -226,7 +226,7 @@ func trimObjectsData(
 					return isCkpChange, err
 				}
 				deleteRow := make([]int64, 0)
-				for v := 0; v < bat.Vecs[0].Length(); v++ {
+				for v := 0; v < bat.Vecs[len(bat.Vecs)-1].Length(); v++ {
 					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-1].GetRawBytesAt(v))
 					if err != nil {
 						return isCkpChange, err
@@ -250,14 +250,14 @@ func trimObjectsData(
 				if err != nil {
 					return isCkpChange, err
 				}
-				for v := 0; v < bat.Vecs[0].Length(); v++ {
-					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-2].GetRawBytesAt(v))
+				for v := 0; v < bat.Vecs[len(bat.Vecs)-1].Length(); v++ {
+					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-1].GetRawBytesAt(v))
 					if err != nil {
 						return isCkpChange, err
 					}
 					if commitTs.Greater(&ts) {
 						windowCNBatch(bat, 0, uint64(v))
-						logutil.Debugf("blkCommitTs %v ts %v , block is %v",
+						logutil.Infof("blkCommitTs %v ts %v , block is %v",
 							commitTs.ToString(), ts.ToString(), location.String())
 						isChange = true
 						break
