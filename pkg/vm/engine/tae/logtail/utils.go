@@ -831,7 +831,7 @@ func (data *CNCheckpointData) ReadFromData(
 					for y := 0; y < cnBatch.Vecs[2].Length(); y++ {
 						stats := objectio.NewObjectStats()
 						stats.UnMarshal(cnBatch.Vecs[2].GetBytesAt(y))
-						logutil.Info("ReadFromData", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID))
+						logutil.Info("ReadFromData", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID), zap.Uint64("start", uint64(block.GetStartOffset())), zap.Uint64("end", block.GetStartOffset()))
 					}
 				}
 			} else {

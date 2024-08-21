@@ -692,6 +692,9 @@ func ReWriteCheckpointAndBlockFromKey(
 		tableTombstoneOff := make(map[uint64]*tableOffset)
 		for i := 0; i < objectInfoMeta.Vecs[0].Length(); i++ {
 			tid := objectInfoMeta.GetVectorByName(SnapshotAttr_TID).Get(i).(uint64)
+			stats := objectio.NewObjectStats()
+			stats.UnMarshal(objectInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Get(i).([]byte))
+			logutil.Infof("object tid %d stats %v, row %d", tid, stats.ObjectName().String(), i)
 			if tableInsertOff[tid] == nil {
 				tableInsertOff[tid] = &tableOffset{
 					offset: i,
@@ -703,6 +706,9 @@ func ReWriteCheckpointAndBlockFromKey(
 
 		for i := 0; i < tombstoneInfoMeta.Vecs[0].Length(); i++ {
 			tid := tombstoneInfoMeta.GetVectorByName(SnapshotAttr_TID).Get(i).(uint64)
+			stats := objectio.NewObjectStats()
+			stats.UnMarshal(objectInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Get(i).([]byte))
+			logutil.Infof("tombstone tid %d stats %v, row %d", tid, stats.ObjectName().String(), i)
 			if tableTombstoneOff[tid] == nil {
 				tableTombstoneOff[tid] = &tableOffset{
 					offset: i,
@@ -713,9 +719,11 @@ func ReWriteCheckpointAndBlockFromKey(
 		}
 
 		for tid, table := range tableInsertOff {
+			logutil.Infof("object tid %d offset %d end %d", tid, table.offset, table.end)
 			data.UpdateDataObjectMeta(tid, int32(table.offset), int32(table.end))
 		}
 		for tid, table := range tableTombstoneOff {
+			logutil.Infof("tombstone tid %d offset %d end %d", tid, table.offset, table.end)
 			data.UpdateTombstoneObjectMeta(tid, int32(table.offset), int32(table.end))
 		}
 	}
