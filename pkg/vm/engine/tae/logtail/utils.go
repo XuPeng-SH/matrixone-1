@@ -827,12 +827,20 @@ func (data *CNCheckpointData) ReadFromData(
 					}
 				}
 				dataBats[uint32(i)] = cnBatch
+				if idx == DataObject || idx == TombstoneObject {
+					for y := 0; y < cnBatch.Vecs[2].Length(); y++ {
+						stats := objectio.NewObjectStats()
+						stats.UnMarshal(cnBatch.Vecs[2].GetBytesAt(y))
+						logutil.Info("ReadFromData", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID))
+					}
+				}
 			} else {
 				dataBats[uint32(i)], err = dataBats[uint32(i)].Append(ctx, m, bat)
 				if err != nil {
 					return
 				}
 			}
+
 		}
 	}
 
@@ -2236,6 +2244,7 @@ func (collector *BaseCollector) VisitObjForBackup(entry *catalog.ObjectEntry) (e
 	if createTS.Greater(&collector.start) {
 		return nil
 	}
+	logutil.Infof("VisitObjForBackup visit object %v, %v, %v, %v", entry.GetTable().ID, entry.ObjectStats.ObjectName(), entry.IsAppendable(), entry.IsTombstone)
 	return collector.visitObjectEntry(entry)
 }
 
