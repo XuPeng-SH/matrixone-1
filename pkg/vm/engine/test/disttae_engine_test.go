@@ -133,7 +133,6 @@ func Test_InsertRows(t *testing.T) {
 
 // Create database and tables, and check the data length in the system tables in TN
 func TestSystemDB1(t *testing.T) {
-	t.Skip("need fix me")
 	p := testutil.InitEnginePack(testutil.TestOptions{}, t)
 	defer p.Close()
 
@@ -203,8 +202,8 @@ func TestSystemDB1(t *testing.T) {
 
 	table, err = catalogDB.GetRelationByName(catalog.MO_COLUMNS)
 	require.Nil(t, err)
+	tableSchema = table.GetMeta().(*catalog2.TableEntry).GetLastestSchema(false)
 	var bat *containers.Batch
-	defer bat.Close()
 	it = table.MakeObjectIt(false)
 	for it.Next() {
 		blk := it.GetObject()
@@ -216,6 +215,7 @@ func TestSystemDB1(t *testing.T) {
 	}
 	require.Equal(t, 3, bat.Length())
 	t.Log(bat.PPString(10))
+	bat.Close()
 }
 
 type dummyCpkGetter struct{}
@@ -450,7 +450,6 @@ func TestLogtailBasic(t *testing.T) {
 }
 
 func TestAlterTableBasic(t *testing.T) {
-	t.Skip("need fix me")
 	opts := config.WithLongScanAndCKPOpts(nil)
 	p := testutil.InitEnginePack(testutil.TestOptions{TaeEngineOptions: opts}, t)
 	defer p.Close()
@@ -495,7 +494,7 @@ func TestAlterTableBasic(t *testing.T) {
 		Table:  &api.TableID{DbId: catalog.MO_CATALOG_ID, TbId: catalog.MO_TABLES_ID},
 	}, true)
 
-	bat, _ := batch.ProtoBatchToBatch(resp.Commands[0].Bat)
+	bat, _ := batch.ProtoBatchToBatch(resp.Commands[2].Bat)
 	cstrCol := containers.NewNonNullBatchWithSharedMemory(bat, common.DefaultAllocator).GetVectorByName(catalog.SystemRelAttr_Constraint)
 	require.Equal(t, 3, cstrCol.Length())
 	c1, err := cstr1.MarshalBinary()
@@ -512,7 +511,7 @@ func TestAlterTableBasic(t *testing.T) {
 	require.Equal(t, []byte("comment version 1"), commetCol.Get(1).([]byte))
 	require.Equal(t, []byte("comment version 1"), commetCol.Get(2).([]byte))
 
-	require.Equal(t, api.Entry_Delete, resp.Commands[1].EntryType)
+	require.Equal(t, api.Entry_Delete, resp.Commands[3].EntryType)
 
 	close()
 
@@ -527,9 +526,9 @@ func TestAlterTableBasic(t *testing.T) {
 		Table:  &api.TableID{DbId: catalog.MO_CATALOG_ID, TbId: catalog.MO_COLUMNS_ID},
 	}, true)
 
-	require.Equal(t, 2, len(resp.Commands)) // create and drop
-	require.Equal(t, api.Entry_Insert, resp.Commands[0].EntryType)
-	require.Equal(t, api.Entry_Delete, resp.Commands[1].EntryType)
+	require.Equal(t, 4, len(resp.Commands)) // create and drop
+	require.Equal(t, api.Entry_Insert, resp.Commands[2].EntryType)
+	require.Equal(t, api.Entry_Delete, resp.Commands[3].EntryType)
 	close()
 }
 
