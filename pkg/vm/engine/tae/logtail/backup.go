@@ -563,14 +563,15 @@ func ReWriteCheckpointAndBlockFromKey(
 				} else {
 					logutil.Infof("resultresult %v len is 0", objectName.String())
 					rowIDVec := vector.MustFixedCol[types.Rowid](sortData.Vecs[0].GetDownstreamVector())
-					for i := 0; i < dataBlocks[0].data.Vecs[0].Length(); i++ {
+					for i := 0; i < sortData.Vecs[0].Length(); i++ {
 						blockID := rowIDVec[i].CloneBlockID()
 						obj := objectsData[blockID.ObjectNameString()]
 						if obj != nil && obj.appendable {
 							newBlockID := objectio.NewBlockid(blockID.Segment(), 1000, blockID.Sequence())
 							newRowID := objectio.NewRowid(newBlockID, rowIDVec[i].GetRowOffset())
 							sortData.Vecs[0].Update(i, *newRowID, false)
-							logutil.Infof("update rowid %v to %v", blockID.String(), newRowID.String())
+							nnewID := sortData.Vecs[0].Get(i).(objectio.Rowid)
+							logutil.Infof("update rowid %v to %v, nnewID %v", rowIDVec[i].String(), newRowID.String(), nnewID.String())
 						}
 					}
 					_, err = mergesort.SortBlockColumns(sortData.Vecs, catalog.TombstonePrimaryKeyIdx, backupPool)
@@ -578,6 +579,10 @@ func ReWriteCheckpointAndBlockFromKey(
 						return nil, nil, nil, err
 					}
 					dataBlocks[0].data = containers.ToCNBatch(sortData)
+					rowIDVec = vector.MustFixedCol[types.Rowid](dataBlocks[0].data)
+					for i := 0; i < dataBlocks[0].data.Vecs[0].Length(); i++ {
+						logutil.Infof("name is %v, rowid %v", objectName.String(), rowIDVec[i].String())
+					}
 				}
 
 				fileNum := uint16(1000) + objectName.Num()
