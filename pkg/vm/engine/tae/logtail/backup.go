@@ -569,8 +569,7 @@ func ReWriteCheckpointAndBlockFromKey(
 						if obj != nil && obj.appendable {
 							newBlockID := objectio.NewBlockid(blockID.Segment(), 1000, blockID.Sequence())
 							newRowID := objectio.NewRowid(newBlockID, rowIDVec[i].GetRowOffset())
-							rowIDVec[i] = newRowID
-							sortData.Vecs[0].Update(i, newRowID, false)
+							sortData.Vecs[0].Update(i, *newRowID, false)
 							logutil.Infof("update rowid %v to %v", blockID.String(), newRowID.String())
 						}
 					}
