@@ -777,6 +777,7 @@ func (data *CNCheckpointData) GetTableMeta(tableID uint64, version uint32, loc o
 
 	data.meta[tid] = tableMeta
 	meta = data.meta[tableID]
+	logutil.Infof("GetTableMeta tableID %d, version %d, tableMeta %v", tableID, version, tableMeta.String())
 	return
 }
 

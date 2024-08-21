@@ -658,11 +658,12 @@ func ReWriteCheckpointAndBlockFromKey(
 		for i := 0; i < objInfoData.Length(); i++ {
 			appendValToBatch(objInfoData, objectInfoMeta, i)
 			if infoInsert[i] != nil {
-				row := objectInfoMeta.Length() - 1
 				if !infoInsert[i].appendable {
+					row := objectInfoMeta.Length() - 1
 					objectInfoMeta.GetVectorByName(EntryNode_DeleteAt).Update(row, types.TS{}, false)
 				} else {
 					appendValToBatch(objInfoData, objectInfoMeta, i)
+					row := objectInfoMeta.Length() - 1
 					objectInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Update(row, infoInsert[i].stats[:], false)
 					objectInfoMeta.GetVectorByName(ObjectAttr_State).Update(row, false, false)
 					objectInfoMeta.GetVectorByName(EntryNode_DeleteAt).Update(row, types.TS{}, false)
@@ -673,11 +674,12 @@ func ReWriteCheckpointAndBlockFromKey(
 		for i := 0; i < blkMetaInsert.Length(); i++ {
 			appendValToBatch(blkMetaInsert, tombstoneInfoMeta, i)
 			if infoInsertTombstone[i] != nil {
-				row := tombstoneInfoMeta.Length() - 1
 				if !infoInsertTombstone[i].appendable {
+					row := tombstoneInfoMeta.Length() - 1
 					tombstoneInfoMeta.GetVectorByName(EntryNode_DeleteAt).Update(row, types.TS{}, false)
 				} else {
 					appendValToBatch(blkMetaInsert, tombstoneInfoMeta, i)
+					row := tombstoneInfoMeta.Length() - 1
 					tombstoneInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Update(row, infoInsertTombstone[i].stats[:], false)
 					tombstoneInfoMeta.GetVectorByName(ObjectAttr_State).Update(row, false, false)
 					tombstoneInfoMeta.GetVectorByName(EntryNode_DeleteAt).Update(row, types.TS{}, false)
