@@ -151,8 +151,8 @@ func TestBitmapIterator_Next(t *testing.T) {
 	}
 }
 
-func TestFastBitmap(t *testing.T) {
-	var bm FastBitmap
+func TestFixSizedBitmap(t *testing.T) {
+	var bm FixSizedBitmap
 	require.True(t, bm.IsEmpty())
 	require.Equal(t, 0, bm.Count())
 
@@ -171,20 +171,20 @@ func TestFastBitmap(t *testing.T) {
 	require.True(t, bm.IsEmpty())
 	require.Equal(t, 0, bm.Count())
 
-	for i := 0; i < FastBitmapBits; i++ {
+	for i := 0; i < FixSizedBitmapBits; i++ {
 		bm.Add(uint64(i))
 		require.Equal(t, i+1, bm.Count())
 	}
 
-	for i := 0; i < FastBitmapBits; i++ {
+	for i := 0; i < FixSizedBitmapBits; i++ {
 		bm.Remove(uint64(i))
-		require.Equal(t, FastBitmapBits-i-1, bm.Count())
+		require.Equal(t, FixSizedBitmapBits-i-1, bm.Count())
 	}
 	require.True(t, bm.IsEmpty())
 
 	var expects []uint64
 	step := rand.Intn(10) + 1
-	for i := 0; i < FastBitmapBits; i += step {
+	for i := 0; i < FixSizedBitmapBits; i += step {
 		bm.Add(uint64(i))
 		expects = append(expects, uint64(i))
 	}

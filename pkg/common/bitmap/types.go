@@ -32,8 +32,8 @@ const (
 )
 
 const (
-	// Why define FastBitmap_Empty|FastBitmap_NotEmpty|FastBitmap_Unknown?
-	// when Reset the FastBitmap, it is expected the whole buffer is reset to all zero,
+	// Why define FixSizedBitmap_Empty|FixSizedBitmap_NotEmpty|FixSizedBitmap_Unknown?
+	// when Reset the FixSizedBitmap, it is expected the whole buffer is reset to all zero,
 	// but the kEmptyFlagEmpty defined by bitmap.Bitmap is -1, which is not zero.
 	// We cannot change the kEmptyFlagEmpty to 0, because it is persisted in the storage.
 
@@ -41,15 +41,15 @@ const (
 	// var buf []byte
 	// put := bufPool.Get(&buf) // get buf from pool and buf is all zero
 	// defer bufPool.Put(put) // put back to pool
-	// bm := types.DecodeFixed[bitmap.FastBitmap](buf) // bm.IsEmpty() should be true
+	// bm := types.DecodeFixed[bitmap.FixSizedBitmap](buf) // bm.IsEmpty() should be true
 	// bm.Reset() // reset all bytes to zero
 
-	FastBitmap_Empty    = 0
-	FastBitmap_NotEmpty = -1
-	FastBitmap_Unknown  = 1
-	FastBitmapBits      = 8192
-	FastBitmapBytes     = FastBitmapBits / 8
-	FastBitmapTypeSize  = unsafe.Sizeof(FastBitmap{})
+	FixSizedBitmap_Empty    = 0
+	FixSizedBitmap_NotEmpty = -1
+	FixSizedBitmap_Unknown  = 1
+	FixSizedBitmapBits      = 8192
+	FixSizedBitmapBytes     = FixSizedBitmapBits / 8
+	FixSizedBitmapTypeSize  = unsafe.Sizeof(FixSizedBitmap{})
 )
 
 type IBitmapData interface {
@@ -72,10 +72,10 @@ type BitmapIterator struct {
 }
 
 // compared with Bitmap
-// 1. FastBitmap is fixed size: 8192 bits
+// 1. FixSizedBitmap is fixed size: 8192 bits
 // 2. Reset only clear data
 // 3. Cannot expand
-type FastBitmap struct {
+type FixSizedBitmap struct {
 	emptyFlag int8
-	data      [FastBitmapBytes / 8]uint64
+	data      [FixSizedBitmapBytes / 8]uint64
 }

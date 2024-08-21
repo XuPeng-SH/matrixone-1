@@ -2,10 +2,10 @@ package bitmap
 
 import "math/bits"
 
-func (bm *FastBitmap) Size() int { return FastBitmapBits }
+func (bm *FixSizedBitmap) Size() int { return FixSizedBitmapBits }
 
 // IsEmpty returns true if no bit in the Bitmap is set, otherwise it will return false
-func (bm *FastBitmap) IsEmpty() bool {
+func (bm *FixSizedBitmap) IsEmpty() bool {
 	if bm.emptyFlag == kEmptyFlagEmpty {
 		return true
 	}
@@ -19,7 +19,7 @@ func (bm *FastBitmap) IsEmpty() bool {
 	return true
 }
 
-func (bm *FastBitmap) Reset() {
+func (bm *FixSizedBitmap) Reset() {
 	if bm.emptyFlag == kEmptyFlagEmpty {
 		return
 	}
@@ -29,13 +29,13 @@ func (bm *FastBitmap) Reset() {
 	bm.emptyFlag = kEmptyFlagEmpty
 }
 
-func (bm *FastBitmap) Add(row uint64) {
+func (bm *FixSizedBitmap) Add(row uint64) {
 	bm.data[row>>6] |= 1 << (row & 63)
 	bm.emptyFlag = kEmptyFlagNotEmpty
 }
 
-func (bm *FastBitmap) Remove(row uint64) {
-	if row >= FastBitmapBits {
+func (bm *FixSizedBitmap) Remove(row uint64) {
+	if row >= FixSizedBitmapBits {
 		return
 	}
 	bm.data[row>>6] &^= 1 << (row & 63)
@@ -43,14 +43,14 @@ func (bm *FastBitmap) Remove(row uint64) {
 	return
 }
 
-func (bm *FastBitmap) Contains(row uint64) bool {
-	if row >= FastBitmapBits {
+func (bm *FixSizedBitmap) Contains(row uint64) bool {
+	if row >= FixSizedBitmapBits {
 		return false
 	}
 	return bm.data[row>>6]&(1<<(row&63)) != 0
 }
 
-func (bm *FastBitmap) Count() int {
+func (bm *FixSizedBitmap) Count() int {
 	if bm.emptyFlag == kEmptyFlagEmpty {
 		return 0
 	}
@@ -58,8 +58,8 @@ func (bm *FastBitmap) Count() int {
 	for i := 0; i < len(bm.data); i++ {
 		cnt += bits.OnesCount64(bm.data[i])
 	}
-	if offset := FastBitmapBits % 64; offset > 0 {
-		start := (FastBitmapBits / 64) * 64
+	if offset := FixSizedBitmapBits % 64; offset > 0 {
+		start := (FixSizedBitmapBits / 64) * 64
 		for i, j := start, start+offset; i < j; i++ {
 			if bm.Contains(uint64(i)) {
 				cnt++
@@ -74,7 +74,7 @@ func (bm *FastBitmap) Count() int {
 	return cnt
 }
 
-func (bm *FastBitmap) Iterator() Iterator {
+func (bm *FixSizedBitmap) Iterator() Iterator {
 	it := BitmapIterator{
 		bm: bm,
 		i:  0,
@@ -89,23 +89,23 @@ func (bm *FastBitmap) Iterator() Iterator {
 	return &it
 }
 
-func (bm *FastBitmap) Word(i uint64) uint64 {
+func (bm *FixSizedBitmap) Word(i uint64) uint64 {
 	return bm.data[i]
 }
 
-func (bm *FastBitmap) Len() int64 {
-	return FastBitmapBits
+func (bm *FixSizedBitmap) Len() int64 {
+	return FixSizedBitmapBits
 }
 
-func (bm *FastBitmap) ToArray() []uint64 {
+func (bm *FixSizedBitmap) ToArray() []uint64 {
 	return ToArrary[uint64](bm)
 }
 
-func (bm *FastBitmap) ToI64Arrary() []int64 {
+func (bm *FixSizedBitmap) ToI64Arrary() []int64 {
 	return ToArrary[int64](bm)
 }
 
-func ToArrary[T int64 | uint64](bm *FastBitmap) (rows []T) {
+func ToArrary[T int64 | uint64](bm *FixSizedBitmap) (rows []T) {
 	if bm.IsEmpty() {
 		return
 	}
