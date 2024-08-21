@@ -451,10 +451,10 @@ func ReWriteCheckpointAndBlockFromKey(
 			panic(any(fmt.Sprintf("commitTs less than ts: %v-%v", commitTS.ToString(), ts.ToString())))
 		}
 		if deleteAt.IsEmpty() {
-			logutil.Infof("block %v deleteAt is empty, stat is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString())
+			logutil.Infof("block %v deleteAt is empty, stat is %v, create ts is %v, ts %v, tid %d", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString(), tid)
 			continue
 		}
-		logutil.Infof("block %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString())
+		logutil.Infof("block %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v, tid %d", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString(), tid)
 		//if appendable && deleteAt.IsEmpty() {
 		//	logutil.Infof("block %v deleteAt is empty", stats.ObjectName().String())
 		//	continue
@@ -485,14 +485,14 @@ func ReWriteCheckpointAndBlockFromKey(
 			panic(any(fmt.Sprintf("commitTs less than ts: %v-%v", commitTS.ToString(), ts.ToString())))
 		}
 		if deleteAt.IsEmpty() {
-			logutil.Infof("tombstone %v deleteAt is empty, stat is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString())
+			logutil.Infof("tombstone %v deleteAt is empty, stat is %v, create ts is %v, ts %v, tid %d", stats.ObjectName().String(), appendable, createAT.ToString(), ts.ToString(), tid)
 			continue
 		}
 
 		if createAT.Equal(&ts) {
 			panic(any(fmt.Sprintf("createAt equal to ts: %v-%v", createAT.ToString(), ts.ToString())))
 		}
-		logutil.Infof("tombstone %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString())
+		logutil.Infof("tombstone %v deleteAt is not null , stat is %v, delete is %v, create ts is %v, ts %v, tid %d", stats.ObjectName().String(), appendable, deleteAt.ToString(), createAT.ToString(), ts.ToString(), tid)
 		addObjectToObjectData(stats, appendable, !deleteAt.IsEmpty(), i, tid, objectio.SchemaTombstone, &objectsData)
 	}
 
