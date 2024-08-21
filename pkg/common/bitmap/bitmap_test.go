@@ -149,3 +149,35 @@ func TestBitmapIterator_Next(t *testing.T) {
 		}
 	}
 }
+
+func TestFastBitmap(t *testing.T) {
+	var bm FastBitmap
+	require.True(t, bm.IsEmpty())
+	require.Equal(t, 0, bm.Count())
+
+	bm.Add(1022)
+	require.False(t, bm.IsEmpty())
+	require.Equal(t, 1, bm.Count())
+
+	bm.Reset()
+	require.True(t, bm.IsEmpty())
+	require.Equal(t, 0, bm.Count())
+
+	bm.Add(0)
+	require.False(t, bm.IsEmpty())
+	require.Equal(t, 1, bm.Count())
+	bm.Remove(0)
+	require.True(t, bm.IsEmpty())
+	require.Equal(t, 0, bm.Count())
+
+	for i := 0; i < FastBitmapBits; i++ {
+		bm.Add(uint64(i))
+		require.Equal(t, i+1, bm.Count())
+	}
+
+	for i := 0; i < FastBitmapBits; i++ {
+		bm.Remove(uint64(i))
+		require.Equal(t, FastBitmapBits-i-1, bm.Count())
+	}
+	require.True(t, bm.IsEmpty())
+}

@@ -14,7 +14,10 @@
 
 package bitmap
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"unsafe"
+)
 
 type Iterator interface {
 	HasNext() bool
@@ -23,9 +26,15 @@ type Iterator interface {
 }
 
 const (
-	kEmptyFlagEmpty    = 1
+	kEmptyFlagEmpty    = 0
 	kEmptyFlagNotEmpty = -1
-	kEmptyFlagUnknown  = 0
+	kEmptyFlagUnknown  = 1
+)
+
+const (
+	FastBitmapBits     = 8192
+	FastBitmapBytes    = FastBitmapBits / 8
+	FastBitmapTypeSize = unsafe.Sizeof(FastBitmap{})
 )
 
 // Bitmap represents line numbers of tuple's is null
@@ -40,4 +49,10 @@ type BitmapIterator struct {
 	i        uint64
 	bm       *Bitmap
 	has_next bool
+}
+
+// 8192 bits
+type FastBitmap struct {
+	emptyFlag int8
+	data      [FastBitmapBytes / 8]uint64
 }
