@@ -707,7 +707,7 @@ func ReWriteCheckpointAndBlockFromKey(
 		for i := 0; i < tombstoneInfoMeta.Vecs[0].Length(); i++ {
 			tid := tombstoneInfoMeta.GetVectorByName(SnapshotAttr_TID).Get(i).(uint64)
 			stats := objectio.NewObjectStats()
-			stats.UnMarshal(objectInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Get(i).([]byte))
+			stats.UnMarshal(tombstoneInfoMeta.GetVectorByName(ObjectAttr_ObjectStats).Get(i).([]byte))
 			logutil.Infof("tombstone tid %d stats %v, row %d", tid, stats.ObjectName().String(), i)
 			if tableTombstoneOff[tid] == nil {
 				tableTombstoneOff[tid] = &tableOffset{
