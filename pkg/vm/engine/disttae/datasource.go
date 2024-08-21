@@ -1289,7 +1289,7 @@ func GetTombstonesByBlockId(
 				return true, nil
 			}
 		}
-
+		if obj.ObjectName().String() == "0191744d-6459-7069-9175-70298eef9fef_01000"
 		if bf, err = objectio.FastLoadBF(
 			ctx, obj.Location(), false, fs); err != nil {
 			return false, err
