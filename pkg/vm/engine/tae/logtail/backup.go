@@ -580,7 +580,7 @@ func ReWriteCheckpointAndBlockFromKey(
 						return nil, nil, nil, err
 					}
 					dataBlocks[0].data = containers.ToCNBatch(sortData)
-					rowIDVec = vector.MustFixedCol[types.Rowid](dataBlocks[0].data)
+					rowIDVec = vector.MustFixedCol[types.Rowid](dataBlocks[0].data.Vecs[catalog.TombstonePrimaryKeyIdx])
 					for i := 0; i < dataBlocks[0].data.Vecs[0].Length(); i++ {
 						logutil.Infof("name is %v, rowid %v, i is %d", objectName.String(), rowIDVec[i].String(), i)
 					}
