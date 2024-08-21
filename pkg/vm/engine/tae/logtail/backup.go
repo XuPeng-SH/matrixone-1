@@ -548,12 +548,12 @@ func ReWriteCheckpointAndBlockFromKey(
 				}
 				sortData := containers.ToTNBatch(dataBlocks[0].data, common.CheckpointAllocator)
 				if objectData.dataType == objectio.SchemaData {
-					if objectData.sortKey != math.MaxUint16 {
-						_, err = mergesort.SortBlockColumns(sortData.Vecs, int(objectData.sortKey), backupPool)
-						if err != nil {
-							return nil, nil, nil, err
-						}
-					}
+					//if objectData.sortKey != math.MaxUint16 {
+					//	_, err = mergesort.SortBlockColumns(sortData.Vecs, int(objectData.sortKey), backupPool)
+					//	if err != nil {
+					//		return nil, nil, nil, err
+					//	}
+					//}
 					dataBlocks[0].data = containers.ToCNBatch(sortData)
 					result := batch.NewWithSize(len(dataBlocks[0].data.Vecs) - 2)
 					for i := range result.Vecs {
