@@ -814,6 +814,7 @@ func (data *CNCheckpointData) ReadFromData(
 				return
 			}
 			if block.GetEndOffset() == 0 {
+				logutil.Infof("ReadFromData block.GetEndOffset() == 0, block %v, tid %d", block.String(), tableID)
 				continue
 			}
 			windowCNBatch(bat, block.GetStartOffset(), block.GetEndOffset())
