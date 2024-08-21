@@ -528,7 +528,7 @@ func ReWriteCheckpointAndBlockFromKey(
 			if objectData.isChange && dataBlocks[0].data.Vecs[0].Length() == 0 {
 				logutil.Infof("delete object %v len is 0", objectName.String())
 			}
-			if objectData.isChange && dataBlocks[0].data.Vecs[0].Length() > 0 {
+			if objectData.appendable && dataBlocks[0].data.Vecs[0].Length() > 0 {
 				// For the aBlock that needs to be retained,
 				// the corresponding NBlock is generated and inserted into the corresponding batch.
 				if len(dataBlocks) > 2 {
@@ -602,7 +602,7 @@ func ReWriteCheckpointAndBlockFromKey(
 				insertObjBatch[objectData.tid].rowObjects = append(insertObjBatch[objectData.tid].rowObjects, io)
 			}
 
-			if !objectData.isChange {
+			if !objectData.appendable {
 				if insertObjBatch[objectData.tid] == nil {
 					insertObjBatch[objectData.tid] = &iObjects{
 						rowObjects: make([]*insertObject, 0),
