@@ -777,7 +777,6 @@ func (data *CNCheckpointData) GetTableMeta(tableID uint64, version uint32, loc o
 
 	data.meta[tid] = tableMeta
 	meta = data.meta[tableID]
-	logutil.Infof("GetTableMeta tableID %d, version %d, tableMeta %v", tableID, version, tableMeta.String())
 	return
 }
 
@@ -795,7 +794,6 @@ func (data *CNCheckpointData) ReadFromData(
 	}
 	dataBats = make([]*batch.Batch, MetaMaxIdx)
 	for i, table := range meta.tables {
-		logutil.Infof("ReadFromData1 tableID %d, version %d, table %v", tableID, version, table.String())
 		if table == nil {
 			continue
 		}
@@ -815,10 +813,8 @@ func (data *CNCheckpointData) ReadFromData(
 				return
 			}
 			if block.GetEndOffset() == 0 {
-				logutil.Infof("ReadFromData2 block.GetEndOffset() == 0, block %v, tid %d", block.String(), tableID)
 				continue
 			}
-			logutil.Infof("ReadFromData3 block %v, tid %d, idx %d, version %d ,start %d, end %d", block.String(), tableID, idx, version, block.GetStartOffset(), block.GetEndOffset())
 			windowCNBatch(bat, block.GetStartOffset(), block.GetEndOffset())
 			if dataBats[uint32(i)] == nil {
 				cnBatch := batch.NewWithSize(len(bat.Vecs))
