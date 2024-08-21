@@ -564,6 +564,7 @@ func ReWriteCheckpointAndBlockFromKey(
 					logutil.Infof("resultresult %v len is 0", objectName.String())
 					rowIDVec := vector.MustFixedCol[types.Rowid](sortData.Vecs[0].GetDownstreamVector())
 					for i := 0; i < sortData.Vecs[0].Length(); i++ {
+						logutil.Infof("old name is %v, rowid %v,i is %d", objectName.String(), rowIDVec[i].String(), i)
 						blockID := rowIDVec[i].CloneBlockID()
 						obj := objectsData[blockID.ObjectNameString()]
 						if obj != nil && obj.appendable {
@@ -581,7 +582,7 @@ func ReWriteCheckpointAndBlockFromKey(
 					dataBlocks[0].data = containers.ToCNBatch(sortData)
 					rowIDVec = vector.MustFixedCol[types.Rowid](dataBlocks[0].data)
 					for i := 0; i < dataBlocks[0].data.Vecs[0].Length(); i++ {
-						logutil.Infof("name is %v, rowid %v", objectName.String(), rowIDVec[i].String())
+						logutil.Infof("name is %v, rowid %v, i is %d", objectName.String(), rowIDVec[i].String(), i)
 					}
 				}
 
