@@ -1281,7 +1281,7 @@ func GetTombstonesByBlockId(
 
 	onTombstone := func(obj logtailreplay.ObjectEntry) (bool, error) {
 		totalScanned++
-
+		logutil.Infof("GetTombstonesByBlockId blockid %v tombstones %v", bid.String(), obj.String())
 		if !obj.ZMIsEmpty() {
 			objZM := obj.SortKeyZoneMap()
 			if skip := !objZM.PrefixEq(bid[:]); skip {
