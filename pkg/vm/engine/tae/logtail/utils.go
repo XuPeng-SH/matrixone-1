@@ -832,11 +832,12 @@ func (data *CNCheckpointData) ReadFromData(
 				}
 				dataBats[uint32(i)] = cnBatch
 				if idx == ObjectInfoIDX || idx == TombstoneObjectInfoIDX {
-					deleteTSCol := vector.MustFixedCol[types.TS](bat.Vecs[8])
+					deleteTSCol := vector.MustFixedCol[types.TS](cnBatch.Vecs[8])
+					createTSCol := vector.MustFixedCol[types.TS](cnBatch.Vecs[7])
 					for y := 0; y < cnBatch.Vecs[2].Length(); y++ {
 						stats := objectio.NewObjectStats()
 						stats.UnMarshal(cnBatch.Vecs[2].GetBytesAt(y))
-						logutil.Info("ReadFromData4", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID), zap.String("delete", deleteTSCol[y].ToString()))
+						logutil.Info("ReadFromData4", zap.String("stats", stats.ObjectName().String()), zap.Uint64("tid", tableID), zap.String("delete", deleteTSCol[y].ToString()), zap.String("create", createTSCol[y].ToString()))
 					}
 				}
 			} else {
