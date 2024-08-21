@@ -1,6 +1,10 @@
 package bitmap
 
-import "math/bits"
+import (
+	"math/bits"
+
+	"github.com/matrixorigin/matrixone/pkg/logutil"
+)
 
 func (bm *FixedSizeBitmap) Size() int { return FixedSizeBitmapBits }
 
@@ -30,13 +34,16 @@ func (bm *FixedSizeBitmap) Reset() {
 }
 
 func (bm *FixedSizeBitmap) Add(row uint64) {
+	if row >= FixedSizeBitmapBits {
+		logutil.Fatalf("row %d is out of range", row)
+	}
 	bm.data[row>>6] |= 1 << (row & 63)
 	bm.emptyFlag = kEmptyFlagNotEmpty
 }
 
 func (bm *FixedSizeBitmap) Remove(row uint64) {
 	if row >= FixedSizeBitmapBits {
-		return
+		logutil.Fatalf("row %d is out of range", row)
 	}
 	bm.data[row>>6] &^= 1 << (row & 63)
 	bm.emptyFlag = kEmptyFlagUnknown
@@ -45,7 +52,7 @@ func (bm *FixedSizeBitmap) Remove(row uint64) {
 
 func (bm *FixedSizeBitmap) Contains(row uint64) bool {
 	if row >= FixedSizeBitmapBits {
-		return false
+		logutil.Fatalf("row %d is out of range", row)
 	}
 	return bm.data[row>>6]&(1<<(row&63)) != 0
 }
@@ -87,6 +94,21 @@ func (bm *FixedSizeBitmap) Iterator() Iterator {
 	it.has_next = false
 
 	return &it
+}
+
+func (bm *FixedSizeBitmap) Or(o *FixedSizeBitmap) {
+	empty := true
+	for i := 0; i < len(bm.data); i++ {
+		bm.data[i] |= o.data[i]
+		if bm.data[i] != 0 {
+			empty = false
+		}
+	}
+	if empty {
+		bm.emptyFlag = FixedSizeBitmap_Empty
+	} else {
+		bm.emptyFlag = FixedSizeBitmap_NotEmpty
+	}
 }
 
 func (bm *FixedSizeBitmap) Word(i uint64) uint64 {
