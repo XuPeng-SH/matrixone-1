@@ -18,18 +18,18 @@ var BitmapPool = fileservice.NewPool(
 	nil,
 )
 
-var NullReusableFixedSizeBitmap ReusableFixedSizeBitmap
+var NullReusableBitmap ReusableBitmap
 
-type ReusableFixedSizeBitmap struct {
+type ReusableBitmap struct {
 	bm  *bitmap.FixedSizeBitmap
 	put func()
 }
 
-func (r *ReusableFixedSizeBitmap) Bitmap() *bitmap.FixedSizeBitmap {
+func (r *ReusableBitmap) Bitmap() *bitmap.FixedSizeBitmap {
 	return r.bm
 }
 
-func (r *ReusableFixedSizeBitmap) Release() {
+func (r *ReusableBitmap) Release() {
 	if r.bm != nil {
 		r.bm = nil
 	}
@@ -39,14 +39,14 @@ func (r *ReusableFixedSizeBitmap) Release() {
 	}
 }
 
-func (r *ReusableFixedSizeBitmap) OrBitmap(o *bitmap.Bitmap) {
+func (r *ReusableBitmap) OrBitmap(o *bitmap.Bitmap) {
 	if !r.IsValid() {
 		logutil.Fatal("invalid bitmap")
 	}
 	r.bm.OrBitmap(o)
 }
 
-func (r *ReusableFixedSizeBitmap) Or(o ReusableFixedSizeBitmap) {
+func (r *ReusableBitmap) Or(o ReusableBitmap) {
 	if o.IsEmpty() {
 		return
 	}
@@ -56,45 +56,45 @@ func (r *ReusableFixedSizeBitmap) Or(o ReusableFixedSizeBitmap) {
 	r.bm.Or(o.bm)
 }
 
-func (r *ReusableFixedSizeBitmap) IsEmpty() bool {
+func (r *ReusableBitmap) IsEmpty() bool {
 	return r.bm == nil || r.bm.IsEmpty()
 }
 
-func (r *ReusableFixedSizeBitmap) Reset() {
+func (r *ReusableBitmap) Reset() {
 	if r.bm != nil {
 		r.bm.Reset()
 	}
 }
 
-func (r *ReusableFixedSizeBitmap) Count() int {
+func (r *ReusableBitmap) Count() int {
 	if r.bm == nil {
 		return 0
 	}
 	return r.bm.Count()
 }
 
-func (r *ReusableFixedSizeBitmap) Contains(i uint64) bool {
+func (r *ReusableBitmap) Contains(i uint64) bool {
 	if r.bm == nil {
 		return false
 	}
 	return r.bm.Contains(i)
 }
 
-func (r *ReusableFixedSizeBitmap) IsValid() bool {
+func (r *ReusableBitmap) IsValid() bool {
 	return r.bm != nil
 }
 
-func GetReusableFixedSizeBitmap() ReusableFixedSizeBitmap {
+func GetReusableBitmap() ReusableBitmap {
 	var bm *bitmap.FixedSizeBitmap
 	put := BitmapPool.Get(&bm)
-	return ReusableFixedSizeBitmap{
+	return ReusableBitmap{
 		bm:  bm,
 		put: put.Put,
 	}
 }
 
-func GetFixedSizeBitmap() ReusableFixedSizeBitmap {
-	return ReusableFixedSizeBitmap{
+func GetReusableBitmapNoReuse() ReusableBitmap {
+	return ReusableBitmap{
 		bm: &bitmap.FixedSizeBitmap{},
 	}
 }

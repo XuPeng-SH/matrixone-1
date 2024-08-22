@@ -176,7 +176,7 @@ func (t *cnMergeTask) GetSortKeyType() types.Type {
 	return types.Type{}
 }
 
-func (t *cnMergeTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableFixedSizeBitmap, func(), error) {
+func (t *cnMergeTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableBitmap, func(), error) {
 	iter := t.blkIters[objIdx]
 	if iter.Next() {
 		blk := iter.Entry()
@@ -187,7 +187,7 @@ func (t *cnMergeTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.
 		blk.CommitTs = obj.CommitTS
 		return t.readblock(ctx, &blk)
 	}
-	return nil, objectio.NullReusableFixedSizeBitmap, nil, mergesort.ErrNoMoreBlocks
+	return nil, objectio.NullReusableBitmap, nil, mergesort.ErrNoMoreBlocks
 }
 
 func (t *cnMergeTask) GetCommitEntry() *api.MergeCommitEntry {
@@ -257,7 +257,7 @@ func (t *cnMergeTask) PrepareNewWriter() *blockio.BlockWriter {
 // readblock reads block data. there is no rowid column, no ablk
 func (t *cnMergeTask) readblock(
 	ctx context.Context, info *objectio.BlockInfo,
-) (bat *batch.Batch, dels objectio.ReusableFixedSizeBitmap, release func(), err error) {
+) (bat *batch.Batch, dels objectio.ReusableBitmap, release func(), err error) {
 	// read data
 	bat, dels, release, err = blockio.BlockDataReadNoCopy(
 		ctx, "", info, t.ds, t.colseqnums, t.coltypes,

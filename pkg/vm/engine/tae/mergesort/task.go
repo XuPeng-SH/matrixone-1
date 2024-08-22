@@ -54,7 +54,7 @@ type MergeTaskHost interface {
 	GetBlkCnts() []int
 	GetAccBlkCnts() []int
 	GetSortKeyType() types.Type
-	LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableFixedSizeBitmap, func(), error)
+	LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableBitmap, func(), error)
 	GetTotalSize() uint64 // total size of all objects, definitely there are cases where the size exceeds 4G, so use uint64
 	GetTotalRowCnt() uint32
 	GetBlockMaxRows() uint32

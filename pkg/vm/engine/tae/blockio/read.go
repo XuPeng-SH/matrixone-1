@@ -110,14 +110,14 @@ func BlockDataReadNoCopy(
 	mp *mpool.MPool,
 	vp engine.VectorPool,
 	policy fileservice.Policy,
-) (*batch.Batch, objectio.ReusableFixedSizeBitmap, func(), error) {
+) (*batch.Batch, objectio.ReusableBitmap, func(), error) {
 	if logutil.GetSkip1Logger().Core().Enabled(zap.DebugLevel) {
 		logutil.Debugf("read block %s, columns %v, types %v", info.BlockID.String(), columns, colTypes)
 	}
 
 	var (
 		rowidPos   int
-		deleteMask objectio.ReusableFixedSizeBitmap
+		deleteMask objectio.ReusableBitmap
 		loaded     *batch.Batch
 		release    func()
 		err        error
@@ -135,12 +135,12 @@ func BlockDataReadNoCopy(
 	if loaded, rowidPos, deleteMask, release, err = readBlockData(
 		ctx, columns, colTypes, info, ts, fs, mp, vp, policy,
 	); err != nil {
-		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
+		return nil, objectio.NullReusableBitmap, nil, err
 	}
 	defer deleteMask.Release()
 	tombstones, err := ds.GetTombstones(ctx, info.BlockID)
 	if err != nil {
-		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
+		return nil, objectio.NullReusableBitmap, nil, err
 	}
 
 	if !deleteMask.IsValid() {
@@ -155,7 +155,7 @@ func BlockDataReadNoCopy(
 			info, nil, mp, vp,
 		); err != nil {
 
-			return nil, objectio.NullReusableFixedSizeBitmap, nil, err
+			return nil, objectio.NullReusableBitmap, nil, err
 		}
 		release = func() {
 			release()
@@ -166,11 +166,11 @@ func BlockDataReadNoCopy(
 	// FIXME later
 	// Temporarily clone the delete mask to avoid the delete mask being released by the caller
 	if deleteMask.IsValid() {
-		retMask := objectio.GetFixedSizeBitmap()
+		retMask := objectio.GetReusableBitmapNoReuse()
 		retMask.Or(deleteMask)
 		return loaded, retMask, release, nil
 	}
-	return loaded, objectio.NullReusableFixedSizeBitmap, release, nil
+	return loaded, objectio.NullReusableBitmap, release, nil
 }
 
 // BlockDataRead only read block data from storage, don't apply deletes.
@@ -305,7 +305,7 @@ func BlockDataReadInner(
 	var (
 		rowidPos    int
 		deletedRows []int64
-		deleteMask  objectio.ReusableFixedSizeBitmap
+		deleteMask  objectio.ReusableBitmap
 		loaded      *batch.Batch
 		release     func()
 	)
@@ -498,7 +498,7 @@ func readBlockData(
 	m *mpool.MPool,
 	vp engine.VectorPool,
 	policy fileservice.Policy,
-) (bat *batch.Batch, rowidPos int, deleteMask objectio.ReusableFixedSizeBitmap, release func(), err error) {
+) (bat *batch.Batch, rowidPos int, deleteMask objectio.ReusableBitmap, release func(), err error) {
 	rowidPos, idxes, typs := getRowsIdIndex(colIndexes, colTypes)
 
 	readColumns := func(cols []uint16) (result *batch.Batch, loaded *batch.Batch, err error) {
@@ -524,7 +524,7 @@ func readBlockData(
 		return
 	}
 
-	readABlkColumns := func(cols []uint16) (result *batch.Batch, deletes objectio.ReusableFixedSizeBitmap, err error) {
+	readABlkColumns := func(cols []uint16) (result *batch.Batch, deletes objectio.ReusableBitmap, err error) {
 		var loaded *batch.Batch
 		// appendable block should be filtered by committs
 		cols = append(cols, objectio.SEQNUM_COMMITTS, objectio.SEQNUM_ABORT) // committs, aborted
@@ -534,7 +534,7 @@ func readBlockData(
 			return
 		}
 
-		deletes = objectio.GetReusableFixedSizeBitmap()
+		deletes = objectio.GetReusableBitmap()
 		bm := deletes.Bitmap()
 		t0 := time.Now()
 		aborts := vector.MustFixedCol[bool](loaded.Vecs[len(loaded.Vecs)-1])
@@ -601,12 +601,12 @@ func IsPersistedByCN(
 
 func EvalDeleteRowsByTimestamp(
 	deletes *batch.Batch, ts types.TS, blockid *types.Blockid,
-) (rows objectio.ReusableFixedSizeBitmap) {
+) (rows objectio.ReusableBitmap) {
 	if deletes == nil {
 		return
 	}
 	// record visible delete rows
-	rows = objectio.GetReusableFixedSizeBitmap()
+	rows = objectio.GetReusableBitmap()
 
 	rowids := vector.MustFixedCol[types.Rowid](deletes.Vecs[0])
 	tss := vector.MustFixedCol[types.TS](deletes.Vecs[1])
@@ -629,12 +629,12 @@ func EvalDeleteRowsByTimestamp(
 
 func EvalDeleteRowsByTimestampForDeletesPersistedByCN(
 	deletes *batch.Batch, ts types.TS, committs types.TS,
-) (rows objectio.ReusableFixedSizeBitmap) {
+) (rows objectio.ReusableBitmap) {
 	if deletes == nil || ts.Less(&committs) {
 		return
 	}
 	// record visible delete rows
-	rows = objectio.GetReusableFixedSizeBitmap()
+	rows = objectio.GetReusableBitmap()
 	rowids := vector.MustFixedCol[types.Rowid](deletes.Vecs[0])
 
 	bm := rows.Bitmap()

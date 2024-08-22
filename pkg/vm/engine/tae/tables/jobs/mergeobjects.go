@@ -180,12 +180,12 @@ func (task *mergeObjectsTask) GetMPool() *mpool.MPool {
 
 func (task *mergeObjectsTask) HostHintName() string { return "DN" }
 
-func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableFixedSizeBitmap, func(), error) {
+func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, objectio.ReusableBitmap, func(), error) {
 	if objIdx >= uint32(len(task.mergedObjs)) {
 		panic("invalid objIdx")
 	}
 	if task.nMergedBlk[objIdx] >= task.blkCnt[objIdx] {
-		return nil, objectio.NullReusableFixedSizeBitmap, nil, mergesort.ErrNoMoreBlocks
+		return nil, objectio.NullReusableBitmap, nil, mergesort.ErrNoMoreBlocks
 	}
 	var err error
 	var view *containers.Batch
@@ -203,7 +203,7 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 	obj := task.mergedObjsHandle[objIdx]
 	view, err = obj.GetColumnDataByIds(ctx, uint16(task.nMergedBlk[objIdx]), task.idxs, common.MergeAllocator)
 	if err != nil {
-		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
+		return nil, objectio.NullReusableBitmap, nil, err
 	}
 	if len(task.attrs) != len(view.Vecs) {
 		panic(fmt.Sprintf("mismatch %v, %v, %v", task.attrs, len(task.attrs), len(view.Vecs)))
@@ -217,10 +217,10 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 	bat.SetRowCount(view.Vecs[0].Length())
 
 	// FIXME later
-	// avoid transfer bitmap. use ReusableFixedSizeBitmap in batch instead
-	var deletes objectio.ReusableFixedSizeBitmap
+	// avoid transfer bitmap. use ReusableBitmap in batch instead
+	var deletes objectio.ReusableBitmap
 	if view.Deletes != nil && !view.Deletes.IsEmpty() {
-		deletes = objectio.GetFixedSizeBitmap()
+		deletes = objectio.GetReusableBitmapNoReuse()
 		deletes.OrBitmap(view.Deletes.GetBitmap())
 	}
 	return bat, deletes, releaseF, nil

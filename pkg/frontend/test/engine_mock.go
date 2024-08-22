@@ -214,7 +214,7 @@ func (m *MockTombstoner) EXPECT() *MockTombstonerMockRecorder {
 }
 
 // ApplyInMemTombstones mocks base method.
-func (m *MockTombstoner) ApplyInMemTombstones(bid types.Blockid, rowsOffset []int64, deleted objectio.ReusableFixedSizeBitmap) []int64 {
+func (m *MockTombstoner) ApplyInMemTombstones(bid types.Blockid, rowsOffset []int64, deleted objectio.ReusableBitmap) []int64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyInMemTombstones", bid, rowsOffset, deleted)
 	ret0, _ := ret[0].([]int64)
@@ -232,8 +232,8 @@ func (m *MockTombstoner) ApplyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask objectio.ReusableFixedSizeBitmap,
-	apply func(context.Context, objectio.Location, types.TS, []int64, objectio, ReusableFixedSizeBitmap) ([]int64, error),
+	mask objectio.ReusableBitmap,
+	apply func(context.Context, objectio.Location, types.TS, []int64, objectio, ReusableBitmap) ([]int64, error),
 ) ([]int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyPersistedTombstones", ctx, bid, rowsOffset, mask, apply)
@@ -736,10 +736,10 @@ func (mr *MockDataSourceMockRecorder) GetOrderBy() *gomock.Call {
 }
 
 // GetTombstones mocks base method.
-func (m *MockDataSource) GetTombstones(ctx context.Context, bid objectio.Blockid) (objectio.ReusableFixedSizeBitmap, error) {
+func (m *MockDataSource) GetTombstones(ctx context.Context, bid objectio.Blockid) (objectio.ReusableBitmap, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetTombstones", ctx, bid)
-	ret0, _ := ret[0].(objectio.ReusableFixedSizeBitmap)
+	ret0, _ := ret[0].(objectio.ReusableBitmap)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

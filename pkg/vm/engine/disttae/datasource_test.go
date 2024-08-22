@@ -109,13 +109,13 @@ func TestTombstoneData1(t *testing.T) {
 	left := tombstones1.ApplyInMemTombstones(
 		*target,
 		rowsOffset,
-		objectio.NullReusableFixedSizeBitmap,
+		objectio.NullReusableBitmap,
 	)
 	require.Equal(t, left, rowsOffset)
 
 	// case 2: target is blk1_3 and deleted rows is [5]
 	// expect: left is [], deleted rows is [5]. no rows are deleted
-	deleted := objectio.GetReusableFixedSizeBitmap()
+	deleted := objectio.GetReusableBitmap()
 	defer deleted.Release()
 	deleted.Bitmap().Add(5)
 	left = tombstones1.ApplyInMemTombstones(
@@ -134,7 +134,7 @@ func TestTombstoneData1(t *testing.T) {
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		rowsOffset,
-		objectio.NullReusableFixedSizeBitmap,
+		objectio.NullReusableBitmap,
 	)
 	require.Equal(t, []int64{4}, left)
 

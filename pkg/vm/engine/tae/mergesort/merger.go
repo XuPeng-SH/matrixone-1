@@ -42,7 +42,7 @@ type merger[T any] struct {
 	heap *heapSlice[T]
 
 	cols    [][]T
-	deletes []objectio.ReusableFixedSizeBitmap
+	deletes []objectio.ReusableBitmap
 	nulls   []*nulls.Nulls
 
 	buffer *batch.Batch
@@ -76,7 +76,7 @@ func newMerger[T any](host MergeTaskHost, lessFunc sort.LessFunc[T], sortKeyPos 
 		bats:       make([]releasableBatch, size),
 		rowIdx:     make([]uint32, size),
 		cols:       make([][]T, size),
-		deletes:    make([]objectio.ReusableFixedSizeBitmap, size),
+		deletes:    make([]objectio.ReusableBitmap, size),
 		nulls:      make([]*nulls.Nulls, size),
 		heap:       newHeapSlice[T](size, lessFunc),
 		sortKeyIdx: sortKeyPos,
