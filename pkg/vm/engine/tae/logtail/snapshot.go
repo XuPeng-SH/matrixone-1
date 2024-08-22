@@ -216,12 +216,12 @@ func (d *DeltaLocDataSource) getAndApplyTombstones(
 ) (objectio.ReusableFixedSizeBitmap, error) {
 	deltaLoc, ts := d.ds.GetDeltaLoc(bid)
 	if deltaLoc.IsEmpty() {
-		return objectio.ReusableFixedSizeBitmap{}, nil
+		return objectio.NullReusableFixedSizeBitmap, nil
 	}
 	logutil.Infof("deltaLoc: %v, id is %d", deltaLoc.String(), bid.Sequence())
 	deletes, _, release, err := blockio.ReadBlockDelete(ctx, deltaLoc, d.fs)
 	if err != nil {
-		return objectio.ReusableFixedSizeBitmap{}, err
+		return objectio.NullReusableFixedSizeBitmap, err
 	}
 	defer release()
 	if ts.IsEmpty() {

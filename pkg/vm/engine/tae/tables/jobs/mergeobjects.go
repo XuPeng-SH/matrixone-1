@@ -185,7 +185,7 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 		panic("invalid objIdx")
 	}
 	if task.nMergedBlk[objIdx] >= task.blkCnt[objIdx] {
-		return nil, objectio.ReusableFixedSizeBitmap{}, nil, mergesort.ErrNoMoreBlocks
+		return nil, objectio.NullReusableFixedSizeBitmap, nil, mergesort.ErrNoMoreBlocks
 	}
 	var err error
 	var view *containers.Batch
@@ -203,7 +203,7 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 	obj := task.mergedObjsHandle[objIdx]
 	view, err = obj.GetColumnDataByIds(ctx, uint16(task.nMergedBlk[objIdx]), task.idxs, common.MergeAllocator)
 	if err != nil {
-		return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
+		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
 	}
 	if len(task.attrs) != len(view.Vecs) {
 		panic(fmt.Sprintf("mismatch %v, %v, %v", task.attrs, len(task.attrs), len(view.Vecs)))

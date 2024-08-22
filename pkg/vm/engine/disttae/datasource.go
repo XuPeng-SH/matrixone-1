@@ -247,9 +247,9 @@ func (rs *RemoteDataSource) ApplyTombstones(
 		return int(a - b)
 	})
 
-	left = rs.applyInMemTombstones(bid, rowsOffset, objectio.ReusableFixedSizeBitmap{})
+	left = rs.applyInMemTombstones(bid, rowsOffset, objectio.NullReusableFixedSizeBitmap)
 
-	left, err = rs.applyPersistedTombstones(ctx, bid, left, objectio.ReusableFixedSizeBitmap{})
+	left, err = rs.applyPersistedTombstones(ctx, bid, left, objectio.NullReusableFixedSizeBitmap)
 	if err != nil {
 		return
 	}

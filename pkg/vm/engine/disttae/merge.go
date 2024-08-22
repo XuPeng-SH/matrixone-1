@@ -187,7 +187,7 @@ func (t *cnMergeTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.
 		blk.CommitTs = obj.CommitTS
 		return t.readblock(ctx, &blk)
 	}
-	return nil, objectio.ReusableFixedSizeBitmap{}, nil, mergesort.ErrNoMoreBlocks
+	return nil, objectio.NullReusableFixedSizeBitmap, nil, mergesort.ErrNoMoreBlocks
 }
 
 func (t *cnMergeTask) GetCommitEntry() *api.MergeCommitEntry {

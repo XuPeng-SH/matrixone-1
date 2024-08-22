@@ -135,12 +135,12 @@ func BlockDataReadNoCopy(
 	if loaded, rowidPos, deleteMask, release, err = readBlockData(
 		ctx, columns, colTypes, info, ts, fs, mp, vp, policy,
 	); err != nil {
-		return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
+		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
 	}
 	defer deleteMask.Release()
 	tombstones, err := ds.GetTombstones(ctx, info.BlockID)
 	if err != nil {
-		return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
+		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
 	}
 	defer tombstones.Release()
 
@@ -155,7 +155,7 @@ func BlockDataReadNoCopy(
 			info, nil, mp, vp,
 		); err != nil {
 
-			return nil, objectio.ReusableFixedSizeBitmap{}, nil, err
+			return nil, objectio.NullReusableFixedSizeBitmap, nil, err
 		}
 		release = func() {
 			release()
@@ -170,7 +170,7 @@ func BlockDataReadNoCopy(
 		retMask.Or(deleteMask)
 		return loaded, retMask, release, nil
 	}
-	return loaded, objectio.ReusableFixedSizeBitmap{}, release, nil
+	return loaded, objectio.NullReusableFixedSizeBitmap, release, nil
 }
 
 // BlockDataRead only read block data from storage, don't apply deletes.
