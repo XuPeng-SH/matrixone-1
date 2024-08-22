@@ -162,6 +162,8 @@ func trimObjectsData(
 		for id := uint32(0); id < dataMeta.BlockCount(); id++ {
 			var bat *batch.Batch
 			var err error
+			// As long as there is an aBlk to be deleted, isCkpChange must be set to true.
+			isCkpChange = true
 			commitTs := types.TS{}
 			location.SetID(uint16(id))
 			bat, err = blockio.LoadOneBlock(ctx, fs, location, objectio.SchemaData)
@@ -188,8 +190,6 @@ func trimObjectsData(
 					bat.Shrink(deleteRow, false)
 				}
 			} else {
-				// As long as there is an aBlk to be deleted, isCkpChange must be set to true.
-				isCkpChange = true
 				for v := 0; v < bat.Vecs[0].Length(); v++ {
 					err = commitTs.Unmarshal(bat.Vecs[len(bat.Vecs)-2].GetRawBytesAt(v))
 					if err != nil {
