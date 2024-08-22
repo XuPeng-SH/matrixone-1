@@ -117,7 +117,7 @@ func TestTombstoneData1(t *testing.T) {
 	// expect: left is [], deleted rows is [5]. no rows are deleted
 	deleted := objectio.GetReusableBitmap()
 	defer deleted.Release()
-	deleted.Bitmap().Add(5)
+	deleted.Add(5)
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		nil,
@@ -142,7 +142,7 @@ func TestTombstoneData1(t *testing.T) {
 	// expect: left is [], deleted rows is [0,1,2,4].
 	target = types.NewBlockidWithObjectID(obj1, 1)
 	deleted.Reset()
-	deleted.Bitmap().Add(4)
+	deleted.Add(4)
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		nil,
