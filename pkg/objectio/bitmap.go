@@ -78,7 +78,7 @@ func (r *ReusableBitmap) Add(i uint64) {
 
 func (r *ReusableBitmap) tryCowOrExpand(nbits int) {
 	if r.bm.IsFixedSize() {
-		if nbits >= bitmap.FixedSizeBitmapBits {
+		if nbits > bitmap.FixedSizeBitmapBits {
 			logutil.Warn(
 				"ReusableBitmap-COW",
 				zap.Int("nbits", nbits),
