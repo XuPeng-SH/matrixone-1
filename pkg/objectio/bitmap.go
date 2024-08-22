@@ -43,7 +43,7 @@ func (r *ReusableBitmap) OrSimpleBitmap(o bitmap.ISimpleBitmap) {
 	if !r.IsValid() {
 		logutil.Fatal("invalid bitmap")
 	}
-	r.tryCow(int(o.Len()))
+	r.tryCowOrExpand(int(o.Len()))
 	r.bm.OrSimpleBitmap(o)
 }
 
@@ -58,7 +58,7 @@ func (r *ReusableBitmap) Or(o ReusableBitmap) {
 	if !r.IsValid() {
 		logutil.Fatal("invalid bitmap")
 	}
-	r.tryCow(int(o.bm.Len()))
+	r.tryCowOrExpand(int(o.bm.Len()))
 	r.bm.OrSimpleBitmap(o.bm)
 }
 
@@ -66,20 +66,25 @@ func (r *ReusableBitmap) Add(i uint64) {
 	if !r.IsValid() {
 		logutil.Fatal("invalid bitmap")
 	}
-	r.tryCow(int(i))
+	r.tryCowOrExpand(int(i) + 1)
 	r.bm.Add(i)
 }
 
-func (r *ReusableBitmap) tryCow(nbits int) {
-	if nbits > bitmap.FixedSizeBitmapBits && r.bm.IsFixedSize() {
-		logutil.Warn(
-			"ReusableBitmap-COW",
-			zap.Int("nbits", nbits),
-		)
-		var nbm bitmap.Bitmap
-		nbm.OrSimpleBitmap(r.bm)
-		r.Release()
-		r.bm = &nbm
+func (r *ReusableBitmap) tryCowOrExpand(nbits int) {
+	if r.bm.IsFixedSize() {
+		if nbits >= bitmap.FixedSizeBitmapBits {
+			logutil.Warn(
+				"ReusableBitmap-COW",
+				zap.Int("nbits", nbits),
+			)
+			var nbm bitmap.Bitmap
+			nbm.TryExpandWithSize(nbits)
+			nbm.OrSimpleBitmap(r.bm)
+			r.Release()
+			r.bm = &nbm
+		}
+	} else {
+		r.bm.TryExpandWithSize(nbits)
 	}
 }
 

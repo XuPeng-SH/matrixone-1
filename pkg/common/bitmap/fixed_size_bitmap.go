@@ -152,6 +152,12 @@ func (bm *FixedSizeBitmap) Len() int64 {
 	return FixedSizeBitmapBits
 }
 
+func (bm *FixedSizeBitmap) TryExpandWithSize(size int) {
+	if size > FixedSizeBitmapBits {
+		logutil.Fatalf("expand FixedSizeBitmap with size %d", size)
+	}
+}
+
 func (bm *FixedSizeBitmap) ToArray() []uint64 {
 	return ToArrary[uint64](bm)
 }

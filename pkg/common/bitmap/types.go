@@ -63,6 +63,7 @@ type ISimpleBitmap interface {
 	OrSimpleBitmap(ISimpleBitmap)
 	IsFixedSize() bool
 	Reset()
+	TryExpandWithSize(size int)
 }
 
 type IBitmapData interface {
