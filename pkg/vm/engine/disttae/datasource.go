@@ -974,7 +974,7 @@ func applyDeletesWithinDeltaLocations(
 		}
 		if offsets != nil {
 			for _, offset := range offsets {
-				if deletedRows.Contains(uint64(offset)) {
+				if loopBM.Contains(uint64(offset)) {
 					continue
 				}
 				leftRows = append(leftRows, offset)
