@@ -44,6 +44,10 @@ func (pb PutBack[T]) Put() {
 	}
 }
 
+func (pb PutBack[T]) Idx() int {
+	return pb.idx
+}
+
 func NewPool[T any](
 	capacity uint32,
 	newFunc func() T,

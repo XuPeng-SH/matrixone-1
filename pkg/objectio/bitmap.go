@@ -24,6 +24,11 @@ var NullReusableBitmap ReusableBitmap
 type ReusableBitmap struct {
 	bm  bitmap.ISimpleBitmap
 	put func()
+	idx int
+}
+
+func (r *ReusableBitmap) Idx() int {
+	return r.idx
 }
 
 func (r *ReusableBitmap) Release() {
@@ -34,6 +39,7 @@ func (r *ReusableBitmap) Release() {
 		r.put()
 		r.put = nil
 	}
+	r.idx = 0
 }
 
 func (r *ReusableBitmap) OrSimpleBitmap(o bitmap.ISimpleBitmap) {
@@ -130,7 +136,7 @@ func (r *ReusableBitmap) Contains(i uint64) bool {
 }
 
 func (r *ReusableBitmap) IsValid() bool {
-	return r.bm != nil
+	return r != nil && r.bm != nil
 }
 
 func GetReusableBitmap() ReusableBitmap {
@@ -139,6 +145,7 @@ func GetReusableBitmap() ReusableBitmap {
 	return ReusableBitmap{
 		bm:  bm,
 		put: put.Put,
+		idx: put.Idx(),
 	}
 }
 

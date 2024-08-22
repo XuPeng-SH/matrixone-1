@@ -214,7 +214,7 @@ func (m *MockTombstoner) EXPECT() *MockTombstonerMockRecorder {
 }
 
 // ApplyInMemTombstones mocks base method.
-func (m *MockTombstoner) ApplyInMemTombstones(bid types.Blockid, rowsOffset []int64, deleted objectio.ReusableBitmap) []int64 {
+func (m *MockTombstoner) ApplyInMemTombstones(bid types.Blockid, rowsOffset []int64, deleted *objectio.ReusableBitmap) []int64 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyInMemTombstones", bid, rowsOffset, deleted)
 	ret0, _ := ret[0].([]int64)
@@ -232,8 +232,8 @@ func (m *MockTombstoner) ApplyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask objectio.ReusableBitmap,
-	apply func(context.Context, objectio.Location, types.TS, []int64, objectio, ReusableBitmap) ([]int64, error),
+	mask *objectio.ReusableBitmap,
+	apply func(context.Context, objectio.Location, types.TS, []int64, objectio, *ReusableBitmap) ([]int64, error),
 ) ([]int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ApplyPersistedTombstones", ctx, bid, rowsOffset, mask, apply)

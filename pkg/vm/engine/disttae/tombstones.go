@@ -194,7 +194,7 @@ func (tomb *tombstoneData) PrefetchTombstones(
 func (tomb *tombstoneData) ApplyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deleted objectio.ReusableBitmap,
+	deleted *objectio.ReusableBitmap,
 ) (left []int64) {
 
 	left = rowsOffset
@@ -217,13 +217,13 @@ func (tomb *tombstoneData) ApplyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask objectio.ReusableBitmap,
+	mask *objectio.ReusableBitmap,
 	apply func(
 		ctx context.Context,
 		loc objectio.Location,
 		cts types.TS,
 		rowsOffset []int64,
-		deleted objectio.ReusableBitmap,
+		deleted *objectio.ReusableBitmap,
 	) (left []int64, err error),
 ) (left []int64, err error) {
 
@@ -499,7 +499,7 @@ func (tomb *tombstoneDataWithDeltaLoc) MarshalBinaryWithBuffer(w *bytes.Buffer) 
 func (tomb *tombstoneDataWithDeltaLoc) ApplyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deleted objectio.ReusableBitmap,
+	deleted *objectio.ReusableBitmap,
 ) (left []int64) {
 	left = rowsOffset
 
@@ -516,13 +516,13 @@ func (tomb *tombstoneDataWithDeltaLoc) ApplyPersistedTombstones(
 	ctx context.Context,
 	bid types.Blockid,
 	rowsOffset []int64,
-	mask objectio.ReusableBitmap,
+	mask *objectio.ReusableBitmap,
 	apply func(
 		ctx context.Context,
 		loc objectio.Location,
 		cts types.TS,
 		rowsOffset []int64,
-		deleted objectio.ReusableBitmap,
+		deleted *objectio.ReusableBitmap,
 	) (left []int64, err error),
 ) (left []int64, err error) {
 

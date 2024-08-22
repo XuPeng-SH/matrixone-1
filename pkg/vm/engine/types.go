@@ -622,7 +622,7 @@ type Tombstoner interface {
 	ApplyInMemTombstones(
 		bid types.Blockid,
 		rowsOffset []int64,
-		deleted objectio.ReusableBitmap,
+		deleted *objectio.ReusableBitmap,
 	) (left []int64)
 
 	// it applies the block related tombstones from the persisted tombstone file
@@ -631,13 +631,13 @@ type Tombstoner interface {
 		ctx context.Context,
 		bid types.Blockid,
 		rowsOffset []int64,
-		mask objectio.ReusableBitmap,
+		mask *objectio.ReusableBitmap,
 		apply func(
 			ctx2 context.Context,
 			loc objectio.Location,
 			cts types.TS,
 			rowsOffset []int64,
-			deleted objectio.ReusableBitmap) (left []int64, err error),
+			deleted *objectio.ReusableBitmap) (left []int64, err error),
 	) (left []int64, err error)
 
 	// a.merge(b) => a = a U b
