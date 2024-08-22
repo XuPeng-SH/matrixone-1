@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"slices"
 	"sort"
 
@@ -216,6 +215,7 @@ func (rs *RemoteDataSource) ApplyTombstones(
 	ctx context.Context,
 	bid objectio.Blockid,
 	rowsOffset []int64,
+	applyPolicy engine.TombstoneApplyPolicy,
 ) (left []int64, err error) {
 
 	slices.SortFunc(rowsOffset, func(a, b int64) int {
@@ -281,7 +281,7 @@ type LocalDataSource struct {
 	rc struct {
 		batchPrefetchCursor int
 		WorkspaceLocked     bool
-		SkipPStateDeletes   bool
+		//SkipPStateDeletes   bool
 	}
 
 	mp  *mpool.MPool
@@ -630,7 +630,7 @@ func (ls *LocalDataSource) filterInMemUnCommittedInserts(
 		offsets := rowIdsToOffset(retainedRowIds, int64(0)).([]int64)
 
 		b, _ := retainedRowIds[0].Decode()
-		sels, err := ls.ApplyTombstones(ls.ctx, b, offsets)
+		sels, err := ls.ApplyTombstones(ls.ctx, b, offsets, engine.Policy_CheckAll)
 		if err != nil {
 			return err
 		}
@@ -669,10 +669,10 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 
 	// in meme committed insert only need to apply deletes that exists
 	// in workspace and flushed to s3 but not commit.
-	ls.rc.SkipPStateDeletes = true
-	defer func() {
-		ls.rc.SkipPStateDeletes = false
-	}()
+	//ls.rc.SkipPStateDeletes = true
+	//defer func() {
+	//	ls.rc.SkipPStateDeletes = false
+	//}()
 
 	if bat.RowCount() >= int(options.DefaultBlockMaxRows) {
 		return nil
@@ -711,6 +711,9 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 		}()
 	}
 
+	applyPolicy := engine.TombstoneApplyPolicy(
+		engine.Policy_SkipCommittedInMemory | engine.Policy_SkipCommittedS3)
+
 	applyOffset := 0
 
 	goon := true
@@ -728,7 +731,7 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 			//	minTS = entry.Time
 			//}
 
-			sel, err = ls.ApplyTombstones(ls.ctx, b, []int64{int64(o)})
+			sel, err = ls.ApplyTombstones(ls.ctx, b, []int64{int64(o)}, applyPolicy)
 			if err != nil {
 				return err
 			}
@@ -773,16 +776,6 @@ func (ls *LocalDataSource) filterInMemCommittedInserts(
 		deleted, err := ls.batchApplyTombstoneObjects(minTS, rowIds[applyOffset:])
 		if err != nil {
 			return err
-		}
-
-		m := make(map[types.Rowid]struct{})
-		for i := range rowIds {
-			m[rowIds[i]] = struct{}{}
-		}
-
-		if len(m) != len(rowIds) {
-			fmt.Println(common.MoBatchToString(bat, 10000))
-			logutil.Fatal("")
 		}
 
 		for i := range deleted {
@@ -854,6 +847,7 @@ func (ls *LocalDataSource) ApplyTombstones(
 	ctx context.Context,
 	bid objectio.Blockid,
 	rowsOffset []int64,
+	dynamicPolicy engine.TombstoneApplyPolicy,
 ) ([]int64, error) {
 
 	slices.SortFunc(rowsOffset, func(a, b int64) int {
@@ -862,25 +856,29 @@ func (ls *LocalDataSource) ApplyTombstones(
 
 	var err error
 
-	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 {
+	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 &&
+		dynamicPolicy&engine.Policy_SkipUncommitedInMemory == 0 {
 		rowsOffset = ls.applyWorkspaceEntryDeletes(bid, rowsOffset, nil)
 	}
-	if ls.tombstonePolicy&engine.Policy_SkipUncommitedS3 == 0 {
+	if ls.tombstonePolicy&engine.Policy_SkipUncommitedS3 == 0 &&
+		dynamicPolicy&engine.Policy_SkipUncommitedS3 == 0 {
 		rowsOffset, err = ls.applyWorkspaceFlushedS3Deletes(bid, rowsOffset, nil)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 {
+	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 &&
+		dynamicPolicy&engine.Policy_SkipUncommitedInMemory == 0 {
 		rowsOffset = ls.applyWorkspaceRawRowIdDeletes(bid, rowsOffset, nil)
 	}
-	if ls.tombstonePolicy&engine.Policy_SkipCommittedInMemory == 0 {
+	if ls.tombstonePolicy&engine.Policy_SkipCommittedInMemory == 0 &&
+		dynamicPolicy&engine.Policy_SkipCommittedInMemory == 0 {
 		rowsOffset = ls.applyPStateInMemDeletes(bid, rowsOffset, nil)
 	}
-	if ls.tombstonePolicy&engine.Policy_SkipCommittedS3 == 0 {
+	if ls.tombstonePolicy&engine.Policy_SkipCommittedS3 == 0 &&
+		dynamicPolicy&engine.Policy_SkipCommittedS3 == 0 {
 		rowsOffset, err = ls.applyPStateTombstoneObjects(bid, rowsOffset, nil)
-		//rowsOffset, err = ls.applyPStatePersistedDeltaLocation(bid, rowsOffset, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1103,9 +1101,9 @@ func (ls *LocalDataSource) applyPStateInMemDeletes(
 	deletedRows *nulls.Nulls,
 ) (leftRows []int64) {
 
-	if ls.rc.SkipPStateDeletes {
-		return offsets
-	}
+	//if ls.rc.SkipPStateDeletes {
+	//	return offsets
+	//}
 
 	var delIter logtailreplay.RowsIter
 
@@ -1132,41 +1130,15 @@ func (ls *LocalDataSource) applyPStateInMemDeletes(
 	return leftRows
 }
 
-func (ls *LocalDataSource) applyPStatePersistedDeltaLocation(
-	bid objectio.Blockid,
-	offsets []int64,
-	deletedRows *nulls.Nulls,
-) (leftRows []int64, err error) {
-
-	if ls.rc.SkipPStateDeletes {
-		return offsets, nil
-	}
-
-	deltaLoc, commitTS, ok := ls.pState.GetBockDeltaLoc(bid)
-	if !ok {
-		return offsets, nil
-	}
-
-	return applyDeletesWithinDeltaLocations(
-		ls.ctx,
-		ls.fs,
-		bid,
-		ls.snapshotTS,
-		commitTS,
-		offsets,
-		deletedRows,
-		deltaLoc[:])
-}
-
 func (ls *LocalDataSource) applyPStateTombstoneObjects(
 	bid objectio.Blockid,
 	offsets []int64,
 	deletedRows *nulls.Nulls,
 ) ([]int64, error) {
 
-	if ls.rc.SkipPStateDeletes {
-		return offsets, nil
-	}
+	//if ls.rc.SkipPStateDeletes {
+	//	return offsets, nil
+	//}
 
 	if ls.pState.ApproxTombstoneObjectsNum() == 0 {
 		return offsets, nil
@@ -1395,6 +1367,10 @@ func (ls *LocalDataSource) batchApplyTombstoneObjects(
 	//if maxTombstoneTS.Less(&minTS) {
 	//	return nil, nil
 	//}
+
+	if ls.pState.ApproxTombstoneObjectsNum() == 0 {
+		return nil, nil
+	}
 
 	iter, err := ls.pState.NewObjectsIter(ls.snapshotTS, true, true)
 	if err != nil {
