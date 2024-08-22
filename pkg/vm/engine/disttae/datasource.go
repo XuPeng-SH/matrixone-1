@@ -850,6 +850,10 @@ func (ls *LocalDataSource) ApplyTombstones(
 	dynamicPolicy engine.TombstoneApplyPolicy,
 ) ([]int64, error) {
 
+	if len(rowsOffset) == 0 {
+		return nil, nil
+	}
+
 	slices.SortFunc(rowsOffset, func(a, b int64) int {
 		return int(a - b)
 	})
@@ -860,6 +864,9 @@ func (ls *LocalDataSource) ApplyTombstones(
 		dynamicPolicy&engine.Policy_SkipUncommitedInMemory == 0 {
 		rowsOffset = ls.applyWorkspaceEntryDeletes(bid, rowsOffset, nil)
 	}
+	if len(rowsOffset) == 0 {
+		return nil, nil
+	}
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedS3 == 0 &&
 		dynamicPolicy&engine.Policy_SkipUncommitedS3 == 0 {
 		rowsOffset, err = ls.applyWorkspaceFlushedS3Deletes(bid, rowsOffset, nil)
@@ -867,14 +874,23 @@ func (ls *LocalDataSource) ApplyTombstones(
 			return nil, err
 		}
 	}
+	if len(rowsOffset) == 0 {
+		return nil, nil
+	}
 
 	if ls.tombstonePolicy&engine.Policy_SkipUncommitedInMemory == 0 &&
 		dynamicPolicy&engine.Policy_SkipUncommitedInMemory == 0 {
 		rowsOffset = ls.applyWorkspaceRawRowIdDeletes(bid, rowsOffset, nil)
 	}
+	if len(rowsOffset) == 0 {
+		return nil, nil
+	}
 	if ls.tombstonePolicy&engine.Policy_SkipCommittedInMemory == 0 &&
 		dynamicPolicy&engine.Policy_SkipCommittedInMemory == 0 {
 		rowsOffset = ls.applyPStateInMemDeletes(bid, rowsOffset, nil)
+	}
+	if len(rowsOffset) == 0 {
+		return nil, nil
 	}
 	if ls.tombstonePolicy&engine.Policy_SkipCommittedS3 == 0 &&
 		dynamicPolicy&engine.Policy_SkipCommittedS3 == 0 {
