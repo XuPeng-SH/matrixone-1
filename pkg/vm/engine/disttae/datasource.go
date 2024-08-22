@@ -1304,11 +1304,6 @@ func GetTombstonesByBlockId(
 ) (err error) {
 
 	var (
-		exist    bool
-		bf       objectio.BloomFilter
-		mask     *nulls.Nulls
-		location objectio.Location
-
 		totalBlk     int
 		zmBreak      int
 		blBreak      int
@@ -1326,34 +1321,45 @@ func GetTombstonesByBlockId(
 			}
 		}
 
-		if bf, err = objectio.FastLoadBF(
-			ctx, obj.Location(), false, fs); err != nil {
+		var objMeta objectio.ObjectMeta
+
+		location := obj.Location()
+
+		if objMeta, err = objectio.FastLoadObjectMeta(
+			ctx, &location, false, fs,
+		); err != nil {
 			return false, err
 		}
+		dataMeta := objMeta.MustDataMeta()
 
-		// bfIndex = index.NewEmptyBloomFilterWithType(index.HBF)
-		var bfIndex index.HybridBloomFilter
-		totalBlk += int(obj.BlkCnt())
-		for idx := 0; idx < int(obj.BlkCnt()); idx++ {
-			buf := bf.GetBloomFilter(uint32(idx))
-			if err = bfIndex.Unmarshal(buf); err != nil {
-				// if err = index.DecodeBloomFilter(bfIndex, buf); err != nil {
-				return false, err
-			}
+		blkCnt := int(dataMeta.BlockCount())
+		totalBlk += blkCnt
 
-			if exist, err = bfIndex.PrefixMayContainsKey(
-				bid[:], index.PrefixFnID_Block, 2); err != nil {
-				return false, err
-			} else if !exist {
-				blBreak++
+		startIdx := sort.Search(blkCnt, func(i int) bool {
+			return dataMeta.GetBlockMeta(uint32(i)).MustGetColumn(0).ZoneMap().AnyGEByValue(bid[:])
+		})
+
+		for pos := startIdx; pos < blkCnt; pos++ {
+			blkMeta := dataMeta.GetBlockMeta(uint32(pos))
+			columnZonemap := blkMeta.MustGetColumn(0).ZoneMap()
+			// block id is the prefix of the rowid and zonemap is min-max of rowid
+			// !PrefixEq means there is no rowid of this block in this zonemap, so skip
+			if !columnZonemap.PrefixEq(bid[:]) {
+				if columnZonemap.PrefixGT(bid[:]) {
+					// all zone maps are sorted by the rowid
+					// if the block id is less than the prefix of the min rowid, skip the rest blocks
+					break
+				}
 				continue
 			}
-
 			loaded++
-			location = catalog2.BuildLocation(obj.ObjectStats, uint16(idx), options.DefaultBlockMaxRows)
+			tombstoneLoc := catalog2.BuildLocation(obj.ObjectStats, uint16(pos), options.DefaultBlockMaxRows)
+
+			var mask *nulls.Nulls
 
 			if mask, err = loadBlockDeletesByLocation(
-				ctx, fs, bid, location, snapshot); err != nil {
+				ctx, fs, bid, tombstoneLoc, snapshot,
+			); err != nil {
 				return false, err
 			}
 
