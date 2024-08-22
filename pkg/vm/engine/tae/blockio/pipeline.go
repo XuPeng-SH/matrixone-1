@@ -32,6 +32,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/logstore/sm"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks"
 	w "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/tasks/worker"
+	"go.uber.org/zap"
 )
 
 var (
@@ -503,7 +504,12 @@ func (p *IoPipeline) onWait(jobs ...any) {
 
 func (p *IoPipeline) crontask(ctx context.Context) {
 	hb := w.NewHeartBeaterWithFunc(time.Second*10, func() {
-		logutil.Info(p.stats.selectivityStats.ExportString())
+		logutil.Info(
+			"[POOL-STATS-BITMAP]",
+			zap.Int("capacity", objectio.BitmapPool.Capacity()),
+			zap.Int("in-use", objectio.BitmapPool.InUse()),
+		)
+		// logutil.Info(p.stats.selectivityStats.ExportString())
 		// logutil.Info(p.sensors.prefetchDepth.String())
 		// wdrops := p.stats.prefetchDropStats.SwapW(0)
 		// if wdrops > 0 {

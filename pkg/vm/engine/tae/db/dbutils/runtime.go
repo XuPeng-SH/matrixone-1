@@ -124,8 +124,6 @@ func (r *Runtime) PrintVectorPoolUsage() {
 	w.WriteString(r.VectorPool.Transient.String())
 	w.WriteByte('\n')
 	w.WriteString(r.VectorPool.Small.String())
-	w.WriteByte('\n')
-	w.WriteString(fmt.Sprintf("BitmapPool[%d/%d]", objectio.BitmapPool.InUse(), objectio.BitmapPool.Capacity()))
 	logutil.Info(w.String())
 }
 
