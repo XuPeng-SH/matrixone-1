@@ -95,6 +95,20 @@ func (p *Pool[T]) Put(idx int, ptr *T) {
 	}
 }
 
+func (p *Pool[T]) Capacity() int {
+	return int(p.capacity)
+}
+
+func (p *Pool[T]) InUse() int {
+	var count int
+	for i := uint32(0); i < p.capacity; i++ {
+		if p.pool[i].Taken.Load() == 1 {
+			count++
+		}
+	}
+	return count
+}
+
 var bytesPoolDefaultBlockSize = NewPool(
 	1024,
 	func() []byte {
