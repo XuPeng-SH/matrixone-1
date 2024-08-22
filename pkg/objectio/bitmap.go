@@ -18,6 +18,8 @@ var BitmapPool = fileservice.NewPool(
 	nil,
 )
 
+var NullReusableFixedSizeBitmap ReusableFixedSizeBitmap
+
 type ReusableFixedSizeBitmap struct {
 	bm  *bitmap.FixedSizeBitmap
 	put func()

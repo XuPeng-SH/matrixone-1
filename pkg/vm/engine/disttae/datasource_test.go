@@ -20,7 +20,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae/logtailreplay"
@@ -110,14 +109,15 @@ func TestTombstoneData1(t *testing.T) {
 	left := tombstones1.ApplyInMemTombstones(
 		*target,
 		rowsOffset,
-		nil,
+		objectio.NullReusableFixedSizeBitmap,
 	)
 	require.Equal(t, left, rowsOffset)
 
 	// case 2: target is blk1_3 and deleted rows is [5]
 	// expect: left is [], deleted rows is [5]. no rows are deleted
-	deleted := nulls.NewWithSize(0)
-	deleted.Add(5)
+	deleted := objectio.GetReusableFixedSizeBitmap()
+	defer deleted.Release()
+	deleted.Bitmap().Add(5)
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		nil,
@@ -134,15 +134,15 @@ func TestTombstoneData1(t *testing.T) {
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		rowsOffset,
-		nil,
+		objectio.NullReusableFixedSizeBitmap,
 	)
 	require.Equal(t, []int64{4}, left)
 
 	// case 4: target is blk1_1 and deleted rows is [4]
 	// expect: left is [], deleted rows is [0,1,2,4].
 	target = types.NewBlockidWithObjectID(obj1, 1)
-	deleted = nulls.NewWithSize(0)
-	deleted.Add(4)
+	deleted.Reset()
+	deleted.Bitmap().Add(4)
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		nil,
