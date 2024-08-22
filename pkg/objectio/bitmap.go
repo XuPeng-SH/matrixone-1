@@ -60,6 +60,19 @@ func (r *ReusableFixedSizeBitmap) IsEmpty() bool {
 	return r.bm == nil || r.bm.IsEmpty()
 }
 
+func (r *ReusableFixedSizeBitmap) Reset() int {
+	if r.bm != nil {
+		r.bm.Reset()
+	}
+}
+
+func (r *ReusableFixedSizeBitmap) Count() int {
+	if r.bm == nil {
+		return 0
+	}
+	return r.bm.Count()
+}
+
 func (r *ReusableFixedSizeBitmap) Contains(i uint64) bool {
 	if r.bm == nil {
 		return false
