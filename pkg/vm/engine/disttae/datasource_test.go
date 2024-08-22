@@ -109,7 +109,7 @@ func TestTombstoneData1(t *testing.T) {
 	left := tombstones1.ApplyInMemTombstones(
 		*target,
 		rowsOffset,
-		objectio.NullReusableBitmap,
+		nil,
 	)
 	require.Equal(t, left, rowsOffset)
 
@@ -121,7 +121,7 @@ func TestTombstoneData1(t *testing.T) {
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		nil,
-		deleted,
+		&deleted,
 	)
 	require.Equal(t, 0, len(left))
 	require.True(t, deleted.Contains(5))
@@ -134,7 +134,7 @@ func TestTombstoneData1(t *testing.T) {
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		rowsOffset,
-		objectio.NullReusableBitmap,
+		nil,
 	)
 	require.Equal(t, []int64{4}, left)
 
@@ -146,7 +146,7 @@ func TestTombstoneData1(t *testing.T) {
 	left = tombstones1.ApplyInMemTombstones(
 		*target,
 		nil,
-		deleted,
+		&deleted,
 	)
 	require.Equal(t, 0, len(left))
 	require.True(t, deleted.Contains(0))
