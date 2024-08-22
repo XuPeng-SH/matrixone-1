@@ -62,6 +62,7 @@ type ISimpleBitmap interface {
 	ToI64Array() []int64
 	OrSimpleBitmap(ISimpleBitmap)
 	IsFixedSize() bool
+	Reset()
 }
 
 type IBitmapData interface {

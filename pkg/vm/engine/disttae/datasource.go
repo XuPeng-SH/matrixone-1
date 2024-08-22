@@ -212,17 +212,15 @@ func (rs *RemoteDataSource) applyPersistedTombstones(
 			return nil, err
 		}
 
-		bm := deletes.Bitmap()
-
 		if rowsOffset != nil {
 			for _, offset := range rowsOffset {
-				if bm.Contains(uint64(offset)) {
+				if deletes.Contains(uint64(offset)) {
 					continue
 				}
 				left = append(left, offset)
 			}
 		} else if deleted.IsValid() {
-			deleted.Bitmap().Or(bm)
+			deleted.Or(deletes)
 		}
 		deletes.Release()
 
@@ -899,7 +897,7 @@ func fastApplyDeletedRows(
 			leftRows = append(leftRows[:x], leftRows[x+1:]...)
 		}
 	} else if deletedRows.IsValid() {
-		deletedRows.Bitmap().Add(uint64(o))
+		deletedRows.Add(uint64(o))
 	}
 
 	return leftRows
@@ -974,17 +972,15 @@ func applyDeletesWithinDeltaLocations(
 			ctx, fs, bid, loc[:], snapshotTS, blkCommitTS); err != nil {
 			return nil, err
 		}
-		bm := loopBM.Bitmap()
-
 		if offsets != nil {
 			for _, offset := range offsets {
-				if bm.Contains(uint64(offset)) {
+				if deletedRows.Contains(uint64(offset)) {
 					continue
 				}
 				leftRows = append(leftRows, offset)
 			}
 		} else if deletedRows.IsValid() {
-			deletedRows.Bitmap().Or(bm)
+			deletedRows.Or(loopBM)
 		}
 		loopBM.Release()
 	}

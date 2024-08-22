@@ -85,9 +85,8 @@ func ReadDataByFilter(
 
 	sels = searchFunc(bat.Vecs)
 	if !deleteMask.IsEmpty() {
-		bm := deleteMask.Bitmap()
 		sels = removeIf(sels, func(i int64) bool {
-			return bm.Contains(uint64(i))
+			return deleteMask.Contains(uint64(i))
 		})
 	}
 	sels, err = ds.ApplyTombstones(ctx, info.BlockID, sels)
@@ -382,7 +381,7 @@ func BlockDataReadInner(
 	// transform delete mask to deleted rows
 	// TODO: avoid this transformation
 	if !deleteMask.IsEmpty() {
-		deletedRows = deleteMask.Bitmap().ToI64Array()
+		deletedRows = deleteMask.ToI64Array()
 		// logutil.Debugf("deleted/length: %d/%d=%f",
 		// 	len(deletedRows),
 		// 	loaded.Vecs[0].Length(),
@@ -535,18 +534,17 @@ func readBlockData(
 		}
 
 		deletes = objectio.GetReusableBitmap()
-		bm := deletes.Bitmap()
 		t0 := time.Now()
 		aborts := vector.MustFixedCol[bool](loaded.Vecs[len(loaded.Vecs)-1])
 		commits := vector.MustFixedCol[types.TS](loaded.Vecs[len(loaded.Vecs)-2])
 		for i := 0; i < len(commits); i++ {
 			if aborts[i] || commits[i].Greater(&ts) {
-				bm.Add(uint64(i))
+				deletes.Add(uint64(i))
 			}
 		}
 		logutil.Debugf(
 			"blockread %s scan filter cost %v: base %s filter out %v\n ",
-			info.BlockID.String(), time.Since(t0), ts.ToString(), deletes.Bitmap().Count())
+			info.BlockID.String(), time.Since(t0), ts.ToString(), deletes.Count())
 		return
 	}
 
@@ -614,15 +612,13 @@ func EvalDeleteRowsByTimestamp(
 
 	start, end := FindIntervalForBlock(rowids, blockid)
 
-	bm := rows.Bitmap()
-
 	for i := start; i < end; i++ {
 		abort := vector.GetFixedAt[bool](aborts, i)
 		if abort || tss[i].Greater(&ts) {
 			continue
 		}
 		row := rowids[i].GetRowOffset()
-		bm.Add(uint64(row))
+		rows.Add(uint64(row))
 	}
 	return
 }
@@ -637,10 +633,9 @@ func EvalDeleteRowsByTimestampForDeletesPersistedByCN(
 	rows = objectio.GetReusableBitmap()
 	rowids := vector.MustFixedCol[types.Rowid](deletes.Vecs[0])
 
-	bm := rows.Bitmap()
 	for _, rowid := range rowids {
 		row := rowid.GetRowOffset()
-		bm.Add(uint64(row))
+		rows.Add(uint64(row))
 	}
 	return
 }

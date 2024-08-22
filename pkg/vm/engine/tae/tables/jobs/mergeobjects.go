@@ -221,7 +221,7 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 	var deletes objectio.ReusableBitmap
 	if view.Deletes != nil && !view.Deletes.IsEmpty() {
 		deletes = objectio.GetReusableBitmapNoReuse()
-		deletes.OrBitmap(view.Deletes.GetBitmap())
+		deletes.OrSimpleBitmap(view.Deletes.GetBitmap())
 	}
 	return bat, deletes, releaseF, nil
 }
