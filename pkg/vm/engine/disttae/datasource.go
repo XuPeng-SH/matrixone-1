@@ -1306,7 +1306,6 @@ func GetTombstonesByBlockId(
 	var (
 		exist    bool
 		bf       objectio.BloomFilter
-		bfIndex  index.StaticFilter
 		mask     *nulls.Nulls
 		location objectio.Location
 
@@ -1332,11 +1331,13 @@ func GetTombstonesByBlockId(
 			return false, err
 		}
 
+		// bfIndex = index.NewEmptyBloomFilterWithType(index.HBF)
+		var bfIndex index.HybridBloomFilter
 		totalBlk += int(obj.BlkCnt())
 		for idx := 0; idx < int(obj.BlkCnt()); idx++ {
 			buf := bf.GetBloomFilter(uint32(idx))
-			bfIndex = index.NewEmptyBloomFilterWithType(index.HBF)
-			if err = index.DecodeBloomFilter(bfIndex, buf); err != nil {
+			if err = bfIndex.Unmarshal(buf); err != nil {
+				// if err = index.DecodeBloomFilter(bfIndex, buf); err != nil {
 				return false, err
 			}
 
