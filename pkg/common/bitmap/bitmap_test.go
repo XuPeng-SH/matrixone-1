@@ -192,7 +192,7 @@ func TestFixedSizeBitmap(t *testing.T) {
 	require.Equal(t, len(expects), bm.Count())
 	actualUints := bm.ToArray()
 	require.Equal(t, expects, actualUints)
-	actualInts := bm.ToI64Arrary()
+	actualInts := bm.ToI64Array()
 	for i, v := range actualInts {
 		require.Equal(t, int64(expects[i]), v)
 	}

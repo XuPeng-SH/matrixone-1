@@ -96,6 +96,17 @@ func (bm *FixedSizeBitmap) Iterator() Iterator {
 	return &it
 }
 
+func (bm *FixedSizeBitmap) OrSimpleBitmap(o ISimpleBitmap) {
+	switch o := o.(type) {
+	case *Bitmap:
+		bm.OrBitmap(o)
+	case *FixedSizeBitmap:
+		bm.Or(o)
+	default:
+		logutil.Fatalf("unsupported type %T", o)
+	}
+}
+
 func (bm *FixedSizeBitmap) OrBitmap(o *Bitmap) {
 	if o.IsEmpty() {
 		return
@@ -112,7 +123,7 @@ func (bm *FixedSizeBitmap) OrBitmap(o *Bitmap) {
 		}
 	}
 	if empty {
-		bm.emptyFlag = FixedSizeBitmap_Empty
+		bm.emptyFlag = FixedSizeBitmap_Unknown
 	} else {
 		bm.emptyFlag = FixedSizeBitmap_NotEmpty
 	}
@@ -145,8 +156,12 @@ func (bm *FixedSizeBitmap) ToArray() []uint64 {
 	return ToArrary[uint64](bm)
 }
 
-func (bm *FixedSizeBitmap) ToI64Arrary() []int64 {
+func (bm *FixedSizeBitmap) ToI64Array() []int64 {
 	return ToArrary[int64](bm)
+}
+
+func (bm *FixedSizeBitmap) IsFixedSize() bool {
+	return true
 }
 
 func ToArrary[T int64 | uint64](bm *FixedSizeBitmap) (rows []T) {

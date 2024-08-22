@@ -292,13 +292,20 @@ func (n *Bitmap) IsSame(m *Bitmap) bool {
 	return true
 }
 
-func (n *Bitmap) Or(m *Bitmap) {
-	n.TryExpand(m)
-	size := (int(m.len) + 63) / 64
+func (n *Bitmap) OrSimpleBitmap(m ISimpleBitmap) {
+	if m.IsEmpty() {
+		return
+	}
+	n.TryExpandWithSize(int(m.Len()))
+	size := (int(m.Len()) + 63) / 64
 	for i := 0; i < size; i++ {
-		n.data[i] |= m.data[i]
+		n.data[i] |= m.Word(uint64(i))
 	}
 	n.emptyFlag.CompareAndSwap(kEmptyFlagEmpty, kEmptyFlagUnknown)
+}
+
+func (n *Bitmap) Or(m *Bitmap) {
+	n.OrSimpleBitmap(m)
 }
 
 func (n *Bitmap) And(m *Bitmap) {
@@ -394,7 +401,7 @@ func (n *Bitmap) ToArray() []uint64 {
 	return rows
 }
 
-func (n *Bitmap) ToI64Arrary() []int64 {
+func (n *Bitmap) ToI64Array() []int64 {
 	var rows []int64
 	if n.EmptyByFlag() {
 		return rows
@@ -450,6 +457,10 @@ func (n *Bitmap) UnmarshalNoCopy(data []byte) {
 
 func (n *Bitmap) String() string {
 	return fmt.Sprintf("%v", n.ToArray())
+}
+
+func (n *Bitmap) IsFixedSize() bool {
+	return false
 }
 
 var _ encoding.BinaryMarshaler = new(Bitmap)

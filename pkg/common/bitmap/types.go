@@ -52,6 +52,18 @@ const (
 	FixedSizeBitmapTypeSize  = unsafe.Sizeof(FixedSizeBitmap{})
 )
 
+type ISimpleBitmap interface {
+	IBitmapData
+	IsEmpty() bool
+	Add(uint64)
+	Contains(uint64) bool
+	Count() int
+	ToArray() []uint64
+	ToI64Array() []int64
+	OrSimpleBitmap(ISimpleBitmap)
+	IsFixedSize() bool
+}
+
 type IBitmapData interface {
 	Word(i uint64) uint64
 	Len() int64
