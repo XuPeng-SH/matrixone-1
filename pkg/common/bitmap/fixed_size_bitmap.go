@@ -103,7 +103,7 @@ func (bm *FixedSizeBitmap) OrBitmap(o *Bitmap) {
 	if o.Len() > FixedSizeBitmapBits {
 		logutil.Fatalf("bitmap length %d is out of range", o.Len())
 	}
-	wordsCnt := int(o.Len()) / 64
+	wordsCnt := len(o.data)
 	empty := true
 	for i := 0; i < wordsCnt; i++ {
 		bm.data[i] |= o.data[i]
