@@ -142,12 +142,12 @@ func BlockDataReadNoCopy(
 	if err != nil {
 		return nil, objectio.NullReusableFixedSizeBitmap, nil, err
 	}
-	defer tombstones.Release()
 
 	if !deleteMask.IsValid() {
 		deleteMask = tombstones
 	} else {
 		deleteMask.Or(tombstones)
+		tombstones.Release()
 	}
 	// build rowid column if needed
 	if rowidPos >= 0 {
@@ -367,14 +367,14 @@ func BlockDataReadInner(
 	if err != nil {
 		return
 	}
-	// release tombstones to bitmap pool
-	defer tombstones.Release()
 
 	// merge deletes from tombstones
 	if !deleteMask.IsValid() {
 		deleteMask = tombstones
 	} else {
 		deleteMask.Or(tombstones)
+		// release tombstones to bitmap pool
+		tombstones.Release()
 	}
 
 	// Note: it always goes here if no filter or the block is not sorted
