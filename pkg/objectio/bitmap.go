@@ -60,7 +60,7 @@ func (r *ReusableFixedSizeBitmap) IsEmpty() bool {
 	return r.bm == nil || r.bm.IsEmpty()
 }
 
-func (r *ReusableFixedSizeBitmap) Reset() int {
+func (r *ReusableFixedSizeBitmap) Reset() {
 	if r.bm != nil {
 		r.bm.Reset()
 	}
