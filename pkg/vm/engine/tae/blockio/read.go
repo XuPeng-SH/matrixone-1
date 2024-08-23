@@ -619,12 +619,21 @@ func EvalDeleteRowsByTimestamp(
 
 	start, end := FindIntervalForBlock(rowids, blockid)
 
+	// TODO: we can always call SafeAdd later
+	safe := false
 	for i := end - 1; i >= start; i-- {
+		// TODO:
+		// We can check the ts zone map first to avoid the following comparison
 		if tss[i].Greater(&ts) {
 			continue
 		}
 		row := rowids[i].GetRowOffset()
-		rows.Add(uint64(row))
+		if !safe {
+			rows.Add(uint64(row))
+			safe = true
+		} else {
+			rows.SafeAdd(uint64(row))
+		}
 	}
 
 	return

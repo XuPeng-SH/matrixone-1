@@ -33,6 +33,11 @@ func (bm *FixedSizeBitmap) Reset() {
 	bm.emptyFlag = kEmptyFlagEmpty
 }
 
+func (bm *FixedSizeBitmap) SafeAdd(row uint64) {
+	bm.data[row>>6] |= 1 << (row & 63)
+	bm.emptyFlag = kEmptyFlagNotEmpty
+}
+
 func (bm *FixedSizeBitmap) Add(row uint64) {
 	if row >= FixedSizeBitmapBits {
 		logutil.Fatalf("row %d is out of range", row)

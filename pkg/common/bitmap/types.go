@@ -41,6 +41,7 @@ type ISimpleBitmap interface {
 	IBitmapData
 	IsEmpty() bool
 	Add(uint64)
+	SafeAdd(uint64)
 	Contains(uint64) bool
 	Count() int
 	ToArray() []uint64

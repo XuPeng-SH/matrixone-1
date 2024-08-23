@@ -209,6 +209,11 @@ func (n *Bitmap) IsEmpty() bool {
 	return true
 }
 
+func (n *Bitmap) SafeAdd(row uint64) {
+	n.data[row>>6] |= 1 << (row & 0x3F)
+	n.emptyFlag.Store(kEmptyFlagNotEmpty)
+}
+
 // We always assume that bitmap has been extended to at least row.
 func (n *Bitmap) Add(row uint64) {
 	n.data[row>>6] |= 1 << (row & 0x3F)

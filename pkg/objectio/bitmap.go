@@ -68,6 +68,10 @@ func (r *ReusableBitmap) Or(o ReusableBitmap) {
 	r.bm.OrSimpleBitmap(o.bm)
 }
 
+func (r *ReusableBitmap) SafeAdd(i uint64) {
+	r.bm.SafeAdd(i)
+}
+
 func (r *ReusableBitmap) Add(i uint64) {
 	if r == nil || r.bm == nil {
 		logutil.Fatal("invalid bitmap")
