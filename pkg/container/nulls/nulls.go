@@ -329,9 +329,13 @@ func (nsp *Nulls) ReadNoCopy(data []byte) error {
 	return nil
 }
 
+func (nsp *Nulls) Merge(m *Nulls) {
+	nsp.Or(m)
+}
+
 // Or the m Nulls into nsp.
 func (nsp *Nulls) Or(m *Nulls) {
-	if !m.np.EmptyByFlag() {
+	if m != nil && !m.np.EmptyByFlag() {
 		nsp.np.Or(&m.np)
 	}
 }
@@ -375,17 +379,6 @@ func (nsp *Nulls) Foreach(fn func(uint64) bool) {
 		if !fn(row) {
 			break
 		}
-	}
-}
-
-func (nsp *Nulls) Merge(o *Nulls) {
-	if o.Count() == 0 {
-		return
-	}
-	itr := o.np.Iterator()
-	for itr.HasNext() {
-		r := itr.Next()
-		nsp.Add(r)
 	}
 }
 
