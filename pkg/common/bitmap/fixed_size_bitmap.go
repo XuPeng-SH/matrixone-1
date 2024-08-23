@@ -123,9 +123,9 @@ func (bm *FixedSizeBitmap) OrBitmap(o *Bitmap) {
 		}
 	}
 	if empty {
-		bm.emptyFlag = FixedSizeBitmap_Unknown
+		bm.emptyFlag = kEmptyFlagUnknown
 	} else {
-		bm.emptyFlag = FixedSizeBitmap_NotEmpty
+		bm.emptyFlag = kEmptyFlagNotEmpty
 	}
 }
 
@@ -138,9 +138,9 @@ func (bm *FixedSizeBitmap) Or(o *FixedSizeBitmap) {
 		}
 	}
 	if empty {
-		bm.emptyFlag = FixedSizeBitmap_Empty
+		bm.emptyFlag = kEmptyFlagEmpty
 	} else {
-		bm.emptyFlag = FixedSizeBitmap_NotEmpty
+		bm.emptyFlag = kEmptyFlagNotEmpty
 	}
 }
 

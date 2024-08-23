@@ -32,24 +32,9 @@ const (
 )
 
 const (
-	// Why define FixedSizeBitmap_Empty|FixedSizeBitmap_NotEmpty|FixedSizeBitmap_Unknown?
-	// when Reset the FixedSizeBitmap, it is expected the whole buffer is reset to all zero,
-	// but the kEmptyFlagEmpty defined by bitmap.Bitmap is -1, which is not zero.
-	// We cannot change the kEmptyFlagEmpty to 0, because it is persisted in the storage.
-
-	// For example:
-	// var buf []byte
-	// put := bufPool.Get(&buf) // get buf from pool and buf is all zero
-	// defer bufPool.Put(put) // put back to pool
-	// bm := types.DecodeFixed[bitmap.FixedSizeBitmap](buf) // bm.IsEmpty() should be true
-	// bm.Reset() // reset all bytes to zero
-
-	FixedSizeBitmap_Empty    = 0
-	FixedSizeBitmap_NotEmpty = -1
-	FixedSizeBitmap_Unknown  = 1
-	FixedSizeBitmapBits      = 8192
-	FixedSizeBitmapBytes     = FixedSizeBitmapBits / 8
-	FixedSizeBitmapTypeSize  = unsafe.Sizeof(FixedSizeBitmap{})
+	FixedSizeBitmapBits     = 8192
+	FixedSizeBitmapBytes    = FixedSizeBitmapBits / 8
+	FixedSizeBitmapTypeSize = unsafe.Sizeof(FixedSizeBitmap{})
 )
 
 type ISimpleBitmap interface {
