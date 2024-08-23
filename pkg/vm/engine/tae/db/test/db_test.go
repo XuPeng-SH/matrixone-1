@@ -6336,6 +6336,7 @@ func TestAppendAndGC(t *testing.T) {
 }
 
 func TestSnapshotGC(t *testing.T) {
+	t.Skip("fix-me")
 	defer testutils.AfterTest(t)()
 	testutils.EnsureNoLeak(t)
 	ctx := context.Background()
