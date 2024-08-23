@@ -26,7 +26,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
@@ -177,7 +176,9 @@ func (t *cnMergeTask) GetSortKeyType() types.Type {
 	return types.Type{}
 }
 
-func (t *cnMergeTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, *nulls.Nulls, func(), error) {
+func (t *cnMergeTask) LoadNextBatch(
+	ctx context.Context, objIdx uint32,
+) (*batch.Batch, objectio.ReusableBitmap, func(), error) {
 	iter := t.blkIters[objIdx]
 	if iter.Next() {
 		blk := iter.Entry()
@@ -188,7 +189,7 @@ func (t *cnMergeTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.
 		blk.CommitTs = obj.CommitTS
 		return t.readblock(ctx, &blk)
 	}
-	return nil, nil, nil, mergesort.ErrNoMoreBlocks
+	return nil, objectio.NullReusableBitmap, nil, mergesort.ErrNoMoreBlocks
 }
 
 func (t *cnMergeTask) GetCommitEntry() *api.MergeCommitEntry {
@@ -256,7 +257,9 @@ func (t *cnMergeTask) PrepareNewWriter() *blockio.BlockWriter {
 }
 
 // readblock reads block data. there is no rowid column, no ablk
-func (t *cnMergeTask) readblock(ctx context.Context, info *objectio.BlockInfo) (bat *batch.Batch, dels *nulls.Nulls, release func(), err error) {
+func (t *cnMergeTask) readblock(
+	ctx context.Context, info *objectio.BlockInfo,
+) (bat *batch.Batch, dels objectio.ReusableBitmap, release func(), err error) {
 	// read data
 	bat, dels, release, err = blockio.BlockDataReadNoCopy(
 		ctx, "", info, t.ds, t.colseqnums, t.coltypes,

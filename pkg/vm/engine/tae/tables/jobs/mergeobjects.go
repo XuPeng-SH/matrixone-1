@@ -191,12 +191,14 @@ func (task *mergeObjectsTask) GetMPool() *mpool.MPool {
 
 func (task *mergeObjectsTask) HostHintName() string { return "DN" }
 
-func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) (*batch.Batch, *nulls.Nulls, func(), error) {
+func (task *mergeObjectsTask) LoadNextBatch(
+	ctx context.Context, objIdx uint32,
+) (*batch.Batch, objectio.ReusableBitmap, func(), error) {
 	if objIdx >= uint32(len(task.mergedObjs)) {
 		panic("invalid objIdx")
 	}
 	if task.nMergedBlk[objIdx] >= task.blkCnt[objIdx] {
-		return nil, nil, nil, mergesort.ErrNoMoreBlocks
+		return nil, objectio.NullReusableBitmap, nil, mergesort.ErrNoMoreBlocks
 	}
 	var err error
 	var view *containers.Batch
@@ -218,7 +220,7 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 		err = obj.HybridScan(ctx, &view, uint16(task.nMergedBlk[objIdx]), task.idxs, common.MergeAllocator)
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, objectio.NullReusableBitmap, nil, err
 	}
 	if task.isTombstone {
 		rowIDs := view.Vecs[0]
@@ -261,7 +263,15 @@ func (task *mergeObjectsTask) LoadNextBatch(ctx context.Context, objIdx uint32) 
 		}
 	}
 	bat.SetRowCount(view.Length())
-	return bat, view.Deletes, releaseF, nil
+
+	// FIXME: w-zr
+	// avoid transfer bitmap. use ReusableBitmap in batch instead
+	var deletes objectio.ReusableBitmap
+	if view.Deletes != nil && !view.Deletes.IsEmpty() {
+		deletes = objectio.GetReusableBitmapNoReuse()
+		deletes.OrSimpleBitmap(view.Deletes.GetBitmap())
+	}
+	return bat, deletes, releaseF, nil
 }
 
 func (task *mergeObjectsTask) GetCommitEntry() *api.MergeCommitEntry {
@@ -357,7 +367,9 @@ func (task *mergeObjectsTask) Execute(ctx context.Context) (err error) {
 		sortkeyPos = schema.GetSingleSortKeyIdx()
 	}
 	phaseDesc = "1-DoMergeAndWrite"
-	if err = mergesort.DoMergeAndWrite(ctx, task.txn.String(), sortkeyPos, task, task.isTombstone); err != nil {
+	if err = mergesort.DoMergeAndWrite(
+		ctx, task.txn.String(), sortkeyPos, task, task.isTombstone,
+	); err != nil {
 		return err
 	}
 

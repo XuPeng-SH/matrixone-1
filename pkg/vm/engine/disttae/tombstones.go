@@ -26,7 +26,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
@@ -264,7 +263,7 @@ func (tomb *tombstoneData) PrefetchTombstones(
 func (tomb *tombstoneData) ApplyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deleted *nulls.Nulls,
+	deleted *objectio.ReusableBitmap,
 ) (left []int64) {
 
 	left = rowsOffset
@@ -289,7 +288,7 @@ func (tomb *tombstoneData) ApplyPersistedTombstones(
 	snapshot types.TS,
 	bid types.Blockid,
 	rowsOffset []int64,
-	deletedMask *nulls.Nulls,
+	deletedMask *objectio.ReusableBitmap,
 ) (left []int64, err error) {
 
 	left = rowsOffset
@@ -309,28 +308,42 @@ func (tomb *tombstoneData) ApplyPersistedTombstones(
 		return nil
 	}
 
-	if deletedMask == nil {
-		deletedMask = &nulls.Nulls{}
-		deletedMask.InitWithSize(8192)
-	}
+	if deletedMask != nil {
+		if err = GetTombstonesByBlockId(
+			ctx,
+			fs,
+			bid,
+			snapshot,
+			deletedMask,
+			scanOp,
+		); err != nil {
+			return nil, err
+		}
 
-	if err = GetTombstonesByBlockId(
-		ctx,
-		fs,
-		bid,
-		snapshot,
-		deletedMask,
-		scanOp); err != nil {
-		return nil, err
-	}
+		if len(rowsOffset) != 0 {
+			left = removeIf(rowsOffset, func(t int64) bool {
+				return deletedMask.Contains(uint64(t))
+			})
+		}
+	} else {
+		mask := objectio.GetReusableBitmap()
+		defer mask.Release()
+		if err = GetTombstonesByBlockId(
+			ctx,
+			fs,
+			bid,
+			snapshot,
+			&mask,
+			scanOp,
+		); err != nil {
+			return nil, err
+		}
 
-	if len(rowsOffset) != 0 {
-		left = removeIf(rowsOffset, func(t int64) bool {
-			if deletedMask.Contains(uint64(t)) {
-				return true
-			}
-			return false
-		})
+		if len(rowsOffset) != 0 {
+			left = removeIf(rowsOffset, func(t int64) bool {
+				return mask.Contains(uint64(t))
+			})
+		}
 	}
 
 	return left, nil
@@ -584,7 +597,7 @@ func (tomb *tombstoneDataWithDeltaLoc) MarshalBinaryWithBuffer(w *bytes.Buffer) 
 func (tomb *tombstoneDataWithDeltaLoc) ApplyInMemTombstones(
 	bid types.Blockid,
 	rowsOffset []int64,
-	deleted *nulls.Nulls,
+	deleted *objectio.ReusableBitmap,
 ) (left []int64) {
 	left = rowsOffset
 
@@ -603,7 +616,7 @@ func (tomb *tombstoneDataWithDeltaLoc) ApplyPersistedTombstones(
 	snapshot types.TS,
 	bid types.Blockid,
 	rowsOffset []int64,
-	deletedMask *nulls.Nulls,
+	deletedMask *objectio.ReusableBitmap,
 ) (left []int64, err error) {
 
 	left = rowsOffset
@@ -616,10 +629,7 @@ func (tomb *tombstoneDataWithDeltaLoc) ApplyPersistedTombstones(
 
 		if len(rowsOffset) != 0 {
 			left = removeIf(rowsOffset, func(t int64) bool {
-				if deletedMask.Contains(uint64(t)) {
-					return true
-				}
-				return false
+				return deletes.Contains(uint64(t))
 			})
 		} else if deletedMask != nil {
 			deletedMask.Or(deletes)

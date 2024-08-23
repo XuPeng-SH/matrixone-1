@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
-	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 
@@ -207,29 +206,21 @@ func (d *DeltaLocDataSource) ApplyTombstones(
 
 func (d *DeltaLocDataSource) GetTombstones(
 	ctx context.Context, bid objectio.Blockid,
-) (deletedRows *nulls.Nulls, err error) {
-	var rows *nulls.Bitmap
-	rows, err = d.getAndApplyTombstones(ctx, bid)
-	if err != nil {
-		return
-	}
-	if rows == nil || rows.IsEmpty() {
-		return
-	}
-	return rows, nil
+) (deletedRows objectio.ReusableBitmap, err error) {
+	return d.getAndApplyTombstones(ctx, bid)
 }
 
 func (d *DeltaLocDataSource) getAndApplyTombstones(
 	ctx context.Context, bid objectio.Blockid,
-) (*nulls.Bitmap, error) {
+) (objectio.ReusableBitmap, error) {
 	deltaLoc, ts := d.ds.GetDeltaLoc(bid)
 	if deltaLoc.IsEmpty() {
-		return nil, nil
+		return objectio.NullReusableBitmap, nil
 	}
 	logutil.Infof("deltaLoc: %v, id is %d", deltaLoc.String(), bid.Sequence())
 	deletes, _, release, err := blockio.ReadBlockDelete(ctx, deltaLoc, d.fs)
 	if err != nil {
-		return nil, err
+		return objectio.NullReusableBitmap, err
 	}
 	defer release()
 	if ts.IsEmpty() {
