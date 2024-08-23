@@ -8,7 +8,7 @@ import (
 )
 
 var BitmapPool = fileservice.NewPool(
-	256,
+	128,
 	func() *bitmap.FixedSizeBitmap {
 		var bm bitmap.FixedSizeBitmap
 		return &bm
