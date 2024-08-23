@@ -1139,7 +1139,7 @@ func (ls *LocalDataSource) applyPStateTombstoneObjects(
 		return ForeachTombstoneObject(ls.snapshotTS, onTombstone, ls.pState)
 	}
 
-	if deletedRows == nil {
+	if deletedRows != nil {
 		if err := GetTombstonesByBlockId(
 			ls.ctx,
 			ls.fs,
