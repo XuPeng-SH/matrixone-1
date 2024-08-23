@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/rand"
 )
 
 const (
@@ -147,5 +148,52 @@ func TestBitmapIterator_Next(t *testing.T) {
 		} else {
 			t.Logf("r now is %d\n", r)
 		}
+	}
+}
+
+func TestFixedSizeBitmap(t *testing.T) {
+	var bm FixedSizeBitmap
+	require.True(t, bm.IsEmpty())
+	require.Equal(t, 0, bm.Count())
+
+	bm.Add(1022)
+	require.False(t, bm.IsEmpty())
+	require.Equal(t, 1, bm.Count())
+
+	bm.Reset()
+	require.True(t, bm.IsEmpty())
+	require.Equal(t, 0, bm.Count())
+
+	bm.Add(0)
+	require.False(t, bm.IsEmpty())
+	require.Equal(t, 1, bm.Count())
+	bm.Remove(0)
+	require.True(t, bm.IsEmpty())
+	require.Equal(t, 0, bm.Count())
+
+	for i := 0; i < FixedSizeBitmapBits; i++ {
+		bm.Add(uint64(i))
+		require.Equal(t, i+1, bm.Count())
+	}
+
+	for i := 0; i < FixedSizeBitmapBits; i++ {
+		bm.Remove(uint64(i))
+		require.Equal(t, FixedSizeBitmapBits-i-1, bm.Count())
+	}
+	require.True(t, bm.IsEmpty())
+
+	var expects []uint64
+	step := rand.Intn(10) + 1
+	for i := 0; i < FixedSizeBitmapBits; i += step {
+		bm.Add(uint64(i))
+		expects = append(expects, uint64(i))
+	}
+
+	require.Equal(t, len(expects), bm.Count())
+	actualUints := bm.ToArray()
+	require.Equal(t, expects, actualUints)
+	actualInts := bm.ToI64Array()
+	for i, v := range actualInts {
+		require.Equal(t, int64(expects[i]), v)
 	}
 }

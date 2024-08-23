@@ -44,6 +44,10 @@ func (pb PutBack[T]) Put() {
 	}
 }
 
+func (pb PutBack[T]) Idx() int {
+	return pb.idx
+}
+
 func NewPool[T any](
 	capacity uint32,
 	newFunc func() T,
@@ -93,6 +97,20 @@ func (p *Pool[T]) Put(idx int, ptr *T) {
 			p.finallyFunc(*ptr)
 		}
 	}
+}
+
+func (p *Pool[T]) Capacity() int {
+	return int(p.capacity)
+}
+
+func (p *Pool[T]) InUse() int {
+	var count int
+	for i := uint32(0); i < p.capacity; i++ {
+		if p.pool[i].Taken.Load() == 1 {
+			count++
+		}
+	}
+	return count
 }
 
 var bytesPoolDefaultBlockSize = NewPool(
