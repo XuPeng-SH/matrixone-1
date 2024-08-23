@@ -69,7 +69,7 @@ func (r *ReusableBitmap) Or(o ReusableBitmap) {
 }
 
 func (r *ReusableBitmap) Add(i uint64) {
-	if !r.IsValid() {
+	if r == nil || r.bm == nil {
 		logutil.Fatal("invalid bitmap")
 	}
 	r.tryCowOrExpand(int(i) + 1)
