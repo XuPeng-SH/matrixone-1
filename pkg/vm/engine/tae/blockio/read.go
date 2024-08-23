@@ -598,14 +598,14 @@ func EvalDeleteRowsByTimestamp(
 
 	start, end := FindIntervalForBlock(rowids, blockid)
 
-	for i := start; i < end; i++ {
-		//abort := vector.GetFixedAt[bool](aborts, i)
+	for i := end - 1; i >= start; i-- {
 		if tss[i].Greater(&ts) {
 			continue
 		}
 		row := rowids[i].GetRowOffset()
 		rows.Add(uint64(row))
 	}
+
 	return
 }
 
