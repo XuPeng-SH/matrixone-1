@@ -142,7 +142,7 @@ func BlockDataReadNoCopy(
 	}
 
 	// merge deletes from tombstones
-	deleteMask.Merge(tombstones)
+	deleteMask.Or(tombstones)
 
 	// build rowid column if needed
 	if rowidPos >= 0 {
@@ -356,7 +356,7 @@ func BlockDataReadInner(
 	}
 
 	// merge deletes from tombstones
-	deleteMask.Merge(tombstones)
+	deleteMask.Or(tombstones)
 
 	// Note: it always goes here if no filter or the block is not sorted
 
