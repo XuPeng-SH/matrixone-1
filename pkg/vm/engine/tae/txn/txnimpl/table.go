@@ -248,6 +248,7 @@ func (tbl *txnTable) TransferDeletes(ts types.TS, phase string) (err error) {
 		return
 	}
 	deletes := tbl.tombstoneTable.tableSpace.node.data
+	preCnt := deletes.Length()
 	for i := 0; i < deletes.Length(); i++ {
 		rowID := deletes.GetVectorByName(catalog.AttrRowID).Get(i).(types.Rowid)
 		id.SetObjectID(rowID.BorrowObjectID())
@@ -282,8 +283,23 @@ func (tbl *txnTable) TransferDeletes(ts types.TS, phase string) (err error) {
 			return
 		}
 	}
+	var transferCnt int
+	if transferd != nil {
+		transferCnt = transferd.Count()
+	}
 	deletes.Deletes = transferd
-	deletes.Compact()
+	nowCnt := deletes.Length()
+	err = deletes.Compact()
+	if err != nil {
+		logutil.Errorf(
+			"DEBUG-ME-INFO",
+			zap.String("table", tbl.dataTable.schema.Name),
+			zap.Int("preCnt", preCnt),
+			zap.Int("nowCnt", nowCnt),
+			zap.Int("transferCnt", transferCnt),
+		)
+		logutil.Fatalf("compact error %v", err)
+	}
 	return
 }
 

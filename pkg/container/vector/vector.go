@@ -27,8 +27,10 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/bytejson"
 	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vectorize/moarray"
 	"github.com/matrixorigin/matrixone/pkg/vectorize/shuffle"
+	"go.uber.org/zap"
 )
 
 const (
@@ -752,8 +754,10 @@ func (v *Vector) Dup(mp *mpool.MPool) (*Vector, error) {
 	return w, nil
 }
 
+var DEBUG_ERROR = moerr.NewInternalErrorNoCtx("debug-me error")
+
 // Shrink use to shrink vectors, sels must be guaranteed to be ordered
-func (v *Vector) Shrink(sels []int64, negate bool) {
+func (v *Vector) Shrink(sels []int64, negate bool) (err error) {
 	if v.IsConst() {
 		if negate {
 			v.length -= len(sels)
@@ -761,6 +765,19 @@ func (v *Vector) Shrink(sels []int64, negate bool) {
 			v.length = len(sels)
 		}
 		return
+	}
+
+	if negate {
+		if v.length-len(sels) < 0 {
+			logutil.Error(
+				"DEBUG-ME-ERROR",
+				zap.String("type", v.typ.String()),
+				zap.Int("length", v.length),
+				zap.Int("sels-len", len(sels)),
+				zap.Any("sels", sels),
+			)
+			return DEBUG_ERROR
+		}
 	}
 
 	switch v.typ.Oid {
@@ -819,6 +836,7 @@ func (v *Vector) Shrink(sels []int64, negate bool) {
 	default:
 		panic(fmt.Sprintf("unexpect type %s for function vector.Shrink", v.typ))
 	}
+	return
 }
 
 func (v *Vector) ShrinkByMask(sels bitmap.Mask, negate bool) {

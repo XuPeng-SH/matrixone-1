@@ -48,7 +48,7 @@ func (v *emptyVector) Append(x any, isNull bool) {
 	panic("not implemented") // TODO: Implement
 }
 
-func (v *emptyVector) Compact(_ *roaring.Bitmap) {
+func (v *emptyVector) Compact(_ *roaring.Bitmap) error {
 	panic("not implemented") // TODO: Implement
 }
 
@@ -131,14 +131,17 @@ func (bat *Batch) DeleteCnt() int {
 	return int(bat.Deletes.GetCardinality())
 }
 
-func (bat *Batch) Compact() {
+func (bat *Batch) Compact() (err error) {
 	if !bat.HasDelete() {
 		return
 	}
 	for _, vec := range bat.Vecs {
-		vec.CompactByBitmap(bat.Deletes)
+		if err = vec.CompactByBitmap(bat.Deletes); err != nil {
+			return
+		}
 	}
 	bat.Deletes = nil
+	return
 }
 
 func (bat *Batch) Length() int {

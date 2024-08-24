@@ -443,7 +443,7 @@ func (vec *vectorWrapper) extendWithOffset(src *vector.Vector, srcOff, srcLen in
 	return
 }
 
-func (vec *vectorWrapper) CompactByBitmap(mask *nulls.Bitmap) {
+func (vec *vectorWrapper) CompactByBitmap(mask *nulls.Bitmap) (err error) {
 	if mask.IsEmpty() {
 		return
 	}
@@ -454,11 +454,12 @@ func (vec *vectorWrapper) CompactByBitmap(mask *nulls.Bitmap) {
 		dels = append(dels, int64(i))
 		return true
 	})
-	vec.wrapped.Shrink(dels, true)
+	err = vec.wrapped.Shrink(dels, true)
 	vec.mpool.PutSels(dels)
+	return
 }
 
-func (vec *vectorWrapper) Compact(deletes *roaring.Bitmap) {
+func (vec *vectorWrapper) Compact(deletes *roaring.Bitmap) (err error) {
 	if deletes == nil || deletes.IsEmpty() {
 		return
 	}
@@ -471,8 +472,9 @@ func (vec *vectorWrapper) Compact(deletes *roaring.Bitmap) {
 		dels = append(dels, int64(r))
 	}
 
-	vec.wrapped.Shrink(dels, true)
+	err = vec.wrapped.Shrink(dels, true)
 	vec.mpool.PutSels(dels)
+	return
 }
 
 func (vec *vectorWrapper) GetDownstreamVector() *vector.Vector {
