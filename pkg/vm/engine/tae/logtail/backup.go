@@ -48,7 +48,6 @@ type objData struct {
 	tid        uint64
 	appendable bool
 	dataType   objectio.DataMetaType
-	isChange   bool
 }
 
 type tableOffset struct {
@@ -226,7 +225,6 @@ func addObjectToObjectData(
 	}
 	object := &objData{
 		stats:      stats,
-		isChange:   false,
 		appendable: isABlk,
 		tid:        tid,
 		dataType:   blockType,
@@ -245,7 +243,6 @@ func trimTombstoneData(
 	objectsData *map[string]*objData,
 ) error {
 	for name := range *objectsData {
-		isChange := false
 		if !(*objectsData)[name].appendable {
 			continue
 		}
@@ -272,7 +269,6 @@ func trimTombstoneData(
 			if commitTs.Greater(&ts) {
 				logutil.Debugf("delete row %v, commitTs %v, location %v",
 					v, commitTs.ToString(), (*objectsData)[name].stats.ObjectLocation().String())
-				isChange = true
 			} else {
 				deleteRow = append(deleteRow, int64(v))
 			}
@@ -284,7 +280,6 @@ func trimTombstoneData(
 		(*objectsData)[name].sortKey = sortKey
 		(*objectsData)[name].data = make([]*batch.Batch, 0)
 		(*objectsData)[name].data = append((*objectsData)[name].data, bat)
-		(*objectsData)[name].isChange = isChange
 	}
 	return nil
 }
@@ -591,7 +586,6 @@ func ReWriteCheckpointAndBlockFromKey(
 			oData.sortKey = sortKey
 			oData.data = make([]*batch.Batch, 0, 1)
 			oData.data = append(oData.data, bat)
-			oData.isChange = true
 			if oData.sortKey != math.MaxUint16 {
 				writer.SetPrimaryKey(oData.sortKey)
 			}
