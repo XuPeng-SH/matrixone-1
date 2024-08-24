@@ -26,6 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 )
 
@@ -137,6 +138,9 @@ func (bat *Batch) Compact() (err error) {
 	}
 	for _, vec := range bat.Vecs {
 		if err = vec.CompactByBitmap(bat.Deletes); err != nil {
+			for j := range bat.Attrs {
+				logutil.Errorf("DEBUG-ME-2 %d:%d:%s", j, bat.Vecs[j].Length(), bat.Attrs[j])
+			}
 			return
 		}
 	}

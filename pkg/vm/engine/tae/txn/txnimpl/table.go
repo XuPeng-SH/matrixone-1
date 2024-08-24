@@ -291,7 +291,7 @@ func (tbl *txnTable) TransferDeletes(ts types.TS, phase string) (err error) {
 	nowCnt := deletes.Length()
 	err = deletes.Compact()
 	if err != nil {
-		logutil.Errorf(
+		logutil.Error(
 			"DEBUG-ME-INFO",
 			zap.String("table", tbl.dataTable.schema.Name),
 			zap.Int("preCnt", preCnt),
