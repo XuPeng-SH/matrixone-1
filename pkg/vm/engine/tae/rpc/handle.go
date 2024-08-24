@@ -819,6 +819,7 @@ func (h *Handle) HandleWrite(
 					zap.String("txn", txn.String()),
 					zap.String("pk", common.MoVectorToString(req.Batch.Vecs[1], i)),
 					zap.String("rowid", rowID.String()),
+					zap.Any("pairs", pairs),
 				)
 			}
 		}
