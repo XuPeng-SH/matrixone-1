@@ -374,7 +374,7 @@ func mergeFilters(
 	switch connector {
 	case function.AND:
 		// use left as default
-		finalFilter = left
+		// finalFilter = left
 		switch left.op {
 		case function.IN:
 			switch right.op {
