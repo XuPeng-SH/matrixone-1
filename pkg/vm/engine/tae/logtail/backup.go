@@ -605,6 +605,12 @@ func ReWriteCheckpointAndBlockFromKey(
 	err = insertBatchFun(
 		tombstonesData,
 		func(oData *objData, writer *blockio.BlockWriter) (bool, error) {
+			if oData.data[0].Vecs[0].Length() == 0 {
+				logutil.Info("[Data Empty] ReWrite Checkpoint",
+					zap.String("tombstone", oData.stats.ObjectName().String()),
+					zap.Uint64("tid", oData.tid))
+				return true, nil
+			}
 			writer.SetDataType(objectio.SchemaTombstone)
 			writer.SetPrimaryKeyWithType(
 				uint16(catalog.TombstonePrimaryKeyIdx),
