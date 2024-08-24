@@ -722,10 +722,13 @@ func (h *Handle) HandleWrite(
 			if tb.Schema(false).(*catalog.Schema).HasPK() {
 				idx := tb.Schema(false).(*catalog.Schema).GetSingleSortKeyIdx()
 				for i := 0; i < req.Batch.Vecs[0].Length(); i++ {
+					pkbuf := req.Batch.Vecs[idx].GetBytesAt(i)
+					pairs, _ := types.Unpack(pkbuf)
 					logutil.Info(
 						"op1",
-						zap.String("start-ts", txn.GetStartTS().ToString()),
 						zap.String("pk", common.MoVectorToString(req.Batch.Vecs[idx], i)),
+						zap.String("txn", txn.String()),
+						zap.String("pairs", pairs.String()),
 					)
 				}
 			}
@@ -809,9 +812,11 @@ func (h *Handle) HandleWrite(
 		if tb.Schema(false).(*catalog.Schema).HasPK() {
 			for i := 0; i < rowIDVec.Length(); i++ {
 				rowID := objectio.HackBytes2Rowid(req.Batch.Vecs[0].GetRawBytesAt(i))
+				pkbuf := req.Batch.Vecs[1].GetBytesAt(i)
+				pairs, _ := types.Unpack(pkbuf)
 				logutil.Info(
 					"op2",
-					zap.String("start-ts", txn.GetStartTS().ToString()),
+					zap.String("txn", txn.String()),
 					zap.String("pk", common.MoVectorToString(req.Batch.Vecs[1], i)),
 					zap.String("rowid", rowID.String()),
 				)
