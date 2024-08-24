@@ -141,6 +141,7 @@ func (h *Handle) GetDB() *db.DB {
 }
 
 func (h *Handle) IsInterceptTable(name string) bool {
+	return name == "bmsql_stock"
 	printMatchRegexp := h.getInterceptMatchRegexp()
 	if printMatchRegexp == nil {
 		return false

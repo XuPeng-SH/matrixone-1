@@ -941,6 +941,7 @@ func (tbl *txnTable) DoPrecommitDedupByPK(pks containers.Vector, pksZM index.ZM,
 			}
 			if !rowIDs.IsNull(i) {
 				entry := common.TypeStringValue(*pks.GetType(), pks.Get(i), false)
+				logutil.Infof("DEBUG-DUP-1 %s:%s:%s:%s", entry, colName, tbl.dataTable.schema.Name, tbl.store.txn.String())
 				err = moerr.NewDuplicateEntryNoCtx(entry, colName)
 				return
 			}
