@@ -26,6 +26,7 @@ import (
 
 	"github.com/RoaringBitmap/roaring"
 
+	mocatalog "github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/moprobe"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -941,8 +942,8 @@ func (tbl *txnTable) DoPrecommitDedupByPK(pks containers.Vector, pksZM index.ZM,
 			}
 			if !rowIDs.IsNull(i) {
 				var entry string
-				if colName == catalog.CPrimaryKeyColName {
-					tuple, _ := types.Unpack()
+				if colName == mocatalog.CPrimaryKeyColName {
+					tuple, _ := types.Unpack(pks.Get(i).([]byte))
 					entry = fmt.Sprintf("%v", tuple.SQLStrings())
 					logutil.Info(
 						"DEBUG-DUP-1",
