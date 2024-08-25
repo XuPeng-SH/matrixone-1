@@ -232,6 +232,13 @@ func (entry *mergeObjectsEntry) transferObjectDeletes(
 
 	rowid := vector.MustFixedCol[types.Rowid](bat.GetVectorByName(catalog.AttrRowID).GetDownstreamVector())
 	ts := vector.MustFixedCol[types.TS](bat.GetVectorByName(catalog.AttrCommitTs).GetDownstreamVector())
+	logutil.Info(
+		"DEBUG-TRANSFER",
+		zap.String("task", entry.taskName),
+		zap.Int("cnt", len(rowid)),
+		zap.String("txn", entry.txn.String()),
+		zap.String("form-rowids", common.MoVectorToString(bat.GetVectorByName(catalog.AttrRowID).GetDownstreamVector(), len(rowid))),
+	)
 
 	count := len(rowid)
 	transCnt += count
