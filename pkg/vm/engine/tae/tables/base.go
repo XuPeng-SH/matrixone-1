@@ -490,7 +490,7 @@ func (blk *baseObject) CollectObjectTombstoneInRange(
 	bat **containers.Batch,
 	mp *mpool.MPool,
 	vpool *containers.VectorPool,
-) (err error) {
+) (maxr, minr uint32, err error) {
 	if !blk.meta.Load().IsTombstone {
 		panic("logic err")
 	}

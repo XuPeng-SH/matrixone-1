@@ -16,6 +16,7 @@ package tables
 
 import (
 	"context"
+
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -151,7 +152,7 @@ func (node *persistedNode) CollectObjectTombstoneInRange(
 	bat **containers.Batch,
 	mp *mpool.MPool,
 	vpool *containers.VectorPool,
-) (err error) {
+) (maxr, minr uint32, err error) {
 	if !node.object.meta.Load().IsTombstone {
 		panic("not support")
 	}
@@ -185,7 +186,7 @@ func (node *persistedNode) CollectObjectTombstoneInRange(
 	objLocation := node.object.meta.Load().GetLocation()
 	objDataMeta, err := objectio.FastLoadObjectMeta(ctx, &objLocation, false, node.object.GetFs().Service)
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	colCount := objDataMeta.MustGetMeta(objectio.SchemaData).GetBlockMeta(0).GetColumnCount()
 	persistedByCN := colCount == 2
@@ -197,7 +198,7 @@ func (node *persistedNode) CollectObjectTombstoneInRange(
 		}
 		containes, err := bfIndex.PrefixMayContainsKey(objID[:], index.PrefixFnID_Object, 1)
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		if !containes {
 			continue
@@ -205,13 +206,13 @@ func (node *persistedNode) CollectObjectTombstoneInRange(
 		id.SetBlockOffset(uint16(blkID))
 		location, err := node.object.buildMetalocation(uint16(blkID))
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		vecs, err := LoadPersistedColumnDatas(
 			ctx, readSchema, node.object.rt, id, colIdxes, location, mp,
 		)
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 		var commitTSs []types.TS
 		if !persistedByCN {

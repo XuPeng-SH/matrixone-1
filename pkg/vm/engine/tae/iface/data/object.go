@@ -135,7 +135,7 @@ type Object interface {
 		bat **containers.Batch,
 		mp *mpool.MPool,
 		vpool *containers.VectorPool,
-	) (err error)
+	) (maxRow, minRow uint32, err error)
 	ScanInMemory(
 		ctx context.Context,
 		batches map[uint32]*containers.BatchWithVersion,

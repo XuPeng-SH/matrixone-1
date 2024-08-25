@@ -329,14 +329,15 @@ func (node *memoryNode) CollectObjectTombstoneInRange(
 	bat **containers.Batch,
 	mp *mpool.MPool,
 	vpool *containers.VectorPool,
-) (err error) {
+) (maxR, minR uint32, err error) {
 	node.object.RLock()
 	defer node.object.RUnlock()
 	minRow, maxRow, commitTSVec, _, _ :=
 		node.object.appendMVCC.CollectAppendLocked(start, end, mp)
 	if commitTSVec == nil {
-		return nil
+		return
 	}
+	maxR, minR = maxRow, minRow
 	rowIDs := vector.MustFixedCol[types.Rowid](
 		node.data.GetVectorByName(catalog.AttrRowID).GetDownstreamVector())
 	commitTSs := vector.MustFixedCol[types.TS](commitTSVec.GetDownstreamVector())

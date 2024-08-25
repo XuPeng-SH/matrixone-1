@@ -73,7 +73,7 @@ type NodeT interface {
 		bat **containers.Batch,
 		mp *mpool.MPool,
 		vpool *containers.VectorPool,
-	) (err error)
+	) (maxRow, minRow uint32, err error)
 	FillBlockTombstones(
 		ctx context.Context,
 		txn txnif.TxnReader,

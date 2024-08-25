@@ -16,6 +16,7 @@ package tables
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -94,12 +95,14 @@ func TombstoneRangeScanByObject(
 			}
 			// TODO: Bloomfilter
 		}
-		if extra_info != "" {
-			infos = append(infos, tombstone.Repr())
-		}
-		err = tombstone.GetObjectData().CollectObjectTombstoneInRange(ctx, start, end, &objectID, &bat, mp, vpool)
+		var maxr, minr uint32
+		maxr, minr, err = tombstone.GetObjectData().CollectObjectTombstoneInRange(ctx, start, end, &objectID, &bat, mp, vpool)
 		if err != nil {
 			return nil, err
+		}
+		if extra_info != "" {
+			info := fmt.Sprintf("%s:[%d,%d]", tombstone.Repr(), minr, maxr)
+			infos = append(infos, info)
 		}
 	}
 	if extra_info != "" {
@@ -107,6 +110,8 @@ func TombstoneRangeScanByObject(
 			"DEBUG-SKIP",
 			zap.String("txn", extra_info),
 			zap.Any("list", infos),
+			zap.String("start", start.ToString()),
+			zap.String("end", end.ToString()),
 		)
 	}
 	return
