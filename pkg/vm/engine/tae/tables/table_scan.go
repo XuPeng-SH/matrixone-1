@@ -96,12 +96,20 @@ func TombstoneRangeScanByObject(
 			// TODO: Bloomfilter
 		}
 		var maxr, minr uint32
+		var startCnt int
+		var endCnt int
+		if bat != nil {
+			startCnt = bat.Length()
+		}
 		maxr, minr, err = tombstone.GetObjectData().CollectObjectTombstoneInRange(ctx, start, end, &objectID, &bat, mp, vpool)
 		if err != nil {
 			return nil, err
 		}
+		if bat != nil {
+			endCnt = bat.Length()
+		}
 		if extra_info != "" {
-			info := fmt.Sprintf("%s:[%d,%d]", tombstone.Repr(), minr, maxr)
+			info := fmt.Sprintf("%s:%d:[%d,%d]", endCnt-startCnt, tombstone.Repr(), minr, maxr)
 			infos = append(infos, info)
 		}
 	}
@@ -112,6 +120,7 @@ func TombstoneRangeScanByObject(
 			zap.Any("list", infos),
 			zap.String("start", start.ToString()),
 			zap.String("end", end.ToString()),
+			zap.String("object", objectID.String()),
 		)
 	}
 	return
