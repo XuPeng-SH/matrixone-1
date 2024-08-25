@@ -430,7 +430,7 @@ func (p *PartitionStateInProgress) HandleRowsDelete(
 		for i, rowid := range rowIDVector {
 			buf := batch.Vecs[2].GetBytesAt(i)
 			tuple, _ := types.Unpack(buf)
-			logutil.Infof("DEBUG-DUP-PS: rowid=%s,pk=%v,cpk=%X", rowid.String(), tuple.SQLStrings(nil), buf)
+			logutil.Infof("DEBUG-DUP-PS-DELETE: rowid=%s,pk=%v,cpk=%X", rowid.String(), tuple.SQLStrings(nil), buf)
 		}
 	}
 
@@ -530,6 +530,14 @@ func (p *PartitionStateInProgress) HandleRowsInsert(
 		batch.Vecs[2+primarySeqnum],
 		packer,
 	)
+	doTrace := p.tid == 272521
+	if doTrace {
+		for i, rowid := range rowIDVector {
+			buf := batch.Vecs[2+primarySeqnum].GetBytesAt(i)
+			tuple, _ := types.Unpack(buf)
+			logutil.Infof("DEBUG-DUP-PS-INSERT: rowid=%s,pk=%v,cpk=%X", rowid.String(), tuple.SQLStrings(nil), buf)
+		}
+	}
 
 	var numInserted int64
 	for i, rowID := range rowIDVector {
