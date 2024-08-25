@@ -18,6 +18,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
+	"runtime/trace"
+	"sync/atomic"
+
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -30,9 +34,6 @@ import (
 	txnTrace "github.com/matrixorigin/matrixone/pkg/txn/trace"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/tidwall/btree"
-	"math"
-	"runtime/trace"
-	"sync/atomic"
 )
 
 type PartitionStateInProgress struct {
@@ -422,6 +423,15 @@ func (p *PartitionStateInProgress) HandleRowsDelete(
 	batch, err := batch.ProtoBatchToBatch(input)
 	if err != nil {
 		panic(err)
+	}
+
+	doTrace := p.tid == 272521
+	if doTrace {
+		for i, rowid := range rowIDVector {
+			buf := batch.Vecs[2].GetBytesAt(i)
+			tuple, _ := types.Unpack(buf)
+			logutil.Infof("DEBUG-DUP-PS: rowid=%s,pk=%v,cpk=%X", rowid.String(), tuple.SQLStrings(nil), buf)
+		}
 	}
 
 	var primaryKeys [][]byte
