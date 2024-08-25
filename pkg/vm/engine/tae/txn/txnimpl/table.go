@@ -944,7 +944,7 @@ func (tbl *txnTable) DoPrecommitDedupByPK(pks containers.Vector, pksZM index.ZM,
 				var entry string
 				if colName == mocatalog.CPrimaryKeyColName {
 					tuple, _ := types.Unpack(pks.Get(i).([]byte))
-					entry = fmt.Sprintf("%v", tuple.SQLStrings())
+					entry = fmt.Sprintf("%v", tuple.SQLStrings(nil))
 					logutil.Info(
 						"DEBUG-DUP-1",
 						zap.String("pk-name", colName),

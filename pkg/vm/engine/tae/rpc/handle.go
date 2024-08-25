@@ -730,7 +730,7 @@ func (h *Handle) HandleWrite(
 							zap.String("txn", txn.String()),
 							zap.String("pk", common.TypeStringValue(pkVec.GetType(), pkBuf, false)),
 							zap.String("rowid", rowID.String()),
-							zap.Any("pk-detail", tuple.SQLStrings()),
+							zap.Any("pk-detail", tuple.SQLStrings(nil)),
 						)
 					} else {
 						logutil.Info(
@@ -831,7 +831,7 @@ func (h *Handle) HandleWrite(
 						zap.String("txn", txn.String()),
 						zap.String("pk", common.TypeStringValue(pkVec.GetType(), pkBuf, false)),
 						zap.String("rowid", rowID.String()),
-						zap.Any("pk-detail", tuple.SQLStrings()),
+						zap.Any("pk-detail", tuple.SQLStrings(nil)),
 					)
 				} else {
 					logutil.Info(
