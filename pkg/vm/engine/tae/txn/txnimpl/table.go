@@ -940,8 +940,19 @@ func (tbl *txnTable) DoPrecommitDedupByPK(pks containers.Vector, pksZM index.ZM,
 				colName = tbl.dataTable.schema.GetPrimaryKey().Name
 			}
 			if !rowIDs.IsNull(i) {
-				entry := common.TypeStringValue(*pks.GetType(), pks.Get(i), false)
-				logutil.Infof("DEBUG-DUP-1 %s:%s:%s:%s", entry, colName, tbl.dataTable.schema.Name, tbl.store.txn.String())
+				var entry string
+				if colName == catalog.CPrimaryKeyColName {
+					tuple, _ := types.Unpack()
+					entry = fmt.Sprintf("%v", tuple.SQLStrings())
+					logutil.Info(
+						"DEBUG-DUP-1",
+						zap.String("pk-name", colName),
+						zap.String("pk-comp", common.TypeStringValue(*pks.GetType(), pks.Get(i), false)),
+						zap.Any("pk-vals", entry),
+					)
+				} else {
+					entry = common.TypeStringValue(*pks.GetType(), pks.Get(i), false)
+				}
 				err = moerr.NewDuplicateEntryNoCtx(entry, colName)
 				return
 			}
