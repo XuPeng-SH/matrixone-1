@@ -37,9 +37,11 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/disttae/logtailreplay"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	catalog2 "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"go.uber.org/zap"
 )
 
 const (
@@ -72,6 +74,7 @@ func NewLocalDataSource(
 ) (source *LocalDataSource, err error) {
 
 	source = &LocalDataSource{}
+	source.doTrace = table.tableName == "bmsql_stock"
 	source.fs = table.getTxn().engine.fs
 	source.ctx = ctx
 	source.mp = table.proc.Load().Mp()
@@ -265,6 +268,7 @@ func (rs *RemoteDataSource) SetFilterZM(_ objectio.ZoneMap) {
 // --------------------------------------------------------------------------------
 
 type LocalDataSource struct {
+	doTrace    bool
 	rangeSlice objectio.BlockInfoSlice
 	pState     *logtailreplay.PartitionStateInProgress
 
@@ -549,6 +553,12 @@ func (ls *LocalDataSource) iterateInMemData(
 
 	if err = ls.filterInMemCommittedInserts(colTypes, seqNums, mp, bat); err != nil {
 		return err
+	}
+	if ls.doTrace {
+		logutil.Info(
+			"DEBUG-READER-IN-MEMORY",
+			zap.String("data", common.MoBatchToString(bat, 10)),
+		)
 	}
 
 	return nil

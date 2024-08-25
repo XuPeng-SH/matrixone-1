@@ -68,7 +68,7 @@ type BlockInfo struct {
 }
 
 func (b *BlockInfo) String() string {
-	return fmt.Sprintf("[A-%v]blk-%s", b.Appendable, b.BlockID.ShortStringEx())
+	return fmt.Sprintf("[A-%v]blk-%s", b.Appendable, b.BlockID.String())
 }
 
 func (b *BlockInfo) MarshalWithBuf(w *bytes.Buffer) (uint32, error) {

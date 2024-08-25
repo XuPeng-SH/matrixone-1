@@ -37,6 +37,7 @@ import (
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/common"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
 )
 
@@ -401,6 +402,13 @@ func (r *reader) Read(
 
 	if logutil.GetSkip1Logger().Core().Enabled(zap.DebugLevel) {
 		logutil.Debug(testutil.OperatorCatchBatch("block reader", bat))
+	}
+	if err == nil && bat != nil && r.tableDef.Name == "bmsql_stock" {
+		logutil.Info(
+			"DEBUG-READER-PERSISTED",
+			zap.String("data", common.MoBatchToString(bat, 10)),
+			zap.String("block", blkInfo.String()),
+		)
 	}
 
 	return
