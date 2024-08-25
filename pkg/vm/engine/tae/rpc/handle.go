@@ -372,6 +372,12 @@ func (h *Handle) HandleCommit(
 			}
 		}
 	}
+	if err == nil {
+		logutil.Info(
+			"DEBUG-COMMIT",
+			zap.String("txn", txn.String()),
+		)
+	}
 	return
 }
 
