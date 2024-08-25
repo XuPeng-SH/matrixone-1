@@ -109,7 +109,7 @@ func TombstoneRangeScanByObject(
 			endCnt = bat.Length()
 		}
 		if extra_info != "" {
-			info := fmt.Sprintf("%s:%d:[%d,%d]", endCnt-startCnt, tombstone.Repr(), minr, maxr)
+			info := fmt.Sprintf("%d:%s:[%d,%d]", endCnt-startCnt, tombstone.Repr(), minr, maxr)
 			infos = append(infos, info)
 		}
 	}
