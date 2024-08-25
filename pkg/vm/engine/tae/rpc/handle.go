@@ -728,8 +728,7 @@ func (h *Handle) HandleWrite(
 						logutil.Info(
 							"op1",
 							zap.String("txn", txn.String()),
-							zap.String("pk", common.TypeStringValue(pkVec.GetType(), pkBuf, false)),
-							zap.String("rowid", rowID.String()),
+							zap.String("pk", common.TypeStringValue(*req.Batch.Vecs[idx].GetType(), pkbuf, false)),
 							zap.Any("pk-detail", tuple.SQLStrings(nil)),
 						)
 					} else {
@@ -737,7 +736,6 @@ func (h *Handle) HandleWrite(
 							"op1",
 							zap.String("txn", txn.String()),
 							zap.String("pk", common.MoVectorToString(req.Batch.Vecs[idx], i)),
-							zap.String("rowid", rowID.String()),
 						)
 					}
 
@@ -829,7 +827,7 @@ func (h *Handle) HandleWrite(
 					logutil.Info(
 						"op2",
 						zap.String("txn", txn.String()),
-						zap.String("pk", common.TypeStringValue(pkVec.GetType(), pkBuf, false)),
+						zap.String("pk", common.TypeStringValue(*req.Batch.Vecs[1].GetType(), pkbuf, false)),
 						zap.String("rowid", rowID.String()),
 						zap.Any("pk-detail", tuple.SQLStrings(nil)),
 					)
