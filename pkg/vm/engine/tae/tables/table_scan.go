@@ -19,10 +19,12 @@ import (
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/iface/txnif"
+	"go.uber.org/zap"
 )
 
 func HybridScanByBlock(
@@ -66,6 +68,7 @@ func HybridScanByBlock(
 
 func TombstoneRangeScanByObject(
 	ctx context.Context,
+	extra_info string,
 	tableEntry *catalog.TableEntry,
 	objectID objectio.ObjectId,
 	start, end types.TS,
@@ -73,16 +76,17 @@ func TombstoneRangeScanByObject(
 	vpool *containers.VectorPool,
 ) (bat *containers.Batch, err error) {
 	it := tableEntry.MakeTombstoneObjectIt()
+	var infos []string
 	for it.Next() {
 		tombstone := it.Item()
 		skip := tombstone.IsCreatingOrAborted() || tombstone.HasDropCommitted()
 		if skip {
 			continue
 		}
-		// visible := tombstone.IsVisibleInRange(start, end)
-		// if !visible {
-		// 	continue
-		// }
+		visible := tombstone.IsVisibleInRange(start, end)
+		if !visible {
+			continue
+		}
 		if tombstone.HasCommittedPersistedData() {
 			zm := tombstone.GetSortKeyZonemap()
 			if !zm.PrefixEq(objectID[:]) {
@@ -90,10 +94,20 @@ func TombstoneRangeScanByObject(
 			}
 			// TODO: Bloomfilter
 		}
+		if extra_info != "" {
+			infos = append(infos, tombstone.Repr())
+		}
 		err = tombstone.GetObjectData().CollectObjectTombstoneInRange(ctx, start, end, &objectID, &bat, mp, vpool)
 		if err != nil {
 			return nil, err
 		}
+	}
+	if extra_info != "" {
+		logutil.Info(
+			"DEBUG-SKIP",
+			zap.String("txn", extra_info),
+			zap.Any("list", infos),
+		)
 	}
 	return
 }

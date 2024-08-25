@@ -186,6 +186,7 @@ func (entry *flushTableTailEntry) collectDelsAndTransfer(
 		var bat *containers.Batch
 		if bat, err = tables.TombstoneRangeScanByObject(
 			ctx,
+			"",
 			entry.tableEntry,
 			*obj.ID(),
 			from.Next(), // NOTE HERE

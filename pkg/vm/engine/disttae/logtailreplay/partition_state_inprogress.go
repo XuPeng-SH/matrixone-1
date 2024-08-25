@@ -430,7 +430,10 @@ func (p *PartitionStateInProgress) HandleRowsDelete(
 		for i, rowid := range rowIDVector {
 			buf := batch.Vecs[2].GetBytesAt(i)
 			tuple, _ := types.Unpack(buf)
-			logutil.Infof("DEBUG-DUP-PS-DELETE: rowid=%s,pk=%v,cpk=%X", rowid.String(), tuple.SQLStrings(nil), buf)
+			logutil.Infof(
+				"DEBUG-DUP-PS-DELETE: rowid=%s,pk=%v,cpk=%X,paddr=%s",
+				rowid.String(), tuple.SQLStrings(nil), tbRowIdVector[i].String(),
+			)
 		}
 	}
 
