@@ -177,11 +177,6 @@ func (p *PartitionStateInProgress) HandleDataObjectList(
 			p.objectIndexByTS.Set(e)
 		}
 
-		//prefetch the object meta
-		if err := blockio.PrefetchMeta(p.service, fs, objEntry.Location()); err != nil {
-			logutil.Errorf("prefetch object meta failed. %v", err)
-		}
-
 		p.dataObjects.Set(objEntry)
 
 		//Need to insert an ee in objectIndexByTS, when soft delete appendable object.
@@ -339,11 +334,6 @@ func (p *PartitionStateInProgress) HandleTombstoneObjectList(
 			if !old.DeleteTime.IsEmpty() {
 				continue
 			}
-		}
-
-		//prefetch the object meta
-		if err := blockio.PrefetchMeta(p.service, fs, objEntry.Location()); err != nil {
-			logutil.Errorf("prefetch object meta failed. %v", err)
 		}
 
 		p.tombstoneObjets.Set(objEntry)
