@@ -915,12 +915,6 @@ func (tbl *txnTable) rangesOnePart(
 				blk.Sorted = obj.Sorted
 				blk.Appendable = obj.Appendable
 				blk.CommitTs = obj.CommitTS
-				//if obj.HasDeltaLoc {
-				//	_, commitTs, ok := state.GetBlockDeltaLoc(blk.BlockID)
-				//	if ok {
-				//		blk.CommitTs = commitTs
-				//	}
-				//}
 
 				outBlocks.AppendBlockInfo(blk)
 

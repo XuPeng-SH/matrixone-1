@@ -15,11 +15,10 @@ package colexec
 
 import (
 	"context"
-	"github.com/matrixorigin/matrixone/pkg/container/types"
-	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
+	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/testutil"
 	"github.com/stretchr/testify/require"
@@ -61,8 +60,9 @@ func TestSortKey(t *testing.T) {
 func TestSetStatsCNCreated(t *testing.T) {
 	proc := testutil.NewProc()
 	s3writer := &S3Writer{}
-	s3writer.SetSortIdx(0)
-	_, err := s3writer.GenerateWriter(proc)
+	s3writer.sortIndex = 0
+	s3writer.isTombstone = true
+	_, err := s3writer.generateWriter(proc)
 	require.NoError(t, err)
 
 	bat := batch.NewWithSize(1)
@@ -73,11 +73,10 @@ func TestSetStatsCNCreated(t *testing.T) {
 		err = vector.AppendFixed[types.Rowid](bat.Vecs[0], row, false, proc.GetMPool())
 		require.NoError(t, err)
 	}
+	bat.SetRowCount(100)
 
-	err = s3writer.WriteBlock(bat, objectio.SchemaTombstone)
-	require.NoError(t, err)
-
-	_, stats, err := s3writer.WriteEndBlocks(proc)
+	s3writer.StashBatch(proc, bat)
+	_, stats, err := s3writer.SortAndSync(proc)
 	require.NoError(t, err)
 
 	cnt := 0
