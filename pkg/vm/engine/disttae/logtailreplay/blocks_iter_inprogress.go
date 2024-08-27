@@ -103,7 +103,7 @@ func (p *PartitionStateInProgress) GetChangedObjsBetween(
 	return
 }
 
-func (p *PartitionStateInProgress) GetBockDeltaLoc(bid types.Blockid) (objectio.ObjectLocation, types.TS, bool) {
+func (p *PartitionStateInProgress) GetBlockDeltaLoc(bid types.Blockid) (objectio.ObjectLocation, types.TS, bool) {
 	iter := p.tombstoneObjets.Copy().Iter()
 	defer iter.Release()
 
