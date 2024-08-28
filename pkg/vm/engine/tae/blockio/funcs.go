@@ -141,7 +141,7 @@ func LoadTombstoneColumns(
 	m *mpool.MPool,
 	policy fileservice.Policy,
 ) (bat *batch.Batch, release func(), err error) {
-	return LoadColumnsData(ctx, objectio.SchemaTombstone, cols, typs, fs, location, m, policy)
+	return LoadColumnsData(ctx, objectio.SchemaData, cols, typs, fs, location, m, policy)
 }
 
 func LoadColumns(
