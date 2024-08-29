@@ -19,6 +19,7 @@ import (
 	"context"
 	"github.com/matrixorigin/matrixone/pkg/defines"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"testing"
 	"time"
 
@@ -36,6 +37,9 @@ func TestTombstoneData1(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
 	defer cancel()
 
+	blockio.Start("")
+	defer blockio.Stop("")
+
 	proc := testutil.NewProc()
 
 	fs, err := fileservice.Get[fileservice.FileService](proc.GetFileService(), defines.SharedFileServiceName)
@@ -43,6 +47,7 @@ func TestTombstoneData1(t *testing.T) {
 
 	var stats []objectio.ObjectStats
 
+	var tombstoneRowIds []types.Rowid
 	for i := 0; i < 3; i++ {
 		writer, err := colexec.NewS3TombstoneWriter()
 		require.NoError(t, err)
@@ -50,9 +55,11 @@ func TestTombstoneData1(t *testing.T) {
 		bat := batch.NewWithSize(2)
 		bat.Vecs[0] = vector.NewVec(types.T_Rowid.ToType())
 		bat.Vecs[1] = vector.NewVec(types.T_int32.ToType())
-		for i := 0; i < 10; i++ {
-			vector.AppendFixed[types.Rowid](bat.Vecs[0], types.RandomRowid(), false, proc.GetMPool())
-			vector.AppendFixed[int32](bat.Vecs[1], int32(i), false, proc.GetMPool())
+		for j := 0; j < 10; j++ {
+			row := types.RandomRowid()
+			tombstoneRowIds = append(tombstoneRowIds, row)
+			vector.AppendFixed[types.Rowid](bat.Vecs[0], row, false, proc.GetMPool())
+			vector.AppendFixed[int32](bat.Vecs[1], int32(j), false, proc.GetMPool())
 		}
 
 		bat.SetRowCount(bat.Vecs[0].Length())
@@ -93,10 +100,29 @@ func TestTombstoneData1(t *testing.T) {
 	err = tombstones1.AppendFiles(stats1, stats2)
 	require.Nil(t, err)
 
-	bid := objectio.BuildObjectBlockid(stats1.ObjectName(), uint16(0))
-	exist, err := tombstones1.HasBlockTombstone(ctx, *bid, fs)
-	require.NoError(t, err)
-	require.True(t, exist)
+	deleteMask := nulls.Nulls{}
+	tombstones1.PrefetchTombstones("", fs, nil)
+	for i := range tombstoneRowIds {
+		sIdx := i / int(stats1.Rows())
+		if sIdx == 2 {
+			continue
+		}
+
+		bid := tombstoneRowIds[i].BorrowBlockID()
+		exist, err := tombstones1.HasBlockTombstone(ctx, *bid, fs)
+		require.NoError(t, err)
+		require.True(t, exist)
+
+		left, err := tombstones1.ApplyPersistedTombstones(
+			ctx, fs, types.MaxTs(), *bid,
+			[]int64{int64(tombstoneRowIds[i].GetRowOffset())},
+			&deleteMask)
+
+		require.NoError(t, err)
+		require.Equal(t, 0, len(left))
+		require.Equal(t, 1, deleteMask.Count())
+		deleteMask.Reset()
+	}
 
 	tombstones1.SortInMemory()
 	last := tombstones1.rowids[0]
