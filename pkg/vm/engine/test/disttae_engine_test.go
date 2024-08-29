@@ -890,7 +890,7 @@ func TestObjectStats1(t *testing.T) {
 	require.Nil(t, err)
 
 	ts := taeHandler.GetDB().TxnMgr.Now()
-	state := disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID).Snapshot()
+	state := disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID, "").Snapshot()
 	iter, err := state.NewObjectsIter(ts, false, false)
 	assert.NoError(t, err)
 	objCount := 0
@@ -930,7 +930,7 @@ func TestObjectStats1(t *testing.T) {
 	t.Log(taeHandler.GetDB().Catalog.SimplePPString(3))
 
 	ts = taeHandler.GetDB().TxnMgr.Now()
-	state = disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID).Snapshot()
+	state = disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID, "").Snapshot()
 	iter, err = state.NewObjectsIter(ts, true, false)
 	assert.NoError(t, err)
 	objCount = 0
@@ -977,7 +977,7 @@ func TestObjectStats2(t *testing.T) {
 	require.Nil(t, err)
 
 	ts := taeHandler.GetDB().TxnMgr.Now()
-	state := disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID).Snapshot()
+	state := disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID, "").Snapshot()
 	iter, err := state.NewObjectsIter(ts, false, false)
 	assert.NoError(t, err)
 	objCount := 0
@@ -1017,7 +1017,7 @@ func TestObjectStats2(t *testing.T) {
 	t.Log(taeHandler.GetDB().Catalog.SimplePPString(3))
 
 	ts = taeHandler.GetDB().TxnMgr.Now()
-	state = disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID).Snapshot()
+	state = disttaeEngine.Engine.GetOrCreateLatestPart(id.DbID, id.TableID, "").Snapshot()
 	iter, err = state.NewObjectsIter(ts, true, false)
 	assert.NoError(t, err)
 	objCount = 0

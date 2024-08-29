@@ -42,7 +42,8 @@ type PartitionState struct {
 	tombstoneObjets *btree.BTreeG[ObjectEntry]
 
 	// also modify the Copy method if adding fields
-	tid uint64
+	tid  uint64
+	name string
 
 	// data
 	rows *btree.BTreeG[RowEntry] // use value type to avoid locking on elements
@@ -407,6 +408,18 @@ func (p *PartitionState) HandleRowsDelete(
 		)
 	}
 
+	doTrace := p.name == "bmsql_stock"
+	if doTrace {
+		for i, rowid := range rowIDVector {
+			buf := batch.Vecs[2].GetBytesAt(i)
+			tuple, _ := types.Unpack(buf)
+			logutil.Infof(
+				"DEBUG-DUP-PS-DELETE: rowid=%s,pk=%v,paddr=%s,ts=%s",
+				rowid.String(), tuple.SQLStrings(nil), tbRowIdVector[i].String(), timeVector[i].ToString(),
+			)
+		}
+	}
+
 	numDeletes := int64(0)
 	for i, rowID := range rowIDVector {
 		blockID := rowID.CloneBlockID()
@@ -494,6 +507,15 @@ func (p *PartitionState) HandleRowsInsert(
 		batch.Vecs[2+primarySeqnum],
 		packer,
 	)
+
+	doTrace := p.name == "bmsql_stock"
+	if doTrace {
+		for i, rowid := range rowIDVector {
+			buf := batch.Vecs[2+primarySeqnum].GetBytesAt(i)
+			tuple, _ := types.Unpack(buf)
+			logutil.Infof("DEBUG-DUP-PS-INSERT: rowid=%s,pk=%v,cpk=%X,ts=%s", rowid.String(), tuple.SQLStrings(nil), buf, timeVector[i].ToString())
+		}
+	}
 
 	var numInserted int64
 	for i, rowID := range rowIDVector {
@@ -599,6 +621,7 @@ func NewPartitionState(
 	service string,
 	noData bool,
 	tid uint64,
+	name string,
 ) *PartitionState {
 	opts := btree.Options{
 		Degree: 64,
@@ -606,6 +629,7 @@ func NewPartitionState(
 	return &PartitionState{
 		service:         service,
 		tid:             tid,
+		name:            name,
 		noData:          noData,
 		rows:            btree.NewBTreeGOptions((RowEntry).Less, opts),
 		dataObjects:     btree.NewBTreeGOptions((ObjectEntry).Less, opts),

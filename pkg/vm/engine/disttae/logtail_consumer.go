@@ -291,7 +291,7 @@ func (c *PushClient) toSubscribeTable(
 
 	tableId := tbl.tableId
 	//if table has been subscribed, return quickly.
-	if ps, ok := c.isSubscribed(tbl.db.databaseId, tableId); ok {
+	if ps, ok := c.isSubscribed(tbl.db.databaseId, tableId, tbl.tableName); ok {
 		return ps, nil
 	}
 
@@ -956,7 +956,7 @@ type SubTableStatus struct {
 	LatestTime time.Time
 }
 
-func (c *PushClient) isSubscribed(dbId, tId uint64) (*logtailreplay.PartitionState, bool) {
+func (c *PushClient) isSubscribed(dbId, tId uint64, tName string) (*logtailreplay.PartitionState, bool) {
 	s := &c.subscribed
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -969,7 +969,7 @@ func (c *PushClient) isSubscribed(dbId, tId uint64) (*logtailreplay.PartitionSta
 			SubState:   Subscribed,
 			LatestTime: time.Now(),
 		}
-		return c.eng.GetOrCreateLatestPart(dbId, tId).Snapshot(), true
+		return c.eng.GetOrCreateLatestPart(dbId, tId, tName).Snapshot(), true
 	}
 	return nil, false
 }
@@ -1506,7 +1506,7 @@ func dispatchSubscribeResponse(
 			return err
 		}
 		if len(lt.CkpLocation) == 0 {
-			p := e.GetOrCreateLatestPart(tbl.DbId, tbl.TbId)
+			p := e.GetOrCreateLatestPart(tbl.DbId, tbl.TbId, tbl.TbName)
 			p.UpdateDuration(types.TS{}, types.MaxTs())
 			c := e.GetLatestCatalogCache()
 			c.UpdateDuration(types.TS{}, types.MaxTs())
@@ -1787,7 +1787,7 @@ func updatePartitionOfPush(
 	dbId, tblId := tl.Table.GetDbId(), tl.Table.GetTbId()
 
 	t0 := time.Now()
-	partition := e.GetOrCreateLatestPart(dbId, tblId)
+	partition := e.GetOrCreateLatestPart(dbId, tblId, tl.Table.GetTbName())
 	v2.LogtailUpdatePartitonGetPartitionDurationHistogram.Observe(time.Since(t0).Seconds())
 
 	t0 = time.Now()

@@ -16,10 +16,11 @@ package disttae
 
 import (
 	"context"
-	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
@@ -72,9 +73,9 @@ func (e *Engine) init(ctx context.Context) error {
 	defer put.Put()
 
 	{
-		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_DATABASE_ID}] = logtailreplay.NewPartition(e.service, 1)
-		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_TABLES_ID}] = logtailreplay.NewPartition(e.service, 2)
-		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_COLUMNS_ID}] = logtailreplay.NewPartition(e.service, 3)
+		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_DATABASE_ID}] = logtailreplay.NewPartition(e.service, 1, "mo_databases")
+		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_TABLES_ID}] = logtailreplay.NewPartition(e.service, 2, "mo_tables")
+		e.partitions[[2]uint64{catalog.MO_CATALOG_ID, catalog.MO_COLUMNS_ID}] = logtailreplay.NewPartition(e.service, 3, "mo_columns")
 	}
 
 	{ // mo_catalog
@@ -286,7 +287,7 @@ func (e *Engine) getOrCreateSnapPart(
 	}
 
 	//new snapshot partition and apply checkpoints into it.
-	snap := logtailreplay.NewPartition(e.service, tbl.tableId)
+	snap := logtailreplay.NewPartition(e.service, tbl.tableId, tbl.tableName)
 	//TODO::if tableId is mo_tables, or mo_colunms, or mo_database,
 	//      we should init the partition,ref to engine.init
 	ckps, err := checkpoint.ListSnapshotCheckpoint(ctx, e.service, e.fs, ts, tbl.tableId, nil)
@@ -350,7 +351,7 @@ func (e *Engine) getOrCreateSnapPart(
 			return nil, err
 		}
 		if ps == nil {
-			ps = tbl.getTxn().engine.GetOrCreateLatestPart(tbl.db.databaseId, tbl.tableId).Snapshot()
+			ps = tbl.getTxn().engine.GetOrCreateLatestPart(tbl.db.databaseId, tbl.tableId, tbl.tableName).Snapshot()
 		}
 		return ps, nil
 	}
@@ -367,12 +368,14 @@ func (e *Engine) getOrCreateSnapPart(
 
 func (e *Engine) GetOrCreateLatestPart(
 	databaseId,
-	tableId uint64) *logtailreplay.Partition {
+	tableId uint64,
+	tableName string,
+) *logtailreplay.Partition {
 	e.Lock()
 	defer e.Unlock()
 	partition, ok := e.partitions[[2]uint64{databaseId, tableId}]
 	if !ok { // create a new table
-		partition = logtailreplay.NewPartition(e.service, tableId)
+		partition = logtailreplay.NewPartition(e.service, tableId, tableName)
 		e.partitions[[2]uint64{databaseId, tableId}] = partition
 	}
 	return partition
@@ -392,7 +395,7 @@ func (e *Engine) LazyLoadLatestCkp(
 		tbl = delegate.origin
 	}
 
-	part := e.GetOrCreateLatestPart(tbl.db.databaseId, tbl.tableId)
+	part := e.GetOrCreateLatestPart(tbl.db.databaseId, tbl.tableId, tbl.tableName)
 	cache := e.GetLatestCatalogCache()
 
 	if err := part.ConsumeCheckpoints(
