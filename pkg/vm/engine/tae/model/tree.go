@@ -16,7 +16,6 @@ package model
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"unsafe"
@@ -315,21 +314,6 @@ func (ttree *TableTree) AddObject(sid *objectio.ObjectId, isTombstone bool) {
 			ttree.Objs[id] = NewObjectTree(&id)
 		}
 	}
-}
-
-func (ttree *TableTree) ShortBlocksString() string {
-	buf := bytes.Buffer{}
-	for _, obj := range ttree.Objs {
-		var shortuuid [8]byte
-		hex.Encode(shortuuid[:], obj.ID[:4])
-		buf.WriteString(fmt.Sprintf(" %s-%d", string(shortuuid[:]), obj.ID.Offset()))
-	}
-	for _, obj := range ttree.Tombstones {
-		var shortuuid [8]byte
-		hex.Encode(shortuuid[:], obj.ID[:4])
-		buf.WriteString(fmt.Sprintf(" %s-%d", string(shortuuid[:]), obj.ID.Offset()))
-	}
-	return buf.String()
 }
 
 func (ttree *TableTree) IsEmpty() bool {
