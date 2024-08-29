@@ -178,6 +178,3 @@ func (store *NoopTxnStore) UpdateObjectStats(*common.ID, *objectio.ObjectStats, 
 func (store *NoopTxnStore) FillInWorkspaceDeletes(id *common.ID, deletes **nulls.Nulls) error {
 	return nil
 }
-func (store *NoopTxnStore) IsDeletedInWorkSpace(id *common.ID, row uint32) (bool, error) {
-	return false, nil
-}
