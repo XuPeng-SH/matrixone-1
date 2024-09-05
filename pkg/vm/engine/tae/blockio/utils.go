@@ -18,11 +18,18 @@ import (
 	"context"
 	"sort"
 
+	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/nulls"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
+	"github.com/matrixorigin/matrixone/pkg/pb/plan"
+	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
+	plan2 "github.com/matrixorigin/matrixone/pkg/sql/plan"
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/mergesort"
 )
 
 func GetTombstonesByBlockId(
@@ -175,5 +182,95 @@ func CheckTombstoneFile(
 			}
 		}
 	}
+	return
+}
+func ConstructInExpr(
+	ctx context.Context,
+	colName string,
+	colVec *vector.Vector,
+) *plan.Expr {
+	data, _ := colVec.MarshalBinary()
+	colExpr := newColumnExpr(0, plan2.MakePlan2Type(colVec.GetType()), colName)
+	return plan2.MakeInExpr(
+		ctx,
+		colExpr,
+		int32(colVec.Length()),
+		data,
+		false,
+	)
+}
+
+// Has non-fake pk column
+func TransferTombstones(
+	ctx context.Context,
+	pkColumnSeq uint16,
+	tombstoneData *batch.Batch,
+	transfered *batch.Batch,
+	createdObjects []objectio.ObjectStats,
+	vp *containers.VectorPool,
+	fs fileservice.FileService,
+) (err error) {
+	transfered.CleanOnlyData()
+
+	// sort tombstoneData by pk column
+	if err = mergesort.SortColumnsByIndex(
+		tombstoneData.Vecs,
+		1,
+		vp.GetMPool(),
+	); err != nil {
+		return
+	}
+
+	for _, stats := range createdObjects {
+		if !stats.SortKeyZoneMap().AnyIn(tombstoneData.Vecs[1]) {
+			continue
+		}
+
+		var objMeta objectio.ObjectMeta
+		location := stats.ObjectLocation()
+
+		if objMeta, err = objectio.FastLoadObjectMeta(
+			ctx, &location, false, fs,
+		); err != nil {
+			return
+		}
+		dataMeta := objMeta.MustDataMeta()
+
+		blkCnt := int(dataMeta.BlockCount())
+		for pos := 0; pos < blkCnt; pos++ {
+			if !dataMeta.GetBlockMeta(uint32(pos)).MustGetColumn(pkColumnSeq).ZoneMap().AnyIn(tombstoneData.Vecs[1]) {
+				continue
+			}
+			blkInfo := objectio.BlockInfo{
+				MetaLoc: objectio.ObjectLocation(
+					stats.BlockLocation(uint16(pos), objectio.BlockMaxRows),
+				),
+				BlockID: *objectio.BuildObjectBlockid(stats.ObjectName(), uint16(pos)),
+			}
+			if err = doTransferByBlock(
+				ctx,
+				blkLoc,
+				tombstoneData,
+				transfered,
+				vp,
+				fs,
+			); err != nil {
+				return
+			}
+		}
+	}
+	return
+}
+
+func doTransferByBlock(
+	ctx context.Context,
+	sid string,
+	ts timestamp.Timestamp,
+	blkInfo objectio.BlockInfo,
+	tombstoneData *batch.Batch,
+	transfered *batch.Batch,
+	vp *containers.VectorPool,
+	fs fileservice.FileService,
+) (err error) {
 	return
 }
