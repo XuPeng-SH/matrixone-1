@@ -15,6 +15,7 @@
 package engine_util
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -740,7 +741,7 @@ func Test_ConstructBasePKFilter(t *testing.T) {
 	require.Zero(t, m.CurrNB())
 }
 
-func TestConstructBlockPKFilterByLESS(t *testing.T) {
+func TestConstructBlockPKFilter(t *testing.T) {
 	mp, err := mpool.NewMPool("", mpool.GB, 0)
 	require.NoError(t, err)
 
@@ -754,6 +755,8 @@ func TestConstructBlockPKFilterByLESS(t *testing.T) {
 		types.T_int8, types.T_int16, types.T_int32, types.T_int64,
 		types.T_uint8, types.T_uint16, types.T_uint32, types.T_uint64,
 		types.T_float32, types.T_float64,
+		types.T_date, types.T_datetime, types.T_time, types.T_timestamp,
+		types.T_decimal64, types.T_decimal128, types.T_varchar, types.T_enum,
 	}
 
 	lb, ub := 1, 2
@@ -761,11 +764,26 @@ func TestConstructBlockPKFilterByLESS(t *testing.T) {
 	var basePKFilters []BasePKFilter
 	for _, op := range ops {
 		for _, ty := range tys {
+			var llb, uub []byte
+
+			if ty == types.T_decimal64 {
+				llb = types.EncodeDecimal128(&types.Decimal128{B0_63: uint64(lb), B64_127: uint64(lb)})
+				uub = types.EncodeDecimal128(&types.Decimal128{B0_63: uint64(ub), B64_127: uint64(ub)})
+
+			} else if ty == types.T_varchar {
+				llb = []byte(strconv.Itoa(lb))
+				uub = []byte(strconv.Itoa(ub))
+
+			} else {
+				llb = types.EncodeFixed(lb)
+				uub = types.EncodeFixed(ub)
+			}
+
 			basePKFilters = append(basePKFilters, BasePKFilter{
 				Valid: true,
 				Op:    op,
-				LB:    types.EncodeFixed(lb),
-				UB:    types.EncodeFixed(ub),
+				LB:    llb,
+				UB:    uub,
 				Vec:   nil,
 				Oid:   ty,
 			})
@@ -818,6 +836,94 @@ func TestConstructBlockPKFilterByLESS(t *testing.T) {
 		sel2 := blkPKFilter.UnSortedSearchFunc([]*vector.Vector{vec})
 
 		require.Equal(t, sel1, sel2, basePKFilters[i].String())
+	}
+}
+
+func TestMergeBaseFilterInKind(t *testing.T) {
+	mp, err := mpool.NewMPool("", mpool.GB, 0)
+	require.NoError(t, err)
+
+	proc := testutil.NewProc()
+
+	tys := []types.T{
+		types.T_int8, types.T_int16, types.T_int32, types.T_int64,
+		types.T_uint8, types.T_uint16, types.T_uint32, types.T_uint64,
+		types.T_float32, types.T_float64,
+	}
+
+	var lvec, rvec *vector.Vector
+	var lvals, rvals = []float64{1, 1, 2, 2, 3, 3}, []float64{3, 3, 4, 4, 5}
+	var left, right = BasePKFilter{}, BasePKFilter{}
+
+	for _, ty := range tys {
+		lvec = vector.NewVec(ty.ToType())
+		rvec = vector.NewVec(ty.ToType())
+		switch ty {
+		case types.T_int8:
+			for i := range rvals {
+				vector.AppendFixed(rvec, int8(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, int8(lvals[i]), false, mp)
+			}
+
+		case types.T_int16:
+			for i := range rvals {
+				vector.AppendFixed(rvec, int16(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, int16(lvals[i]), false, mp)
+			}
+		case types.T_int32:
+			for i := range rvals {
+				vector.AppendFixed(rvec, int32(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, int32(lvals[i]), false, mp)
+			}
+		case types.T_int64:
+			for i := range rvals {
+				vector.AppendFixed(rvec, int64(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, int64(lvals[i]), false, mp)
+			}
+		case types.T_uint8:
+			for i := range rvals {
+				vector.AppendFixed(rvec, uint8(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, uint8(lvals[i]), false, mp)
+			}
+		case types.T_uint16:
+			for i := range rvals {
+				vector.AppendFixed(rvec, uint16(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, uint16(lvals[i]), false, mp)
+			}
+		case types.T_uint32:
+			for i := range rvals {
+				vector.AppendFixed(rvec, uint32(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, uint32(lvals[i]), false, mp)
+			}
+		case types.T_uint64:
+			for i := range rvals {
+				vector.AppendFixed(rvec, uint64(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, uint64(lvals[i]), false, mp)
+			}
+		case types.T_float32:
+			for i := range rvals {
+				vector.AppendFixed(rvec, float32(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, float32(lvals[i]), false, mp)
+			}
+		case types.T_float64:
+			for i := range rvals {
+				vector.AppendFixed(rvec, float64(rvals[i]), false, mp)
+				vector.AppendFixed(lvec, float64(lvals[i]), false, mp)
+			}
+		}
+
+		left.Vec = lvec
+		right.Vec = rvec
+		left.Oid = ty
+		right.Oid = ty
+
+		ret, err := mergeBaseFilterInKind(left, right, false, proc)
+		require.NoError(t, err)
+		require.Equal(t, int(1), int(ret.Vec.Length()), ret.Oid.String())
+
+		ret, err = mergeBaseFilterInKind(left, right, true, proc)
+		require.NoError(t, err)
+		require.Equal(t, int(5), int(ret.Vec.Length()))
 
 	}
 }
