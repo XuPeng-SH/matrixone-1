@@ -723,10 +723,6 @@ func Test_ConstructBasePKFilter(t *testing.T) {
 
 	tableDef.Pkey.PkeyColName = "a"
 	for i, expr := range exprs {
-		if exprStrings[i] == "b=40 and a=50" {
-			x := 0
-			x++
-		}
 		BasePKFilter, err := ConstructBasePKFilter(expr, tableDef, proc)
 		require.NoError(t, err)
 		require.Equal(t, filters[i].Valid, BasePKFilter.Valid, exprStrings[i])
@@ -742,4 +738,86 @@ func Test_ConstructBasePKFilter(t *testing.T) {
 	}
 
 	require.Zero(t, m.CurrNB())
+}
+
+func TestConstructBlockPKFilterByLESS(t *testing.T) {
+	mp, err := mpool.NewMPool("", mpool.GB, 0)
+	require.NoError(t, err)
+
+	ops := []int{
+		function.LESS_EQUAL, function.LESS_THAN,
+		function.GREAT_EQUAL, function.GREAT_THAN,
+		function.EQUAL, function.BETWEEN,
+	}
+
+	tys := []types.T{
+		types.T_int8, types.T_int16, types.T_int32, types.T_int64,
+		types.T_uint8, types.T_uint16, types.T_uint32, types.T_uint64,
+		types.T_float32, types.T_float64,
+	}
+
+	lb, ub := 1, 2
+
+	var basePKFilters []BasePKFilter
+	for _, op := range ops {
+		for _, ty := range tys {
+			basePKFilters = append(basePKFilters, BasePKFilter{
+				Valid: true,
+				Op:    op,
+				LB:    types.EncodeFixed(lb),
+				UB:    types.EncodeFixed(ub),
+				Vec:   nil,
+				Oid:   ty,
+			})
+		}
+	}
+
+	for i := range basePKFilters {
+		blkPKFilter, err := ConstructBlockPKFilter("a", basePKFilters[i])
+		require.NoError(t, err)
+
+		require.True(t, blkPKFilter.Valid)
+		require.NotNil(t, blkPKFilter.SortedSearchFunc)
+		require.NotNil(t, blkPKFilter.UnSortedSearchFunc)
+
+		vec := vector.NewVec(basePKFilters[i].Oid.ToType())
+		switch basePKFilters[i].Oid {
+		case types.T_int8:
+			vector.AppendFixed(vec, int8(lb), false, mp)
+			vector.AppendFixed(vec, int8(ub), false, mp)
+		case types.T_int16:
+			vector.AppendFixed(vec, int16(lb), false, mp)
+			vector.AppendFixed(vec, int16(ub), false, mp)
+		case types.T_int32:
+			vector.AppendFixed(vec, int32(lb), false, mp)
+			vector.AppendFixed(vec, int32(ub), false, mp)
+		case types.T_int64:
+			vector.AppendFixed(vec, int64(lb), false, mp)
+			vector.AppendFixed(vec, int64(ub), false, mp)
+		case types.T_uint8:
+			vector.AppendFixed(vec, uint8(lb), false, mp)
+			vector.AppendFixed(vec, uint8(ub), false, mp)
+		case types.T_uint16:
+			vector.AppendFixed(vec, uint16(lb), false, mp)
+			vector.AppendFixed(vec, uint16(ub), false, mp)
+		case types.T_uint32:
+			vector.AppendFixed(vec, uint32(lb), false, mp)
+			vector.AppendFixed(vec, uint32(ub), false, mp)
+		case types.T_uint64:
+			vector.AppendFixed(vec, uint64(lb), false, mp)
+			vector.AppendFixed(vec, uint64(ub), false, mp)
+		case types.T_float32:
+			vector.AppendFixed(vec, float32(lb), false, mp)
+			vector.AppendFixed(vec, float32(ub), false, mp)
+		case types.T_float64:
+			vector.AppendFixed(vec, float64(lb), false, mp)
+			vector.AppendFixed(vec, float64(ub), false, mp)
+		}
+
+		sel1 := blkPKFilter.SortedSearchFunc([]*vector.Vector{vec})
+		sel2 := blkPKFilter.UnSortedSearchFunc([]*vector.Vector{vec})
+
+		require.Equal(t, sel1, sel2, basePKFilters[i].String())
+
+	}
 }
