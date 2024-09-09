@@ -184,12 +184,12 @@ func CompareGeneric(a, b any, t types.T) int {
 		ts2 := a.(types.TS)
 		return ts2.Compare(&ts1)
 	case types.T_Rowid:
-		v1 := b.(types.Rowid)
-		v2 := a.(types.Rowid)
+		v1 := a.(types.Rowid)
+		v2 := b.(types.Rowid)
 		return v1.Compare(&v2)
 	case types.T_Blockid:
-		v1 := b.(types.Blockid)
-		v2 := a.(types.Blockid)
+		v1 := a.(types.Blockid)
+		v2 := b.(types.Blockid)
 		return v1.Compare(&v2)
 	case types.T_uuid:
 		return types.CompareUuid(a.(types.Uuid), b.(types.Uuid))

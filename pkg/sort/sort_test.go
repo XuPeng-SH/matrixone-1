@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	Rows          = 15
+	Rows          = 1000
 	BenchmarkRows = 100000
 )
 
@@ -292,4 +292,14 @@ func newTestCase(desc bool, m *mpool.MPool, typ types.Type) testCase {
 		proc: testutil.NewProcessWithMPool("", m),
 		vec:  testutil.NewVector(Rows, typ, m, true, nil),
 	}
+}
+
+func TestBlockidLess(t *testing.T) {
+	obj := types.NewObjectid()
+
+	blk1 := types.NewBlockidWithObjectID(obj, uint16(0))
+	blk2 := types.NewBlockidWithObjectID(obj, uint16(1))
+
+	ret := BlockidLess(*blk1, *blk2)
+	require.True(t, ret)
 }

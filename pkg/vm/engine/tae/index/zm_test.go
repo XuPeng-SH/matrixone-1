@@ -16,6 +16,9 @@ package index
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
@@ -489,4 +492,73 @@ func BenchmarkUpdateZMVector(b *testing.B) {
 			BatchUpdateZM(zm, vec)
 		}
 	})
+}
+
+func TestZM_SubVecIn(t *testing.T) {
+	mp := mpool.MustNewZero()
+
+	blkId := types.NewBlockidWithObjectID(types.NewObjectid(), uint16(0xA))
+
+	vec := vector.NewVec(types.T_Rowid.ToType())
+	for i := 0; i < 100; i++ {
+		row := types.NewRowid(blkId, uint32(i))
+		err := vector.AppendFixed[types.Rowid](vec, *row, false, mp)
+		assert.Nil(t, err)
+	}
+
+	for i := 0; i < 100; i++ {
+		a := rand.Int() % vec.Length()
+		b := rand.Int() % vec.Length()
+
+		if a > b {
+			a, b = b, a
+		}
+
+		minv := vector.GetFixedAtWithTypeCheck[types.Rowid](vec, a)
+		maxv := vector.GetFixedAtWithTypeCheck[types.Rowid](vec, b)
+
+		zm := BuildZM(types.T_Rowid, minv[:])
+		err := zm.Update(minv)
+		require.Nil(t, err)
+
+		err = zm.Update(maxv)
+		require.Nil(t, err)
+
+		s, e := zm.SubVecIn(vec)
+		require.Equal(t, a, s)
+		require.Equal(t, b+1, e)
+	}
+}
+
+func TestZM_AnyIn(t *testing.T) {
+	mp := mpool.MustNewZero()
+
+	blkId := types.NewBlockidWithObjectID(types.NewObjectid(), uint16(0xA))
+
+	vec := vector.NewVec(types.T_Rowid.ToType())
+	for i := 0; i < 100; i++ {
+		row := types.NewRowid(blkId, uint32(i))
+		err := vector.AppendFixed[types.Rowid](vec, *row, false, mp)
+		assert.Nil(t, err)
+	}
+
+	for i := 0; i < 1000; i++ {
+		a := rand.Int() % vec.Length() * 2
+		b := rand.Int()%vec.Length() + 2
+
+		if a > b {
+			a, b = b, a
+		}
+
+		row1 := types.NewRowid(blkId, uint32(a))
+		row2 := types.NewRowid(blkId, uint32(b))
+
+		zm := BuildZM(types.T_Rowid, row1[:])
+		err := zm.Update(*row2)
+		require.Nil(t, err)
+
+		ok := zm.AnyIn(vec)
+		require.Equal(t, a < vec.Length(), ok, fmt.Sprintf("a=%d, b=%d", a, b))
+
+	}
 }

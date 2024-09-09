@@ -15,6 +15,9 @@
 package compute
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"math/rand"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -52,6 +55,77 @@ func TestCompareGeneric(t *testing.T) {
 		a1 = types.ArrayToBytes[float64]([]float64{1, 2, 3})
 		b1 = types.ArrayToBytes[float64]([]float64{1, 2, 3})
 		assert.True(t, CompareGeneric(a1, b1, types.T_array_float64) == 0)
+	}
+
+}
+
+func TestCompareRowId(t *testing.T) {
+	s := byte(0xA)
+	var a, b []byte
+
+	for i := 0; i < 24; i++ {
+		a = append(a, s+byte(i))
+		b = append(b, s+byte(i))
+	}
+
+	{
+		ret1 := Compare(a, b, types.T_Rowid, 0, 0)
+		require.Equal(t, 0, ret1)
+
+		ret2 := CompareGeneric(types.Rowid(a), types.Rowid(b), types.T_Rowid)
+		require.Equal(t, ret1, ret2)
+	}
+
+	{
+		x := a[:types.ObjectidSize]
+		ret1 := Compare(x, b, types.T_Rowid, 0, 0)
+		require.Equal(t, 0, ret1)
+
+		ret1 = Compare(b, x, types.T_Rowid, 0, 0)
+		require.Equal(t, 0, ret1)
+	}
+
+	{
+		x := a[:types.BlockidSize]
+		ret := Compare(x, b, types.T_Rowid, 0, 0)
+		require.Equal(t, 0, ret)
+
+		ret = Compare(b, x, types.T_Rowid, 0, 0)
+		require.Equal(t, 0, ret)
+	}
+
+	{
+		x := a
+		x[rand.Int()%len(x)] += byte(1)
+		ret := Compare(x, b, types.T_Rowid, 0, 0)
+		require.True(t, ret > 0)
+		ret2 := CompareGeneric(types.Rowid(x), types.Rowid(b), types.T_Rowid)
+		require.Equal(t, ret2, ret)
+
+		ret = Compare(b, x, types.T_Rowid, 0, 0)
+		require.True(t, ret < 0)
+		ret2 = CompareGeneric(types.Rowid(b), types.Rowid(x), types.T_Rowid)
+		require.Equal(t, ret2, ret)
+
+	}
+}
+
+func TestCompareBlockId(t *testing.T) {
+	obj := types.NewObjectid()
+
+	var idx1, idx2 int
+	for i := 0; i < 100; i++ {
+		idx1 = rand.Int() % 999
+		idx2 = rand.Int() % 999
+
+		blk1 := types.NewBlockidWithObjectID(obj, uint16(idx1))
+		blk2 := types.NewBlockidWithObjectID(obj, uint16(idx2))
+
+		ret := Compare(blk1[:], blk2[:], types.T_Blockid, 0, 0)
+		require.Equal(t, idx1 < idx2, ret < 0)
+
+		ret2 := CompareGeneric(*blk1, *blk2, types.T_Blockid)
+		require.Equal(t, ret, ret2, fmt.Sprintf("idx1: %d, idx2: %d", idx1, idx2))
 	}
 
 }

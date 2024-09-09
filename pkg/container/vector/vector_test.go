@@ -15,6 +15,8 @@
 package vector
 
 import (
+	"github.com/stretchr/testify/assert"
+	"math/rand"
 	"testing"
 
 	"github.com/matrixorigin/matrixone/pkg/common/bitmap"
@@ -2527,4 +2529,77 @@ func BenchmarkMustFixedCol(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		MustFixedColWithTypeCheck[int8](vec)
 	}
+}
+
+func TestVector_InplaceSortAndCompact(t *testing.T) {
+	mp := mpool.MustNewZero()
+
+	blkId := types.NewBlockidWithObjectID(types.NewObjectid(), uint16(0xA))
+
+	vec1 := NewVec(types.T_Rowid.ToType())
+	for i := 0; i < 2; i++ {
+		row := types.NewRowid(blkId, uint32(i))
+		err := AppendFixed[types.Rowid](vec1, *row, false, mp)
+		assert.Nil(t, err)
+	}
+
+	vec2, err := vec1.Dup(mp)
+	assert.Nil(t, err)
+
+	col1 := MustFixedColNoTypeCheck[types.Rowid](vec1)
+	col2 := MustFixedColNoTypeCheck[types.Rowid](vec2)
+
+	require.Equal(t, col1, col2)
+
+	for i := 0; i < len(col1); i++ {
+		x := rand.Int() % len(col1)
+		y := rand.Int() % len(col1)
+		col1[x], col1[y] = col1[y], col1[x]
+	}
+
+	for i := 0; i < len(col1)/2; i++ {
+		err := AppendFixed[types.Rowid](vec1, col1[i], false, mp)
+		assert.Nil(t, err)
+	}
+
+	require.NotEqual(t, col1, col2)
+
+	vec1.InplaceSortAndCompact()
+
+	col1 = MustFixedColNoTypeCheck[types.Rowid](vec1)
+	require.Equal(t, col2, col1)
+}
+
+func TestVector_InplaceSort(t *testing.T) {
+	mp := mpool.MustNewZero()
+
+	blkId := types.NewBlockidWithObjectID(types.NewObjectid(), uint16(0xA))
+
+	vec1 := NewVec(types.T_Rowid.ToType())
+	for i := 0; i < 2; i++ {
+		row := types.NewRowid(blkId, uint32(i))
+		err := AppendFixed[types.Rowid](vec1, *row, false, mp)
+		assert.Nil(t, err)
+	}
+
+	vec2, err := vec1.Dup(mp)
+	assert.Nil(t, err)
+
+	col1 := MustFixedColNoTypeCheck[types.Rowid](vec1)
+	col2 := MustFixedColNoTypeCheck[types.Rowid](vec2)
+
+	require.Equal(t, col1, col2)
+
+	for i := 0; i < len(col1); i++ {
+		x := rand.Int() % len(col1)
+		y := rand.Int() % len(col1)
+		col1[x], col1[y] = col1[y], col1[x]
+	}
+
+	require.NotEqual(t, col1, col2)
+
+	vec1.InplaceSort()
+	col1 = MustFixedColNoTypeCheck[types.Rowid](vec1)
+
+	require.Equal(t, col2, col1)
 }
