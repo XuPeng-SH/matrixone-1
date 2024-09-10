@@ -51,7 +51,14 @@ const (
 func init() {
 	RegisterIOEnrtyCodec(IOEntryHeader{IOET_ObjMeta, IOET_ObjectMeta_V1}, nil, DecodeObjectMetaV1)
 	RegisterIOEnrtyCodec(IOEntryHeader{IOET_ObjMeta, IOET_ObjectMeta_V2}, nil, DecodeObjectMetaV2)
-	RegisterIOEnrtyCodec(IOEntryHeader{IOET_ObjMeta, IOET_ObjectMeta_V3}, nil, DecodeObjectMetaV3)
+	RegisterIOMetaEnrtyCodec(
+		IOEntryHeader{IOET_ObjMeta, IOET_ObjectMeta_V3},
+		nil,
+		DecodeObjectMetaV3,
+		func(buf []byte) ObjectMeta {
+			return objectMetaV3(buf)
+		},
+	)
 	RegisterIOEnrtyCodec(IOEntryHeader{IOET_ColData, IOET_ColumnData_V1}, EncodeColumnDataV1, DecodeColumnDataV1)
 	RegisterIOEnrtyCodec(IOEntryHeader{IOET_BF, IOET_BloomFilter_V1}, nil, nil)
 	RegisterIOEnrtyCodec(IOEntryHeader{IOET_BF, IOET_BloomFilter_V2}, nil, nil)

@@ -55,6 +55,7 @@ type IOEntry interface {
 
 type IOEncodeFunc = func(any) ([]byte, error)
 type IODecodeFunc = func([]byte) (any, error)
+type IODecodeMetadataFunc = func([]byte) ObjectMeta
 
 type ioEntryCodec struct {
 	// if encFn is nil, no need to encode
@@ -62,6 +63,9 @@ type ioEntryCodec struct {
 
 	// if decFn is nil, no need to decode
 	decFn IODecodeFunc
+
+	// if metaFn is nil, no need to decode metadata
+	decMetaFn IODecodeMetadataFunc
 }
 
 func (codec ioEntryCodec) NoMarshal() bool {
@@ -70,6 +74,13 @@ func (codec ioEntryCodec) NoMarshal() bool {
 
 func (codec ioEntryCodec) NoUnmarshal() bool {
 	return codec.decFn == nil
+}
+
+func (codec ioEntryCodec) MustMetaEntry(buf []byte) ObjectMeta {
+	if codec.decMetaFn == nil {
+		panic("no meta decoder")
+	}
+	return codec.decMetaFn(buf)
 }
 
 func (codec ioEntryCodec) Decode(buf []byte) (v any, err error) {
@@ -81,6 +92,23 @@ func (codec ioEntryCodec) Decode(buf []byte) (v any, err error) {
 }
 
 var ioEntryCodecs = map[IOEntryHeader]ioEntryCodec{}
+
+func RegisterIOMetaEnrtyCodec(
+	h IOEntryHeader,
+	encFn IOEncodeFunc,
+	decFn IODecodeFunc,
+	dmFn IODecodeMetadataFunc,
+) {
+	_, ok := ioEntryCodecs[h]
+	if ok {
+		panic(fmt.Sprintf("duplicate io entry codec found: %s", h.String()))
+	}
+	ioEntryCodecs[h] = ioEntryCodec{
+		encFn:     encFn,
+		decFn:     decFn,
+		decMetaFn: dmFn,
+	}
+}
 
 func RegisterIOEnrtyCodec(h IOEntryHeader, encFn IOEncodeFunc, decFn IODecodeFunc) {
 	_, ok := ioEntryCodecs[h]

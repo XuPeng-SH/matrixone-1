@@ -65,3 +65,9 @@ func Decode(buf []byte) (any, error) {
 	}
 	return v, nil
 }
+
+func MustDecodeObjectMeta(buf []byte) ObjectMeta {
+	header := DecodeIOEntryHeader(buf)
+	codec := GetIOEntryCodec(*header)
+	return codec.MustMetaEntry(buf[IOEntryHeaderSize:])
+}
