@@ -37,6 +37,32 @@ func init() {
 	RowidType = types.T_Rowid.ToType()
 }
 
+func ObjectStatsToBlockInfoSlice(
+	stats *ObjectStats,
+	withInMemory bool,
+) BlockInfoSlice {
+	var ret BlockInfoSlice
+	offset := 0
+	if withInMemory {
+		ret = make([]byte, (int(stats.BlockCnt())+1)*BlockInfoSize)
+		ret.Set(offset, &EmptyBlockInfo)
+		offset++
+	} else {
+		ret = make([]byte, int(stats.BlockCnt())*BlockInfoSize)
+	}
+	for i := 0; i < ret.Len(); i++ {
+		loc := stats.BlockLocation(uint16(i), BlockMaxRows)
+		blk := BlockInfo{
+			BlockID: *BuildObjectBlockid(stats.ObjectName(), uint16(i)),
+			MetaLoc: ObjectLocation(loc),
+		}
+		blk.SetFlagByObjStats(stats)
+		ret.Set(offset, &blk)
+		offset++
+	}
+	return ret
+}
+
 type CreateObjOpt struct {
 	Stats       *ObjectStats
 	IsTombstone bool

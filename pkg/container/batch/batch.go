@@ -492,3 +492,12 @@ func (bat *Batch) Window(start, end int) (*Batch, error) {
 	}
 	return b, nil
 }
+
+func (bat *Batch) UnionOne(o *Batch, sel int64, mp *mpool.MPool) error {
+	for i := range bat.Vecs {
+		if err := bat.Vecs[i].UnionOne(o.Vecs[i], sel, mp); err != nil {
+			return err
+		}
+	}
+	return nil
+}

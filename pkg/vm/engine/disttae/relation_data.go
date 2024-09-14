@@ -40,6 +40,15 @@ func UnmarshalRelationData(data []byte) (engine.RelData, error) {
 	}
 }
 
+func NewObjectBlockListRelationData(
+	stats *objectio.ObjectStats,
+	withInMemory bool,
+) *blockListRelData {
+	return &blockListRelData{
+		blklist: objectio.ObjectStatsToBlockInfoSlice(stats, withInMemory),
+	}
+}
+
 func NewEmptyBlockListRelationData() *blockListRelData {
 	return &blockListRelData{
 		blklist: objectio.BlockInfoSlice{},
