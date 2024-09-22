@@ -437,7 +437,7 @@ func checkObjectEntry(entry *ObjectEntry, start, end types.TS) bool {
 		if !entry.ObjectStats.GetCNCreated() {
 			return false
 		}
-		return entry.CreateTime.GreaterEq(&start) && entry.DeleteTime.LessEq(&end)
+		return entry.CreateTime.GreaterEq(&start) && entry.DeleteTime.LE(&end)
 	}
 }
 
@@ -550,5 +550,5 @@ func fillInDeleteBatch(bat **batch.Batch, entry *RowEntry, mp *mpool.MPool) {
 }
 
 func checkTS(start, end types.TS, ts types.TS) bool {
-	return ts.LessEq(&end) && ts.GreaterEq(&start)
+	return ts.LE(&end) && ts.GreaterEq(&start)
 }
