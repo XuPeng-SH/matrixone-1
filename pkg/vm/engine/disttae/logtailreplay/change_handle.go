@@ -394,7 +394,7 @@ func applyTSFilterForBatch(bat *batch.Batch, sortIdx int, start, end types.TS, m
 	commitTSs := vector.MustFixedColWithTypeCheck[types.TS](bat.Vecs[sortIdx])
 	deletes := make([]int64, 0)
 	for i, ts := range commitTSs {
-		if ts.Less(&start) || ts.Greater(&end) {
+		if ts.LT(&start) || ts.Greater(&end) {
 			deletes = append(deletes, int64(i))
 		}
 	}
@@ -429,7 +429,7 @@ func checkObjectEntry(entry *ObjectEntry, start, end types.TS) bool {
 		if entry.CreateTime.Greater(&end) {
 			return false
 		}
-		if !entry.DeleteTime.IsEmpty() && entry.DeleteTime.Less(&start) {
+		if !entry.DeleteTime.IsEmpty() && entry.DeleteTime.LT(&start) {
 			return false
 		}
 		return true

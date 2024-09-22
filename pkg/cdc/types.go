@@ -204,7 +204,7 @@ type AtomicBatchRow struct {
 
 func (row AtomicBatchRow) Less(other AtomicBatchRow) bool {
 	//ts asc
-	if row.Ts.Less(&other.Ts) {
+	if row.Ts.LT(&other.Ts) {
 		return true
 	}
 	if row.Ts.Greater(&other.Ts) {
