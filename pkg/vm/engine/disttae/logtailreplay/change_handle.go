@@ -437,7 +437,7 @@ func checkObjectEntry(entry *ObjectEntry, start, end types.TS) bool {
 		if !entry.ObjectStats.GetCNCreated() {
 			return false
 		}
-		return entry.CreateTime.GreaterEq(&start) && entry.DeleteTime.LE(&end)
+		return entry.CreateTime.GE(&start) && entry.DeleteTime.LE(&end)
 	}
 }
 
@@ -549,6 +549,7 @@ func fillInDeleteBatch(bat **batch.Batch, entry *RowEntry, mp *mpool.MPool) {
 	vector.AppendFixed((*bat).Vecs[1], entry.Time, false, mp)
 }
 
+// PXU TODO
 func checkTS(start, end types.TS, ts types.TS) bool {
-	return ts.LE(&end) && ts.GreaterEq(&start)
+	return ts.LE(&end) && ts.GE(&start)
 }
