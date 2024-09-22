@@ -30,7 +30,6 @@ import (
 
 func TryFastFilterBlocks(
 	ctx context.Context,
-	tbl *txnTable,
 	snapshotTS timestamp.Timestamp,
 	tableDef *plan.TableDef,
 	exprs []*plan.Expr,
@@ -48,7 +47,6 @@ func TryFastFilterBlocks(
 
 	err = FilterTxnObjects(
 		ctx,
-		tbl,
 		snapshotTS,
 		fastFilterOp,
 		loadOp,
@@ -60,7 +58,6 @@ func TryFastFilterBlocks(
 		uncommittedObjects,
 		outBlocks,
 		fs,
-		proc,
 		highSelectivityHint,
 	)
 	return true, err
@@ -68,7 +65,6 @@ func TryFastFilterBlocks(
 
 func FilterTxnObjects(
 	ctx context.Context,
-	tbl *txnTable,
 	snapshotTS timestamp.Timestamp,
 	fastFilterOp engine_util.FastFilterOp,
 	loadOp engine_util.LoadOp,
@@ -80,7 +76,6 @@ func FilterTxnObjects(
 	uncommittedObjects []objectio.ObjectStats,
 	outBlocks *objectio.BlockInfoSlice,
 	fs fileservice.FileService,
-	proc *process.Process,
 	highSelectivityHint bool,
 ) (err error) {
 

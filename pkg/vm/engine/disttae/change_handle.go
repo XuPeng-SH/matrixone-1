@@ -128,7 +128,6 @@ func (h *CheckpointChangesHandle) initReader(ctx context.Context) (err error) {
 	var blockList objectio.BlockInfoSlice
 	if _, err = TryFastFilterBlocks(
 		ctx,
-		h.table,
 		h.end.ToTimestamp(),
 		tblDef,
 		nil,

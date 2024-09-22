@@ -350,7 +350,6 @@ func doTransferRowids(
 	var blockList objectio.BlockInfoSlice
 	if _, err = TryFastFilterBlocks(
 		ctx,
-		table,
 		table.db.op.SnapshotTS(),
 		table.GetTableDef(ctx),
 		[]*plan.Expr{expr},

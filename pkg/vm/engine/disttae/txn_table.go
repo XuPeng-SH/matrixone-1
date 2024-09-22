@@ -705,7 +705,6 @@ func (tbl *txnTable) rangesOnePart(
 
 	if done, err = TryFastFilterBlocks(
 		ctx,
-		tbl,
 		tbl.db.op.SnapshotTS(),
 		tbl.tableDef,
 		exprs,
