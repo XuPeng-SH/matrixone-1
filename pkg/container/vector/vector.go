@@ -2012,6 +2012,10 @@ func (v *Vector) UnionOne(w *Vector, sel int64, mp *mpool.MPool) error {
 		case 1:
 			v.data[oldLen] = w.data[sel]
 		default:
+			if (oldLen+1)*tlen > len(v.data) || (int(sel)+1)*tlen > len(w.data) {
+				x := 0
+				x++
+			}
 			copy(v.data[oldLen*tlen:(oldLen+1)*tlen], w.data[int(sel)*tlen:(int(sel)+1)*tlen])
 		}
 	}

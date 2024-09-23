@@ -16,7 +16,7 @@ package disttae
 
 import (
 	"context"
-
+	"fmt"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -36,6 +36,76 @@ func WithTrasnferBuffer(buffer *containers.OneSchemaBatchBuffer) TransferOption 
 	return func(flow *TransferFlow) {
 		flow.buffer = buffer
 	}
+}
+
+func ConstructCNTombstoneObjectsTransferFlow(
+	start, end types.TS,
+	table *txnTable,
+	txn *Transaction,
+	mp *mpool.MPool,
+	fs fileservice.FileService) (*TransferFlow, error) {
+
+	ctx := table.proc.Load().Ctx
+	state, err := table.getPartitionState(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	isObjectDeletedFn := func(objId *objectio.ObjectId) bool {
+		return state.IsObjectDeleted(end, false, objId)
+	}
+
+	txn.cn_flushed_s3_tombstone_object_stats_list.Lock()
+	defer txn.cn_flushed_s3_tombstone_object_stats_list.Unlock()
+
+	relData := NewBlockListRelationData(0)
+
+	ForeachBlkInObjStatsList(
+		true,
+		nil,
+		func(blk objectio.BlockInfo,
+			blkMeta objectio.BlockObject) bool {
+			relData.AppendBlockInfo(&blk)
+			return true
+		}, txn.cn_flushed_s3_tombstone_object_stats_list.data...)
+
+	if relData.DataCnt() == 0 {
+		//fmt.Println("relData is nil", table.tableName)
+		return nil, nil
+	}
+
+	readers, err := table.BuildReaders(
+		ctx,
+		table.proc.Load(),
+		nil,
+		relData,
+		1,
+		0,
+		false,
+		engine.Policy_SkipAll,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	defer readers[0].Close()
+
+	newDataObjects, str := state.CollectVisibleObjectsBetween(types.TS{}, types.MaxTs(), false)
+	if len(newDataObjects) == 0 {
+		fmt.Println("newDataObjects is nil", table.tableName, "\n", str)
+		return nil, nil
+	}
+
+	fmt.Println("newDataObjects: ", str)
+
+	return ConstructTransferFlow(
+		table,
+		true,
+		readers[0],
+		isObjectDeletedFn,
+		newDataObjects,
+		mp,
+		fs), nil
 }
 
 func ConstructTransferFlow(
@@ -149,13 +219,14 @@ func (flow *TransferFlow) processOneBatch(ctx context.Context, buffer *batch.Bat
 	staged := flow.getStaged()
 	for i, rowid := range rowids {
 		objectid := rowid.BorrowObjectID()
-		if !objectid.EQ(last) {
+		if last == nil || !objectid.EQ(last) {
 			deleted = flow.isObjectDeletedFn(objectid)
 			last = objectid
 		}
-		if deleted {
+		if !deleted {
 			continue
 		}
+		fmt.Println("check obj delete", objectid.String(), deleted)
 		if err := staged.UnionOne(buffer, int64(i), flow.mp); err != nil {
 			return err
 		}

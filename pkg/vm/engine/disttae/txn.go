@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -1213,6 +1214,10 @@ func (txn *Transaction) Commit(ctx context.Context) ([]txn.TxnRequest, error) {
 		return nil, err
 	}
 
+	if err := txn.transferTombstoneObjects(ctx); err != nil {
+		return nil, err
+	}
+
 	if err := txn.mergeTxnWorkspaceLocked(); err != nil {
 		return nil, err
 	}
@@ -1308,7 +1313,45 @@ func (txn *Transaction) GetSnapshotWriteOffset() int {
 
 type UT_ForceTransCheck struct{}
 
-func (txn *Transaction) transferDeletesLocked(ctx context.Context, commit bool) error {
+func (txn *Transaction) transferTombstoneObjects(
+	ctx context.Context,
+) (err error) {
+
+	var start types.TS
+	if txn.statementID == 1 {
+		start = types.TimestampToTS(txn.timestamps[0])
+	} else {
+		//statementID > 1
+		start = types.TimestampToTS(txn.timestamps[txn.statementID-2])
+	}
+
+	end := types.TimestampToTS(txn.op.SnapshotTS())
+
+	return txn.forEachTableHasDeletesLocked(func(tbl *txnTable) error {
+		flow, err := ConstructCNTombstoneObjectsTransferFlow(
+			start,
+			end,
+			tbl,
+			txn,
+			txn.proc.Mp(),
+			txn.proc.GetFileService())
+		if err != nil {
+			return err
+		}
+
+		if flow != nil {
+			if strings.Contains(tbl.tableName, "hhh") {
+				x := 0
+				x++
+			}
+			fmt.Println("flow.Process", tbl.tableName)
+			return flow.Process(ctx)
+		}
+		return nil
+	})
+}
+
+func (txn *Transaction) transferInmemTombstoneLocked(ctx context.Context, commit bool) error {
 	var latestTs timestamp.Timestamp
 	txn.timestamps = append(txn.timestamps, txn.op.SnapshotTS())
 	if txn.statementID > 0 && txn.op.Txn().IsRCIsolation() {
