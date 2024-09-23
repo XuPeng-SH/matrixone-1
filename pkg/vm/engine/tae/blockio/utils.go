@@ -230,8 +230,8 @@ func CheckTombstoneFile(
 	return
 }
 
-// CoarseFilterTombstoneObject filters tombstone objects based on deleted data objects.
-// This is a coarse filter. It is used to filter out tombstone objects that do not contain any deleted data objects.
+// CoarseFilterTombstoneObject It is used to filter out tombstone objects that do not contain any deleted data objects.
+// This is a coarse filter using ZM, so false positives may occur
 func CoarseFilterTombstoneObject(
 	ctx context.Context,
 	nextDeletedDataObject func() *objectio.ObjectId,
