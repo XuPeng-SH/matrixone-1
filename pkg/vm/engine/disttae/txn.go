@@ -1327,7 +1327,6 @@ func (txn *Transaction) transferTombstoneObjects(
 	end := types.TimestampToTS(txn.op.SnapshotTS())
 
 	return txn.forEachTableHasDeletesLocked(func(tbl *txnTable) error {
-		fmt.Println("construct flow", tbl.tableName)
 		flow, err := ConstructCNTombstoneObjectsTransferFlow(
 			start,
 			end,
@@ -1340,7 +1339,6 @@ func (txn *Transaction) transferTombstoneObjects(
 		}
 
 		if flow != nil {
-			fmt.Println("process flow", tbl.tableName)
 			if err = flow.Process(ctx); err != nil {
 				return err
 			}
@@ -1352,7 +1350,6 @@ func (txn *Transaction) transferTombstoneObjects(
 
 			for i := range statsList {
 				fileName := statsList[i].ObjectLocation().String()
-				fmt.Println("new object", fileName, tbl.tableName)
 				bat := batch.New(false, []string{catalog.ObjectMeta_ObjectStats})
 				bat.SetVector(0, vector.NewVec(types.T_text.ToType()))
 				if err = vector.AppendBytes(
