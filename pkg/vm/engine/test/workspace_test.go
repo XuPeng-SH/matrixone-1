@@ -136,16 +136,17 @@ func Test_BigDeleteWriteS3(t *testing.T) {
 }
 
 func randomVarcharByLength(ll int) string {
-	bb := make([]byte, ll)
-	for i := 0; i < ll; i++ {
+	bb := make([]byte, ll/2)
+	for i := 0; i < ll/2; i++ {
 		bb[i] = byte(rand.Intn(256))
 	}
 
-	return hex.EncodeToString(bb)
+	str := hex.EncodeToString(bb)
+	fmt.Println(str)
+	return str
 }
 
 func Test_CNTransferTombstoneObjects(t *testing.T) {
-	t.SkipNow()
 	var (
 		opts         testutil.TestOptions
 		tableName    = "test1"
@@ -156,14 +157,21 @@ func Test_CNTransferTombstoneObjects(t *testing.T) {
 	defer cancel()
 
 	opts.TaeEngineOptions = config.WithLongScanAndCKPOpts(nil)
+
+	opt, err := testutil.GetS3SharedFileServiceOption(ctx, testutil.GetDefaultTestPath("test", t))
+	require.NoError(t, err)
+
+	opts.TaeEngineOptions.Fs = opt.Fs
+
 	p := testutil.InitEnginePack(opts, t)
 	defer p.Close()
 
-	schema := catalog2.MockSchemaEnhanced(1, 0, 12)
+	schema := catalog2.MockSchemaEnhanced(1, 0, 3)
 	schema.Name = tableName
 
 	txnop := p.StartCNTxn()
-	_, _ = p.CreateDBAndTable(txnop, databaseName, schema)
+	_, rel := p.CreateDBAndTable(txnop, databaseName, schema)
+	require.NotNil(t, rel)
 	require.NoError(t, txnop.Commit(ctx))
 
 	txnop = p.StartCNTxn()
@@ -172,13 +180,12 @@ func Test_CNTransferTombstoneObjects(t *testing.T) {
 
 	exec := v.(executor.SQLExecutor)
 
-	deletion.SetCNFlushDeletesThreshold(32)
+	deletion.SetCNFlushDeletesThreshold(1)
 
 	{
 		res, err := exec.Exec(p.Ctx,
-			fmt.Sprintf("insert into `%s`.`%s` select %s from generate_series(1, 100);",
+			fmt.Sprintf("insert into `%s`.`%s` select * from generate_series(1, 100*100*10)g;",
 				databaseName, tableName,
-				randomVarcharByLength(65535),
 			),
 			executor.Options{}.
 				WithTxn(txnop).
@@ -189,16 +196,18 @@ func Test_CNTransferTombstoneObjects(t *testing.T) {
 	}
 
 	{
-		txnop = p.StartCNTxn()
-		res, err := exec.Exec(p.Ctx, "begin;", executor.Options{}.WithTxn(txnop))
-		require.NoError(t, err)
-		res.Close()
+		exec.ExecTxn(ctx, func(txn executor.TxnExecutor) error {
 
-		res, err = exec.Exec(p.Ctx, "delete from `%s`.`%s`;",
-			executor.Options{}.WithTxn(txnop))
+			_, err := txn.Exec(
+				fmt.Sprintf("delete from `%s`.`%s` where 1=1;", databaseName, tableName),
+				executor.StatementOption{})
+			require.NoError(t, err)
 
-		testutil2.MergeBlocks(t, 0, p.T.GetDB(), databaseName, schema, true)
-		require.NoError(t, txnop.Commit(ctx))
+			p.D.SubscribeTable(ctx, rel.GetDBID(ctx), rel.GetTableID(ctx), true)
+
+			testutil2.MergeBlocks(t, 0, p.T.GetDB(), databaseName, schema, true)
+
+			return nil
+		}, executor.Options{})
 	}
-
 }

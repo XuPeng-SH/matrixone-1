@@ -15,6 +15,7 @@
 package deletion
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
@@ -39,9 +40,9 @@ var (
 	flushThreshold = 5 * mpool.MB
 )
 
-// SetCNFlushDeletesThreshold update threshold to n B
+// SetCNFlushDeletesThreshold update threshold to n MB
 func SetCNFlushDeletesThreshold(n int) {
-	flushThreshold = n * mpool.B
+	flushThreshold = n * mpool.MB
 }
 
 type BatchPool struct {
@@ -238,6 +239,7 @@ func (deletion *Deletion) SplitBatch(proc *process.Process, srcBat *batch.Batch)
 	}
 	// we will flush all
 	if deletion.ctr.batch_size >= uint32(flushThreshold) {
+		fmt.Println("flush")
 		size, err := deletion.ctr.flush(proc)
 		if err != nil {
 			return err

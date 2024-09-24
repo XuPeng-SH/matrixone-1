@@ -16,6 +16,7 @@ package disttae
 
 import (
 	"context"
+	"fmt"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -74,6 +75,7 @@ func ConstructCNTombstoneObjectsTransferFlow(
 		})
 
 	if relData.DataCnt() == 0 {
+		fmt.Println("tombstone obj is nil", table.tableName)
 		return nil, nil
 	}
 
@@ -95,7 +97,7 @@ func ConstructCNTombstoneObjectsTransferFlow(
 
 	newDataObjects := state.CollectVisibleObjectsBetween(start, end, false)
 	if len(newDataObjects) == 0 {
-		//fmt.Println("newDataObjects is nil", table.tableName, "\n", str)
+		fmt.Println("newDataObjects is nil", table.tableName)
 		return nil, nil
 	}
 
