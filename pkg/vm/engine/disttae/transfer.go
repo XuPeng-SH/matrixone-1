@@ -344,6 +344,7 @@ func doTransferRowids(
 		duration := time.Since(now)
 		v2.BatchTransferTombstonesDurationHistogram.Observe(duration.Seconds())
 	}()
+
 	pkColumName := table.GetTableDef(ctx).Pkey.PkeyColName
 	expr := ConstructInExpr(ctx, pkColumName, searchPKColumn)
 
