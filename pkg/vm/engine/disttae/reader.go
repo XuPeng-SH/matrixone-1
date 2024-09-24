@@ -16,6 +16,7 @@ package disttae
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -53,6 +54,27 @@ func (mixin *withFilterMixin) reset() {
 	mixin.columns.colTypes = nil
 }
 
+func (mixin *withFilterMixin) tryUpdateTombstoneColumns(cols []string) {
+	pkColIdx := mixin.tableDef.Name2ColIndex[mixin.tableDef.Pkey.PkeyColName]
+	pkCol := mixin.tableDef.Cols[pkColIdx]
+
+	mixin.columns.seqnums = []uint16{0, 1}
+	mixin.columns.colTypes = []types.Type{
+		types.T_Rowid.ToType(),
+		plan2.ExprType2Type(&pkCol.Typ)}
+
+	mixin.columns.colTypes[1].Scale = pkCol.Typ.Scale
+	mixin.columns.colTypes[1].Width = pkCol.Typ.Width
+
+	if len(cols) == len(objectio.TombstoneAttrs_TN_Created) {
+		mixin.columns.seqnums = append(mixin.columns.seqnums, 2)
+		mixin.columns.colTypes = append(mixin.columns.colTypes, types.T_TS.ToType())
+	}
+
+	mixin.filterState.seqnums = mixin.columns.seqnums[:]
+	mixin.filterState.colTypes = mixin.columns.colTypes[:]
+}
+
 // when the reader.Read is called for a new block, it will always
 // call tryUpdate to update the seqnums
 // NOTE: here we assume the tryUpdate is always called with the same cols
@@ -78,6 +100,12 @@ func (mixin *withFilterMixin) tryUpdateColumns(cols []string) {
 	// mixin.columns.colNulls = make([]bool, len(cols))
 	mixin.columns.pkPos = -1
 	mixin.columns.indexOfFirstSortedColumn = -1
+
+	if slices.Equal(cols, objectio.TombstoneAttrs_CN_Created) ||
+		slices.Equal(cols, objectio.TombstoneAttrs_TN_Created) {
+		mixin.tryUpdateTombstoneColumns(cols)
+		return
+	}
 
 	for i, column := range cols {
 		column = strings.ToLower(column)

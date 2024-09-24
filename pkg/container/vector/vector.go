@@ -2332,6 +2332,10 @@ func (v *Vector) UnionBatch(w *Vector, offset int64, cnt int, flags []uint8, mp 
 			}
 		} else {
 			if flags == nil {
+				if (v.length+cnt)*tlen > len(v.data) || (int(offset)+cnt)*tlen > len(w.data) {
+					x := 0
+					x++
+				}
 				copy(v.data[v.length*tlen:(v.length+cnt)*tlen], w.data[(int(offset))*tlen:(int(offset)+cnt)*tlen])
 				v.length += cnt
 			} else {

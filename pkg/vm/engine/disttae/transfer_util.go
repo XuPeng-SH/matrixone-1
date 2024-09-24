@@ -16,7 +16,6 @@ package disttae
 
 import (
 	"context"
-	"fmt"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
@@ -55,23 +54,35 @@ func ConstructCNTombstoneObjectsTransferFlow(
 		return state.IsObjectDeleted(end, false, objId)
 	}
 
-	txn.cn_flushed_s3_tombstone_object_stats_list.Lock()
-	defer txn.cn_flushed_s3_tombstone_object_stats_list.Unlock()
-
 	relData := NewBlockListRelationData(0)
 
-	ForeachBlkInObjStatsList(
-		true,
-		nil,
-		func(blk objectio.BlockInfo,
-			blkMeta objectio.BlockObject) bool {
-			relData.AppendBlockInfo(&blk)
-			return true
-		}, txn.cn_flushed_s3_tombstone_object_stats_list.data...)
+	txn.ForEachTableWrites(
+		table.db.databaseId, table.tableId,
+		len(txn.writes),
+		func(entry Entry) {
+			if entry.fileName != "" && entry.typ == DELETE {
+				stats := objectio.ObjectStats(entry.bat.Vecs[0].GetBytesAt(0))
+				ForeachBlkInObjStatsList(
+					true,
+					nil,
+					func(blk objectio.BlockInfo,
+						blkMeta objectio.BlockObject) bool {
+						relData.AppendBlockInfo(&blk)
+						return true
+					}, stats)
+			}
+		})
 
 	if relData.DataCnt() == 0 {
 		//fmt.Println("relData is nil", table.tableName)
 		return nil, nil
+	} else {
+		//for i := 0; i < relData.DataCnt(); i++ {
+		//	loc := relData.GetBlockInfo(i).MetaLoc
+		//	bat, _, _ := blockio.LoadColumns(ctx, []uint16{1},
+		//		[]types.Type{types.T_int32.ToType()}, fs, loc[:], mp, fileservice.Policy(0))
+		//	fmt.Println("check tombstone: ", common.MoBatchToString(bat, 10000))
+		//}
 	}
 
 	readers, err := table.BuildReaders(
@@ -90,17 +101,17 @@ func ConstructCNTombstoneObjectsTransferFlow(
 
 	defer readers[0].Close()
 
-	newDataObjects, str := state.CollectVisibleObjectsBetween(types.TS{}, types.MaxTs(), false)
+	newDataObjects := state.CollectVisibleObjectsBetween(start, end, false)
 	if len(newDataObjects) == 0 {
-		fmt.Println("newDataObjects is nil", table.tableName, "\n", str)
+		//fmt.Println("newDataObjects is nil", table.tableName, "\n", str)
 		return nil, nil
 	}
 
-	fmt.Println("newDataObjects: ", str)
+	//fmt.Println("newDataObjects: ", str)
 
 	return ConstructTransferFlow(
 		table,
-		true,
+		false,
 		readers[0],
 		isObjectDeletedFn,
 		newDataObjects,
@@ -195,7 +206,12 @@ func (flow *TransferFlow) Process(ctx context.Context) error {
 			return err
 		}
 	}
-	return flow.transferStaged(ctx)
+
+	if err := flow.transferStaged(ctx); err != nil {
+		return err
+	}
+
+	return flow.sinker.Sync(ctx)
 }
 
 func (flow *TransferFlow) getStaged() *batch.Batch {
@@ -222,15 +238,17 @@ func (flow *TransferFlow) processOneBatch(ctx context.Context, buffer *batch.Bat
 		if last == nil || !objectid.EQ(last) {
 			deleted = flow.isObjectDeletedFn(objectid)
 			last = objectid
+			//fmt.Println(objectid.String(), deleted)
 		}
 		if !deleted {
 			continue
 		}
-		fmt.Println("check obj delete", objectid.String(), deleted)
 		if err := staged.UnionOne(buffer, int64(i), flow.mp); err != nil {
 			return err
 		}
+
 		if staged.Vecs[0].Length() >= objectio.BlockMaxRows {
+			//fmt.Println("check1", staged.Attrs, common.MoVectorToString(staged.Vecs[1], staged.Vecs[0].Length()))
 			if err := flow.transferStaged(ctx); err != nil {
 				return err
 			}
@@ -258,6 +276,8 @@ func (flow *TransferFlow) transferStaged(ctx context.Context) error {
 	result := flow.getBuffer()
 	defer flow.putBuffer(result)
 
+	//ctx = context.WithValue(ctx, "transfer flow", "yes")
+
 	if err := doTransferRowids(
 		ctx,
 		flow.table,
@@ -274,6 +294,7 @@ func (flow *TransferFlow) transferStaged(ctx context.Context) error {
 
 	flow.orphanStaged()
 
+	result.SetRowCount(result.Vecs[0].Length())
 	return flow.sinker.Write(ctx, result)
 }
 

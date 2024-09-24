@@ -195,16 +195,16 @@ func (p *PartitionState) BlockPersisted(blockID *types.Blockid) bool {
 func (p *PartitionState) CollectVisibleObjectsBetween(
 	start, end types.TS,
 	isTombstone bool,
-) (stats []objectio.ObjectStats, str string) {
+) (stats []objectio.ObjectStats) {
 
-	var buf bytes.Buffer
-	buf.WriteString(fmt.Sprintf("CollectVisibleObjectsBetween: %s, %s\n", start.ToString(), end.ToString()))
-	p.dataObjectTSIndex.Scan(func(item ObjectIndexByTSEntry) bool {
-		buf.WriteString(fmt.Sprintf("item: %s, %v, %s\n", item.Time.ToString(), item.IsDelete, item.ShortObjName.Segmentid().String()))
-		return true
-	})
+	//var buf bytes.Buffer
+	//buf.WriteString(fmt.Sprintf("CollectVisibleObjectsBetween: %s, %s\n", start.ToString(), end.ToString()))
+	//p.dataObjectTSIndex.Scan(func(item ObjectIndexByTSEntry) bool {
+	//	buf.WriteString(fmt.Sprintf("item: %s, %v, %s\n", item.Time.ToString(), item.IsDelete, item.ShortObjName.Segmentid().String()))
+	//	return true
+	//})
 
-	str = buf.String()
+	//str = buf.String()
 
 	iter := p.dataObjectTSIndex.Copy().Iter()
 	defer iter.Release()

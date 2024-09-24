@@ -19,7 +19,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -1340,12 +1339,41 @@ func (txn *Transaction) transferTombstoneObjects(
 		}
 
 		if flow != nil {
-			if strings.Contains(tbl.tableName, "hhh") {
-				x := 0
-				x++
+			//fmt.Println("flow.Process", tbl.tableName)
+			if err = flow.Process(ctx); err != nil {
+				return err
 			}
-			fmt.Println("flow.Process", tbl.tableName)
-			return flow.Process(ctx)
+
+			statsList, tail := flow.GetResult()
+			if len(tail) > 0 {
+				logutil.Fatal("???", zap.Int("tail", len(tail)))
+			}
+
+			for i := range statsList {
+				fileName := statsList[i].ObjectLocation().String()
+				//fmt.Println("flow done", statsList[i].String())
+				bat := batch.New(false, []string{catalog.ObjectMeta_ObjectStats})
+				bat.SetVector(0, vector.NewVec(types.T_text.ToType()))
+				if err = vector.AppendBytes(
+					bat.GetVector(0), statsList[i].Marshal(), false, tbl.proc.Load().GetMPool()); err != nil {
+					return err
+				}
+
+				bat.SetRowCount(bat.Vecs[0].Length())
+
+				txn.WriteFile(
+					DELETE,
+					tbl.accountId,
+					tbl.db.databaseId,
+					tbl.tableId,
+					tbl.db.databaseName,
+					tbl.tableName,
+					fileName,
+					bat,
+					txn.tnStores[0],
+				)
+			}
+
 		}
 		return nil
 	})

@@ -344,6 +344,15 @@ func doTransferRowids(
 		duration := time.Since(now)
 		v2.BatchTransferTombstonesDurationHistogram.Observe(duration.Seconds())
 	}()
+
+	//var debug bool
+	//if val := ctx.Value("transfer flow"); val != nil {
+	//	debug = true
+	//	for i := 0; i < len(objectList); i++ {
+	//		fmt.Println("obj", objectList[i].String())
+	//	}
+	//}
+
 	pkColumName := table.GetTableDef(ctx).Pkey.PkeyColName
 	expr := ConstructInExpr(ctx, pkColumName, searchPKColumn)
 
@@ -366,6 +375,22 @@ func doTransferRowids(
 	for i, end := 0, blockList.Len(); i < end; i++ {
 		relData.AppendBlockInfo(blockList.Get(i))
 	}
+
+	//if debug {
+	//	var buf bytes.Buffer
+	//	buf.WriteString(fmt.Sprintf("search pk:\n%s\n",
+	//		common.MoVectorToString(searchPKColumn, searchPKColumn.Length())))
+	//
+	//	for i := 0; i < blockList.Len(); i++ {
+	//		loc := blockList.Get(i).MetaLoc
+	//		bat, _, _ := blockio.LoadColumns(ctx, []uint16{uint16(table.tableDef.Name2ColIndex[pkColumName])},
+	//			[]types.Type{*readPKColumn.GetType()}, fs, loc[:], mp, fileservice.Policy(0))
+	//		buf.WriteString(fmt.Sprintf("search bat:\n%s\n", common.MoBatchToString(bat, 10000)))
+	//
+	//		fmt.Println("debug", "\n", buf.String())
+	//	}
+	//
+	//}
 
 	readers, err := table.BuildReaders(
 		ctx,

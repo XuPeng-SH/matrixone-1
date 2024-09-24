@@ -16,6 +16,16 @@ package test
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
+	"github.com/matrixorigin/matrixone/pkg/common/runtime"
+	"github.com/matrixorigin/matrixone/pkg/sql/colexec/deletion"
+	"github.com/matrixorigin/matrixone/pkg/util/executor"
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils/config"
+	"math/rand"
+	"testing"
+	"time"
+
 	"github.com/matrixorigin/matrixone/pkg/catalog"
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
@@ -27,8 +37,6 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/containers"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/test/testutil"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func Test_BigDeleteWriteS3(t *testing.T) {
@@ -123,5 +131,58 @@ func Test_BigDeleteWriteS3(t *testing.T) {
 		_, err = reader.Read(ctx, ret.Attrs, nil, mp, ret)
 		require.NoError(t, err)
 		require.Equal(t, insertCnt-deleteCnt, ret.RowCount())
+	}
+}
+
+func randomVarcharByLength(ll int) string {
+	bb := make([]byte, ll)
+	for i := 0; i < ll; i++ {
+		bb[i] = byte(rand.Intn(256))
+	}
+
+	return hex.EncodeToString(bb)
+}
+
+func Test_CNTransferTombstoneObjects(t *testing.T) {
+	var (
+		opts         testutil.TestOptions
+		tableName    = "test1"
+		databaseName = "db1"
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	opts.TaeEngineOptions = config.WithLongScanAndCKPOpts(nil)
+	p := testutil.InitEnginePack(opts, t)
+	defer p.Close()
+
+	schema := catalog2.MockSchemaEnhanced(1, 0, 12)
+	schema.Name = tableName
+
+	txnop := p.StartCNTxn()
+	_, _ = p.CreateDBAndTable(txnop, databaseName, schema)
+	require.NoError(t, txnop.Commit(ctx))
+
+	txnop = p.StartCNTxn()
+	v, ok := runtime.ServiceRuntime("").GetGlobalVariables(runtime.InternalSQLExecutor)
+	require.True(t, ok)
+
+	exec := v.(executor.SQLExecutor)
+
+	deletion.SetCNFlushDeletesThreshold(32)
+
+	{
+		res, err := exec.Exec(p.Ctx,
+			fmt.Sprintf("insert into `%s`.`%s` select %s from generate_series(1, 100);",
+				databaseName, tableName,
+				randomVarcharByLength(65535),
+			),
+			executor.Options{}.
+				WithTxn(txnop).
+				WithWaitCommittedLogApplied())
+		require.NoError(t, err)
+		res.Close()
+		require.NoError(t, txnop.Commit(ctx))
 	}
 }
