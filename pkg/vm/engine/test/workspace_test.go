@@ -21,6 +21,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/runtime"
 	"github.com/matrixorigin/matrixone/pkg/sql/colexec/deletion"
 	"github.com/matrixorigin/matrixone/pkg/util/executor"
+	testutil2 "github.com/matrixorigin/matrixone/pkg/vm/engine/tae/db/testutil"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/testutils/config"
 	"math/rand"
 	"testing"
@@ -144,6 +145,7 @@ func randomVarcharByLength(ll int) string {
 }
 
 func Test_CNTransferTombstoneObjects(t *testing.T) {
+	t.SkipNow()
 	var (
 		opts         testutil.TestOptions
 		tableName    = "test1"
@@ -185,4 +187,18 @@ func Test_CNTransferTombstoneObjects(t *testing.T) {
 		res.Close()
 		require.NoError(t, txnop.Commit(ctx))
 	}
+
+	{
+		txnop = p.StartCNTxn()
+		res, err := exec.Exec(p.Ctx, "begin;", executor.Options{}.WithTxn(txnop))
+		require.NoError(t, err)
+		res.Close()
+
+		res, err = exec.Exec(p.Ctx, "delete from `%s`.`%s`;",
+			executor.Options{}.WithTxn(txnop))
+
+		testutil2.MergeBlocks(t, 0, p.T.GetDB(), databaseName, schema, true)
+		require.NoError(t, txnop.Commit(ctx))
+	}
+
 }

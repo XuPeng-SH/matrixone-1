@@ -74,15 +74,7 @@ func ConstructCNTombstoneObjectsTransferFlow(
 		})
 
 	if relData.DataCnt() == 0 {
-		//fmt.Println("relData is nil", table.tableName)
 		return nil, nil
-	} else {
-		//for i := 0; i < relData.DataCnt(); i++ {
-		//	loc := relData.GetBlockInfo(i).MetaLoc
-		//	bat, _, _ := blockio.LoadColumns(ctx, []uint16{1},
-		//		[]types.Type{types.T_int32.ToType()}, fs, loc[:], mp, fileservice.Policy(0))
-		//	fmt.Println("check tombstone: ", common.MoBatchToString(bat, 10000))
-		//}
 	}
 
 	readers, err := table.BuildReaders(
@@ -106,8 +98,6 @@ func ConstructCNTombstoneObjectsTransferFlow(
 		//fmt.Println("newDataObjects is nil", table.tableName, "\n", str)
 		return nil, nil
 	}
-
-	//fmt.Println("newDataObjects: ", str)
 
 	return ConstructTransferFlow(
 		table,
@@ -238,7 +228,6 @@ func (flow *TransferFlow) processOneBatch(ctx context.Context, buffer *batch.Bat
 		if last == nil || !objectid.EQ(last) {
 			deleted = flow.isObjectDeletedFn(objectid)
 			last = objectid
-			//fmt.Println(objectid.String(), deleted)
 		}
 		if !deleted {
 			continue
@@ -248,7 +237,6 @@ func (flow *TransferFlow) processOneBatch(ctx context.Context, buffer *batch.Bat
 		}
 
 		if staged.Vecs[0].Length() >= objectio.BlockMaxRows {
-			//fmt.Println("check1", staged.Attrs, common.MoVectorToString(staged.Vecs[1], staged.Vecs[0].Length()))
 			if err := flow.transferStaged(ctx); err != nil {
 				return err
 			}
@@ -275,8 +263,6 @@ func (flow *TransferFlow) transferStaged(ctx context.Context) error {
 	}
 	result := flow.getBuffer()
 	defer flow.putBuffer(result)
-
-	//ctx = context.WithValue(ctx, "transfer flow", "yes")
 
 	if err := doTransferRowids(
 		ctx,

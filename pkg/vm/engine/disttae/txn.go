@@ -1339,7 +1339,6 @@ func (txn *Transaction) transferTombstoneObjects(
 		}
 
 		if flow != nil {
-			//fmt.Println("flow.Process", tbl.tableName)
 			if err = flow.Process(ctx); err != nil {
 				return err
 			}
@@ -1351,7 +1350,6 @@ func (txn *Transaction) transferTombstoneObjects(
 
 			for i := range statsList {
 				fileName := statsList[i].ObjectLocation().String()
-				//fmt.Println("flow done", statsList[i].String())
 				bat := batch.New(false, []string{catalog.ObjectMeta_ObjectStats})
 				bat.SetVector(0, vector.NewVec(types.T_text.ToType()))
 				if err = vector.AppendBytes(
@@ -1373,7 +1371,6 @@ func (txn *Transaction) transferTombstoneObjects(
 					txn.tnStores[0],
 				)
 			}
-
 		}
 		return nil
 	})

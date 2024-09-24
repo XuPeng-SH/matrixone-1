@@ -197,15 +197,6 @@ func (p *PartitionState) CollectVisibleObjectsBetween(
 	isTombstone bool,
 ) (stats []objectio.ObjectStats) {
 
-	//var buf bytes.Buffer
-	//buf.WriteString(fmt.Sprintf("CollectVisibleObjectsBetween: %s, %s\n", start.ToString(), end.ToString()))
-	//p.dataObjectTSIndex.Scan(func(item ObjectIndexByTSEntry) bool {
-	//	buf.WriteString(fmt.Sprintf("item: %s, %v, %s\n", item.Time.ToString(), item.IsDelete, item.ShortObjName.Segmentid().String()))
-	//	return true
-	//})
-
-	//str = buf.String()
-
 	iter := p.dataObjectTSIndex.Copy().Iter()
 	defer iter.Release()
 

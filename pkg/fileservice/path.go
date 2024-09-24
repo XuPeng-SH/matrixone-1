@@ -16,10 +16,8 @@ package fileservice
 
 import (
 	"encoding/csv"
-	"fmt"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"strings"
 	"unicode"
 
@@ -76,7 +74,6 @@ func ParsePath(s string) (path Path, err error) {
 		if r > unicode.MaxASCII && unicode.IsPrint(r) {
 			continue
 		}
-		fmt.Println(string(debug.Stack()))
 		err = moerr.NewInvalidPathNoCtx(path.File)
 		return
 	}
