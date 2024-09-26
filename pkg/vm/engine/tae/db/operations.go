@@ -32,13 +32,6 @@ const (
 	OpGetLogTail = uint32(apipb.OpCode_OpGetLogTail)
 )
 
-type RelationType uint8
-
-const (
-	RelationTable RelationType = iota + 1
-	RelationView
-)
-
 type AccessInfo struct {
 	AccountID uint32
 	UserID    uint32
