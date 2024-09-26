@@ -74,6 +74,7 @@ func NewGCTable(
 	for _, opt := range opts {
 		opt(&table)
 	}
+	WithBufferSize(64 * mpool.MB)(&table)
 	return &table
 }
 
@@ -361,6 +362,7 @@ func (t *GCTable) insertFlow(
 			}
 			break
 		}
+		logutil.Infof("GCTable insertFlow: batch size %d", bat.Size())
 		if err = processOneBatch(ctx, bat); err != nil {
 			t.putBuffer(bat)
 			return err
@@ -483,6 +485,7 @@ func (t *GCTable) ProcessMapBatch(
 	ctx context.Context,
 	data *batch.Batch,
 ) error {
+	logutil.Infof("start to sort data %v", data.String())
 	if err := mergesort.SortColumnsByIndex(
 		data.Vecs,
 		ObjectTablePrimaryKeyIdx,
