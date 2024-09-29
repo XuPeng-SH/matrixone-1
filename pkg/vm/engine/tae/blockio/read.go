@@ -640,6 +640,13 @@ func EvalDeleteMaskFromDNCreatedTombstones(
 	}
 	rowids := vector.MustFixedColWithTypeCheck[types.Rowid](deletedRows)
 	start, end := FindStartEndOfBlockFromSortedRowids(rowids, blockid)
+	var last types.Rowid
+	for i := range rowids {
+		if last.GE(&rowids[i]) {
+			logutil.Error("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+		}
+		last = rowids[i]
+	}
 
 	noTSCheck := false
 	if end-start > 10 {

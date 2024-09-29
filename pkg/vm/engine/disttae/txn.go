@@ -1218,9 +1218,9 @@ func (txn *Transaction) Commit(ctx context.Context) ([]txn.TxnRequest, error) {
 		return nil, err
 	}
 
-	if err := txn.transferTombstoneObjects(ctx); err != nil {
-		return nil, err
-	}
+	// if err := txn.transferTombstoneObjects(ctx); err != nil {
+	// 	return nil, err
+	// }
 
 	if err := txn.mergeTxnWorkspaceLocked(); err != nil {
 		return nil, err
