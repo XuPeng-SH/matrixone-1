@@ -349,6 +349,11 @@ func (tbl *txnTable) TransferDeletes(
 				return err
 			}
 			writerStats := writer.GetObjectStats()
+			logutil.Info(
+				"DEBUG-DN-TRANSFER",
+				zap.String("table", tbl.GetLocalSchema(false).Name),
+				zap.String("stats", writerStats.String()),
+			)
 			stats := objectio.NewObjectStatsWithObjectID(name.ObjectId(), false, true, true)
 			objectio.SetObjectStats(stats, &writerStats)
 			tbl.tombstoneTable.tableSpace.stats = append(tbl.tombstoneTable.tableSpace.stats, *stats)
