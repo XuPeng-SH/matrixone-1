@@ -96,6 +96,11 @@ func NewMergeObjectsTask(
 		createAt:         time.Now(),
 	}
 
+	if isTombstone {
+		erra = moerr.GetOkExpectedEOB()
+		return
+	}
+
 	database, err := txn.GetDatabaseByID(task.did)
 	if err != nil {
 		return
