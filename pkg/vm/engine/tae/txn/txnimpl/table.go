@@ -192,6 +192,22 @@ func (tbl *txnTable) TransferDeletes(
 	if len(tbl.tombstoneTable.tableSpace.stats) != 0 {
 		tGetSoftdeleteObjects := time.Now()
 		softDeleteObjects = tbl.entry.GetSoftdeleteObjects(tbl.store.txn.GetStartTS(), tbl.transferedTS.Next(), ts)
+		var w bytes.Buffer
+		if len(softDeleteObjects) != 0 {
+			for i, obj := range softDeleteObjects {
+				w.WriteString(fmt.Sprintf("%d:%s\n", i, obj.String()))
+			}
+		}
+
+		logutil.Info(
+			"DEBUG-DN-TRANSFER-1",
+			zap.String("table", tbl.GetLocalSchema(false).Name),
+			zap.String("phase", phase),
+			zap.String("from", tbl.transferedTS.Next().ToString()),
+			zap.String("to", ts.ToString()),
+			zap.Int("s-cnt", len(softDeleteObjects)),
+			zap.String("s-objs", w.String()),
+		)
 		v2.TxnS3TombstoneTransferGetSoftdeleteObjectsHistogram.Observe(time.Since(tGetSoftdeleteObjects).Seconds())
 		v2.TxnS3TombstoneSoftdeleteObjectCounter.Add(float64(len(softDeleteObjects)))
 		var findTombstoneDuration, readTombstoneDuration, deleteRowsDuration time.Duration
@@ -350,9 +366,12 @@ func (tbl *txnTable) TransferDeletes(
 			}
 			writerStats := writer.GetObjectStats()
 			logutil.Info(
-				"DEBUG-DN-TRANSFER",
+				"DEBUG-DN-TRANSFER-2",
 				zap.String("table", tbl.GetLocalSchema(false).Name),
 				zap.String("stats", writerStats.String()),
+				zap.String("phase", phase),
+				zap.String("from", tbl.transferedTS.Next().ToString()),
+				zap.String("to", ts.ToString()),
 			)
 			stats := objectio.NewObjectStatsWithObjectID(name.ObjectId(), false, true, true)
 			objectio.SetObjectStats(stats, &writerStats)
