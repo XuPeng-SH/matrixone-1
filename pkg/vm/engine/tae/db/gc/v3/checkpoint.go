@@ -741,7 +741,7 @@ func (c *checkpointCleaner) tryGCLocked(
 	// 1.2. If there is no incremental checkpoint scanned, no need to do GC.
 	//      because GC is based on the scanned result.
 	var scannedWindow *GCWindow
-	if scannedWindow = c.GetScannedWindow(); scannedWindow == nil {
+	if scannedWindow = c.GetScannedWindowLocked(); scannedWindow == nil {
 		return
 	}
 
