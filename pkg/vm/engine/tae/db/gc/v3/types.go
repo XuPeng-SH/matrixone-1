@@ -161,7 +161,7 @@ type Cleaner interface {
 	RemoveChecker(key string) error
 	GetScanWaterMark() *checkpoint.CheckpointEntry
 	GetCheckpointGCWaterMark() *types.TS
-	GetFirstWindow() *GCWindow
+	GetGCWindow() *GCWindow
 	Stop()
 	// for test
 	SetMinMergeCountForTest(count int)

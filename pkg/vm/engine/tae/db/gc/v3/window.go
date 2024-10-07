@@ -90,6 +90,19 @@ type GCWindow struct {
 	}
 }
 
+func (w *GCWindow) Clone() GCWindow {
+	window := GCWindow{
+		metaDir: w.metaDir,
+		mp:      w.mp,
+		fs:      w.fs,
+		files:   make([]objectio.ObjectStats, 0, len(w.files)),
+	}
+	window.tsRange.start = w.tsRange.start
+	window.tsRange.end = w.tsRange.end
+	window.files = append(window.files, w.files...)
+	return window
+}
+
 func (w *GCWindow) MakeFilesReader(
 	ctx context.Context,
 	fs fileservice.FileService,

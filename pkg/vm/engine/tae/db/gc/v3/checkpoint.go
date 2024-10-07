@@ -99,7 +99,7 @@ type checkpointCleaner struct {
 	// remainingObjects is to record the currently valid GCWindow
 	remainingObjects struct {
 		sync.RWMutex
-		windows []*GCWindow
+		window *GCWindow
 	}
 
 	// gcState is used to record state of the executed GCs
@@ -366,7 +366,12 @@ func (c *checkpointCleaner) updateCheckpointGCWaterMark(ts *types.TS) {
 func (c *checkpointCleaner) addGCWindow(window *GCWindow) {
 	c.remainingObjects.Lock()
 	defer c.remainingObjects.Unlock()
-	c.remainingObjects.windows = append(c.remainingObjects.windows, window)
+	if c.remainingObjects.window == nil {
+		c.remainingObjects.window = window
+	} else {
+		c.remainingObjects.window.Merge(window)
+		window.Close()
+	}
 }
 
 func (c *checkpointCleaner) recordFilesGCed(files []string) {
@@ -391,10 +396,14 @@ func (c *checkpointCleaner) GetCheckpointGCWaterMark() *types.TS {
 	return c.watermarks.checkpointGCWaterMark.Load()
 }
 
-func (c *checkpointCleaner) GetFirstWindow() *GCWindow {
+func (c *checkpointCleaner) GetGCWindow() *GCWindow {
 	c.remainingObjects.RLock()
 	defer c.remainingObjects.RUnlock()
-	return c.remainingObjects.windows[0]
+	return c.remainingObjects.window
+}
+
+func (c *checkpointCleaner) GetGCWindowLocked() *GCWindow {
+	return c.remainingObjects.window
 }
 
 func (c *checkpointCleaner) SetMinMergeCountForTest(count int) {
@@ -528,13 +537,7 @@ func (c *checkpointCleaner) upgradeGCFiles(
 			delete(c.metaFiles, metaFile.Name())
 		}
 	}
-	c.remainingObjects.RLock()
-	if len(c.remainingObjects.windows) == 0 {
-		c.remainingObjects.RUnlock()
-		return
-	}
-	// windows[0] has always been a full GCWindow
-	c.remainingObjects.RUnlock()
+
 	if err = c.fs.DelFiles(c.ctx, deleteFiles); err != nil {
 		logutil.Error(
 			"Merging-GC-File-Error",
@@ -658,7 +661,7 @@ func (c *checkpointCleaner) mergeCheckpointFiles(
 	deleteFiles = append(deleteFiles, dFiles...)
 	// merge ickp
 	var newCheckpoint *checkpoint.CheckpointEntry
-	window := c.GetFirstWindow()
+	window := c.GetGCWindow()
 
 	if len(mergeFiles) > 0 {
 		ckpEnd := mergeFiles[len(mergeFiles)-1].GetEnd()
@@ -768,7 +771,8 @@ func (c *checkpointCleaner) TryGC() (err error) {
 		)
 		return
 	}
-	if len(c.remainingObjects.windows) == 0 {
+	var window *GCWindow
+	if window = c.GetGCWindow(); window == nil {
 		return
 	}
 	metaFiles := make(map[string]GCMetaFile, len(c.metaFiles))
@@ -776,7 +780,7 @@ func (c *checkpointCleaner) TryGC() (err error) {
 		metaFiles[k] = v
 	}
 	if err = c.upgradeGCFiles(
-		metaFiles, c.remainingObjects.windows[0],
+		metaFiles, window,
 	); err != nil {
 		logutil.Error(
 			"DiskCleaner-Replay-UpgradeGC-Error",
@@ -851,20 +855,11 @@ func (c *checkpointCleaner) doGCAgainstGlobalCheckpoint(
 			zap.String("soft-gc cost", softCost.String()),
 			zap.String("merge-table cost", mergeCost.String()))
 	}()
-	if len(c.remainingObjects.windows) < 2 {
+
+	window := c.GetGCWindowLocked()
+	if window == nil {
 		return nil, nil
 	}
-
-	// merge all windows into one for the following GC
-	// [t100, t200] [t200, t300] [t300, t400] => [t100, t400]
-	// [f1, f2, f3] [f4, f5, f6] [f7, f8, f9] => [f1, f2, f3, f4, f5, f6, f7, f8, f9
-	oneWindow := c.remainingObjects.windows[0]
-	for i := 1; i < len(c.remainingObjects.windows); i++ {
-		oneWindow.Merge(c.remainingObjects.windows[i])
-		c.remainingObjects.windows[i].Close()
-		c.remainingObjects.windows[i] = nil
-	}
-	c.remainingObjects.windows = c.remainingObjects.windows[:1]
 
 	var (
 		filesToGC []string
@@ -873,13 +868,13 @@ func (c *checkpointCleaner) doGCAgainstGlobalCheckpoint(
 	)
 	// do GC against the global checkpoint
 	// the result is the files that need to be deleted
-	// it will update the file list in the oneWindow
+	// it will update the file list in the window
 	// Before:
 	// [t100, t400] [f1, f2, f3, f4, f5, f6, f7, f8, f9]
 	// After:
 	// [t100, t400] [f10, f11]
 	// Also, it will update the GC metadata
-	if filesToGC, metafile, err = oneWindow.ExecuteGlobalCheckpointBasedGC(
+	if filesToGC, metafile, err = window.ExecuteGlobalCheckpointBasedGC(
 		c.ctx,
 		gckp,
 		accountSnapshots,
@@ -895,8 +890,8 @@ func (c *checkpointCleaner) doGCAgainstGlobalCheckpoint(
 	}
 	c.metaFiles[metafile] = GCMetaFile{
 		name:  metafile,
-		start: oneWindow.tsRange.start,
-		end:   oneWindow.tsRange.end,
+		start: window.tsRange.start,
+		end:   window.tsRange.end,
 		ext:   blockio.CheckpointExt,
 	}
 
@@ -995,24 +990,19 @@ func (c *checkpointCleaner) DoCheck() error {
 		return moerr.NewInternalErrorNoCtxf("processing clean GetPITRs %s: %v", debugCandidates[0].String(), err)
 	}
 
-	mergeWindow := NewGCWindow(c.mp, c.fs.Service)
-	for _, window := range c.remainingObjects.windows {
-		if len(window.files) == 0 {
-			logutil.Infof("mergeWindow is empty")
-		} else {
-			logutil.Infof("mergeWindow is %d, stats is %v", len(window.files), window.files[0].ObjectName().String())
-		}
-		mergeWindow.Merge(window)
+	var window GCWindow
+	if w := c.GetGCWindowLocked(); w != nil {
+		window = w.Clone()
 	}
-	defer mergeWindow.Close()
+	defer window.Close()
 
 	accoutSnapshots := TransformToTSList(snapshots)
 	logutil.Infof(
 		"merge table is %d, stats is %v",
-		len(mergeWindow.files),
-		mergeWindow.files[0].ObjectName().String(),
+		len(window.files),
+		window.files[0].ObjectName().String(),
 	)
-	if _, _, err = mergeWindow.ExecuteGlobalCheckpointBasedGC(
+	if _, _, err = window.ExecuteGlobalCheckpointBasedGC(
 		c.ctx,
 		gCkp,
 		accoutSnapshots,
@@ -1029,8 +1019,8 @@ func (c *checkpointCleaner) DoCheck() error {
 
 	logutil.Infof(
 		"merge table2 is %d, stats is %v",
-		len(mergeWindow.files),
-		mergeWindow.files[0].ObjectName().String(),
+		len(window.files),
+		window.files[0].ObjectName().String(),
 	)
 
 	//logutil.Infof("debug table is %d, stats is %v", len(debugWindow.files.stats), debugWindow.files.stats[0].ObjectName().String())
@@ -1050,9 +1040,9 @@ func (c *checkpointCleaner) DoCheck() error {
 	}
 
 	//logutil.Infof("debug table2 is %d, stats is %v", len(debugWindow.files.stats), debugWindow.files.stats[0].ObjectName().String())
-	objects1, objects2, equal := mergeWindow.Compare(debugWindow, buffer)
+	objects1, objects2, equal := window.Compare(debugWindow, buffer)
 	if !equal {
-		logutil.Errorf("remainingObjects :%v", c.remainingObjects.windows[0].String(objects1))
+		logutil.Errorf("remainingObjects :%v", window.String(objects1))
 		logutil.Errorf("debugWindow :%v", debugWindow.String(objects2))
 		return moerr.NewInternalErrorNoCtx("Compare is failed")
 	} else {
@@ -1166,7 +1156,7 @@ func (c *checkpointCleaner) Process() {
 		}
 
 		if err = c.upgradeGCFiles(
-			metaFiles, c.remainingObjects.windows[0],
+			metaFiles, c.GetGCWindow(),
 		); err != nil {
 			logutil.Error(
 				"DiskCleaner-Process-UpgradeGC-Error",
