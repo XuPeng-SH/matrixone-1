@@ -645,7 +645,7 @@ func (c *checkpointCleaner) filterCheckpoints(
 	var i int
 	for i = len(checkpoints) - 1; i >= 0; i-- {
 		endTS := checkpoints[i].GetEnd()
-		if endTS.LT(highWater) {
+		if endTS.LE(highWater) {
 			break
 		}
 	}
