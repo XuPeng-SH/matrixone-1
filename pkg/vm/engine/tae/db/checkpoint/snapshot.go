@@ -117,15 +117,11 @@ func ListSnapshotCheckpoint(
 	if len(metaFiles) == 0 {
 		return nil, nil
 	}
-	bat, version, closeCBs, err := loadCheckpointMeta(ctx, sid, fs, metaFiles)
-	defer func() {
-		for _, cb := range closeCBs {
-			cb()
-		}
-	}()
+	bat, version, err := loadCheckpointMeta(ctx, sid, fs, metaFiles)
 	if err != nil {
 		return nil, err
 	}
+	defer bat.Close()
 	return ListSnapshotCheckpointWithMeta(bat, version)
 }
 
@@ -198,7 +194,7 @@ func ListSnapshotMeta(
 	// so you only need to read the last meta file
 	oFiles, _ = FilterSortedMetaFilesByTimestamp(&snapshot, metaFiles)
 
-	return oFiles[:len(oFiles)-1], nil
+	return oFiles[len(oFiles)-1:], nil
 }
 
 func loadCheckpointMeta(
@@ -206,29 +202,28 @@ func loadCheckpointMeta(
 	sid string,
 	fs fileservice.FileService,
 	metaFiles []*MetaFile,
-) (bat *containers.Batch, checkpointVersion int, releases []func(), err error) {
+) (bat *containers.Batch, checkpointVersion int, err error) {
 	colNames := CheckpointSchema.Attrs()
 	colTypes := CheckpointSchema.Types()
 	bat = containers.NewBatch()
-	releases = make([]func(), 0)
 	var (
-		bats    []*batch.Batch
-		closeCB func()
-		reader  *blockio.BlockReader
+		bats   []*batch.Batch
+		tmpBat *batch.Batch
+		reader *blockio.BlockReader
 	)
-
 	loader := func(name string) error {
 		reader, err = blockio.NewFileReader(sid, fs, name)
 		if err != nil {
 			return err
 		}
+		var closeCB func()
 		bats, closeCB, err = reader.LoadAllColumns(ctx, nil, common.DebugAllocator)
 		if err != nil {
 			return err
 		}
-		if closeCB != nil {
-			releases = append(releases, closeCB)
-		}
+		defer func() {
+			closeCB()
+		}()
 
 		if len(bats) > 1 {
 			panic("unexpected multiple batches in a checkpoint file")
@@ -236,19 +231,13 @@ func loadCheckpointMeta(
 		if len(bats) == 0 {
 			return nil
 		}
-		b := bats[0]
-		if len(bat.Vecs) > 0 {
-			bat.Append(containers.ToTNBatch(b, common.DebugAllocator))
-			return nil
-		}
-		for i := range b.Vecs {
-			var vec containers.Vector
-			if bats[0].Vecs[i].Length() == 0 {
-				vec = containers.MakeVector(colTypes[i], common.DebugAllocator)
-			} else {
-				vec = containers.ToTNVector(bats[0].Vecs[i], common.DebugAllocator)
+		if tmpBat == nil {
+			tmpBat, err = bats[0].Dup(common.DefaultAllocator)
+			if err != nil {
+				return err
 			}
-			bat.AddVector(colNames[i], vec)
+		} else {
+			tmpBat.Append(ctx, common.DebugAllocator, bats[0])
 		}
 		return nil
 	}
@@ -258,6 +247,15 @@ func loadCheckpointMeta(
 		if err != nil {
 			return
 		}
+	}
+	for i := range tmpBat.Vecs {
+		var vec containers.Vector
+		if bats[0].Vecs[i].Length() == 0 {
+			vec = containers.MakeVector(colTypes[i], common.DebugAllocator)
+		} else {
+			vec = containers.ToTNVector(bats[0].Vecs[i], common.DebugAllocator)
+		}
+		bat.AddVector(colNames[i], vec)
 	}
 
 	// in version 1, checkpoint metadata doesn't contain 'version'.
