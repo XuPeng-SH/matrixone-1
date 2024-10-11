@@ -197,7 +197,13 @@ type GCMetaFile struct {
 }
 
 func (f *GCMetaFile) String() string {
-	return fmt.Sprintf("GCFile[%s-%s-%s-%s]", f.name, f.start, f.end, f.ext)
+	return fmt.Sprintf(
+		"GCFile[%s-%s-%s-%s]",
+		f.name,
+		f.ext,
+		f.start.ToString(),
+		f.end.ToString(),
+	)
 }
 
 func (f *GCMetaFile) FullName(dir string) string {
