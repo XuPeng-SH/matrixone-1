@@ -26,22 +26,35 @@ import (
 )
 
 var deleteTimeout = 10 * time.Minute
-var groupDeleteMaxCnt = 1000
+var deleteBatchSize = 1000
 
-func SetGroupDeleteMaxCnt(cnt int) {
-	groupDeleteMaxCnt = cnt
+func SetDeleteBatchSize(cnt int) {
+	deleteBatchSize = cnt
+}
+func SetDeleteTimeout(duration time.Duration) {
+	deleteTimeout = duration
 }
 
 type GCWorker struct {
 	// toDeletePaths is list of files that can be GC
-	toDeletePaths []string
-	fs            *objectio.ObjectFS
+	toDeletePaths   []string
+	fs              *objectio.ObjectFS
+	deleteTimeout   time.Duration
+	deleteBatchSize int
 }
 
 func NewGCWorker(fs *objectio.ObjectFS) *GCWorker {
-	return &GCWorker{
-		fs: fs,
+	w := &GCWorker{
+		fs:              fs,
+		deleteTimeout:   deleteTimeout,
+		deleteBatchSize: deleteBatchSize,
 	}
+	logutil.Info(
+		"GC-Worker-Init",
+		zap.Duration("delete-timeout", w.deleteTimeout),
+		zap.Int("delete-batch-size", w.deleteBatchSize),
+	)
+	return w
 }
 
 func (g *GCWorker) ExecDelete(
@@ -79,13 +92,13 @@ func (g *GCWorker) ExecDelete(
 
 	toDeletePaths := g.toDeletePaths
 
-	for i := 0; i < cnt; i += groupDeleteMaxCnt {
-		end := i + groupDeleteMaxCnt
+	for i := 0; i < cnt; i += g.deleteBatchSize {
+		end := i + g.deleteBatchSize
 		if end > cnt {
 			end = cnt
 		}
 		now := time.Now()
-		deleteCtx, cancel := context.WithTimeout(ctx, deleteTimeout)
+		deleteCtx, cancel := context.WithTimeout(ctx, g.deleteTimeout)
 		defer cancel()
 		err = g.fs.DelFiles(deleteCtx, toDeletePaths[i:end])
 		logutil.Info(
