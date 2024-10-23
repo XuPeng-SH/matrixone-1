@@ -179,7 +179,7 @@ func NewCheckpointCleaner(
 	for _, opt := range opts {
 		opt(cleaner)
 	}
-	cleaner.delWorker = NewGCWorker(fs, cleaner)
+	cleaner.delWorker = NewGCWorker(fs)
 	cleaner.options.gcEnabled.Store(true)
 	cleaner.mp = common.CheckpointAllocator
 	cleaner.checker.extras = make(map[string]func(item any) bool)
@@ -1062,16 +1062,9 @@ func (c *checkpointCleaner) tryGCAgainstGCKPLocked(
 	memoryBuffer *containers.OneSchemaBatchBuffer,
 ) (err error) {
 	now := time.Now()
-	// TODO: no error here???
-	if !c.delWorker.Start() {
-		return
-	}
 	var snapshots map[uint32]containers.Vector
 	var extraErrMsg string
 	defer func() {
-		if err != nil {
-			c.delWorker.Idle()
-		}
 		logtail.CloseSnapshotList(snapshots)
 		logutil.Info(
 			"GC-TRACE-TRY-GC-AGAINST-GCKP",
@@ -1102,7 +1095,11 @@ func (c *checkpointCleaner) tryGCAgainstGCKPLocked(
 	}
 	// Delete files after doGCAgainstGlobalCheckpointLocked
 	// TODO:Requires Physical Removal Policy
-	if err = c.delWorker.ExecDelete(c.ctx, filesToGC); err != nil {
+	if err = c.delWorker.ExecDelete(
+		c.ctx,
+		c.TaskNameLocked(),
+		filesToGC,
+	); err != nil {
 		extraErrMsg = fmt.Sprintf("ExecDelete %v failed", filesToGC)
 		return
 	}

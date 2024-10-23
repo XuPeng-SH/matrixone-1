@@ -16,7 +16,6 @@ package gc
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -26,71 +25,89 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 )
 
+var deleteTimeout = 10 * time.Minute
+var groupDeleteMaxCnt = 1000
+
+func SetGroupDeleteMaxCnt(cnt int) {
+	groupDeleteMaxCnt = cnt
+}
+
 type GCWorker struct {
-	sync.RWMutex
-	// objects is list of files that can be GC
-	objects []string
-
-	// The status of GCWorker, only one delete worker can be running
-	state CleanerState
-
-	cleaner *checkpointCleaner
-	fs      *objectio.ObjectFS
+	// toDeletePaths is list of files that can be GC
+	toDeletePaths []string
+	fs            *objectio.ObjectFS
 }
 
-func NewGCWorker(fs *objectio.ObjectFS, cleaner *checkpointCleaner) *GCWorker {
+func NewGCWorker(fs *objectio.ObjectFS) *GCWorker {
 	return &GCWorker{
-		state:   Idle,
-		fs:      fs,
-		cleaner: cleaner,
+		fs: fs,
 	}
 }
 
-func (g *GCWorker) Start() bool {
-	g.Lock()
-	defer g.Unlock()
-	if g.state == Running {
-		return false
+func (g *GCWorker) ExecDelete(
+	ctx context.Context,
+	taskName string,
+	names []string,
+) (err error) {
+	beforeCnt := len(g.toDeletePaths)
+	g.toDeletePaths = append(g.toDeletePaths, names...)
+
+	if len(g.toDeletePaths) == 0 {
+		return
 	}
-	g.state = Running
-	return true
-}
+	cnt := len(g.toDeletePaths)
 
-func (g *GCWorker) Idle() {
-	g.Lock()
-	defer g.Unlock()
-	g.state = Idle
-}
-
-func (g *GCWorker) resetObjects() {
-	g.objects = make([]string, 0)
-}
-
-func (g *GCWorker) ExecDelete(ctx context.Context, names []string) error {
-	g.Lock()
-	g.objects = append(g.objects, names...)
-	if len(g.objects) == 0 {
-		g.state = Idle
-		g.Unlock()
-		return nil
-	}
-	deleteCount := len(g.objects)
-	g.Unlock()
 	now := time.Now()
 	defer func() {
-		logutil.Info("[DB GC] exec delete files",
-			zap.Int("file count", deleteCount),
-			zap.String("time cost", time.Since(now).String()))
+		logger := logutil.Info
+		if err != nil {
+			logger = logutil.Error
+		}
+		logger(
+			"GC-ExecDelete-Done",
+			zap.String("task", taskName),
+			zap.Error(err),
+			zap.Duration("duration", time.Since(now)),
+		)
 	}()
-	logutil.Infof("[DB GC] files to delete: %v", g.objects)
-	err := g.fs.DelFiles(ctx, g.objects)
-	g.Lock()
-	defer g.Unlock()
-	if err != nil && !moerr.IsMoErrCode(err, moerr.ErrFileNotFound) {
-		g.state = Idle
-		return err
+	logutil.Info(
+		"GC-ExecDelete-Start",
+		zap.String("task", taskName),
+		zap.Int("before-cnt", beforeCnt),
+		zap.Int("cnt", cnt),
+	)
+
+	toDeletePaths := g.toDeletePaths
+
+	for i := 0; i < cnt; i += groupDeleteMaxCnt {
+		end := i + groupDeleteMaxCnt
+		if end > cnt {
+			end = cnt
+		}
+		now := time.Now()
+		deleteCtx, cancel := context.WithTimeout(ctx, deleteTimeout)
+		defer cancel()
+		err = g.fs.DelFiles(deleteCtx, toDeletePaths[i:end])
+		logutil.Info(
+			"GC-ExecDelete-Group",
+			zap.String("task", taskName),
+			zap.Strings("paths", toDeletePaths[i:end]),
+			zap.Duration("duration", time.Since(now)),
+			zap.Int("left", cnt-end),
+			zap.Int("cnt", end-i),
+			zap.Error(err),
+		)
+		if err != nil && !moerr.IsMoErrCode(err, moerr.ErrFileNotFound) {
+			return
+		}
+		err = nil
+		g.toDeletePaths = toDeletePaths[end:]
 	}
-	g.resetObjects()
-	g.state = Idle
-	return nil
+
+	if cap(g.toDeletePaths) > 5000 {
+		g.toDeletePaths = make([]string, 0, 1000)
+	} else {
+		g.toDeletePaths = g.toDeletePaths[:0]
+	}
+	return
 }
