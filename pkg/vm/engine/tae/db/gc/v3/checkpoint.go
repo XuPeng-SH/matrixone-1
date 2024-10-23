@@ -105,8 +105,9 @@ type checkpointCleaner struct {
 	mutation struct {
 		sync.Mutex
 		taskState struct {
-			id   uint64
-			name string
+			id        uint64
+			name      string
+			startTime time.Time
 		}
 		scanned      *GCWindow
 		metaFiles    map[string]GCMetaFile
@@ -236,9 +237,19 @@ func (c *checkpointCleaner) StartMutationTask(name string) {
 	c.mutation.Lock()
 	c.mutation.taskState.id++
 	c.mutation.taskState.name = fmt.Sprintf("%s-%d", name, c.mutation.taskState.id)
+	c.mutation.taskState.startTime = time.Now()
+	logutil.Info(
+		"GC-Task-Started",
+		zap.String("task", c.TaskNameLocked()),
+	)
 }
 
 func (c *checkpointCleaner) StopMutationTask() {
+	logutil.Info(
+		"GC-Task-Done",
+		zap.String("task", c.TaskNameLocked()),
+		zap.Duration("duration", time.Since(c.mutation.taskState.startTime)),
+	)
 	c.mutation.taskState.name = ""
 	c.mutation.Unlock()
 }
