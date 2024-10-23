@@ -35,7 +35,7 @@ func SetDeleteTimeout(duration time.Duration) {
 	deleteTimeout = duration
 }
 
-type GCWorker struct {
+type Deleter struct {
 	// toDeletePaths is list of files that can be GC
 	toDeletePaths   []string
 	fs              *objectio.ObjectFS
@@ -43,8 +43,8 @@ type GCWorker struct {
 	deleteBatchSize int
 }
 
-func NewGCWorker(fs *objectio.ObjectFS) *GCWorker {
-	w := &GCWorker{
+func NewDeleter(fs *objectio.ObjectFS) *Deleter {
+	w := &Deleter{
 		fs:              fs,
 		deleteTimeout:   deleteTimeout,
 		deleteBatchSize: deleteBatchSize,
@@ -57,13 +57,13 @@ func NewGCWorker(fs *objectio.ObjectFS) *GCWorker {
 	return w
 }
 
-func (g *GCWorker) ExecDelete(
+func (g *Deleter) DeleteMany(
 	ctx context.Context,
 	taskName string,
-	names []string,
+	paths []string,
 ) (err error) {
 	beforeCnt := len(g.toDeletePaths)
-	g.toDeletePaths = append(g.toDeletePaths, names...)
+	g.toDeletePaths = append(g.toDeletePaths, paths...)
 
 	if len(g.toDeletePaths) == 0 {
 		return

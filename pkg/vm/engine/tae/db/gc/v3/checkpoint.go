@@ -49,7 +49,7 @@ type checkpointCleaner struct {
 	fs *objectio.ObjectFS
 
 	checkpointCli checkpoint.RunnerReader
-	delWorker     *GCWorker
+	deleter       *Deleter
 
 	watermarks struct {
 		// scanWaterMark is the watermark of the incremental checkpoint which has been
@@ -179,7 +179,7 @@ func NewCheckpointCleaner(
 	for _, opt := range opts {
 		opt(cleaner)
 	}
-	cleaner.delWorker = NewGCWorker(fs)
+	cleaner.deleter = NewDeleter(fs)
 	cleaner.options.gcEnabled.Store(true)
 	cleaner.mp = common.CheckpointAllocator
 	cleaner.checker.extras = make(map[string]func(item any) bool)
@@ -1095,7 +1095,7 @@ func (c *checkpointCleaner) tryGCAgainstGCKPLocked(
 	}
 	// Delete files after doGCAgainstGlobalCheckpointLocked
 	// TODO:Requires Physical Removal Policy
-	if err = c.delWorker.ExecDelete(
+	if err = c.deleter.DeleteMany(
 		c.ctx,
 		c.TaskNameLocked(),
 		filesToGC,
