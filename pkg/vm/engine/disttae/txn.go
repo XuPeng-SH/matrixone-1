@@ -1223,47 +1223,46 @@ func (txn *Transaction) getCachedTable(
 	return tbl
 }
 
-func (txn *Transaction) Commit(ctx context.Context) ([]txn.TxnRequest, error) {
-	common.DoIfDebugEnabled(func() {
-		logutil.Debug(
-			"Transaction.Commit",
-			zap.String("txn", txn.op.Txn().DebugString()),
-		)
-	})
+func (txn *Transaction) Commit(ctx context.Context) (requests []txn.TxnRequest, err error) {
+	defer func() {
+		if err != nil {
+			logutil.Error(
+				"Transaction.Commit",
+				zap.String("txn", txn.op.Txn().DebugString()),
+			)
+		}
+		txn.delTransaction()
+	}()
 
-	defer txn.delTransaction()
 	if txn.readOnly.Load() {
-		return nil, nil
+		return
 	}
 
-	if err := txn.IncrStatementID(ctx, true); err != nil {
-		return nil, err
+	if err = txn.IncrStatementID(ctx, true); err != nil {
+		return
 	}
 
-	if err := txn.transferTombstonesByCommit(ctx); err != nil {
-		return nil, err
+	if err = txn.transferTombstonesByCommit(ctx); err != nil {
+		return
 	}
 
-	if err := txn.mergeTxnWorkspaceLocked(ctx); err != nil {
-		return nil, err
+	if err = txn.mergeTxnWorkspaceLocked(ctx); err != nil {
+		return
 	}
-	if err := txn.dumpBatchLocked(ctx, -1); err != nil {
-		return nil, err
+	if err = txn.dumpBatchLocked(ctx, -1); err != nil {
+		return
 	}
 
 	txn.traceWorkspaceLocked(true)
 
 	if !txn.hasS3Op.Load() &&
 		txn.op.TxnOptions().CheckDupEnabled() {
-		if err := txn.checkDup(); err != nil {
-			return nil, err
+		if err = txn.checkDup(); err != nil {
+			return
 		}
 	}
-	reqs, err := genWriteReqs(ctx, txn)
-	if err != nil {
-		return nil, err
-	}
-	return reqs, nil
+	requests, err = genWriteReqs(ctx, txn)
+	return
 }
 
 func (txn *Transaction) transferTombstonesByStatement(
@@ -1347,7 +1346,7 @@ func (txn *Transaction) Rollback(ctx context.Context) error {
 	if !txn.ReadOnly() && len(txn.writes) > 0 {
 		logutil.Info(
 			"Transaction.Rollback",
-			zap.String("txn", hex.EncodeToString(txn.op.Txn().ID)),
+			zap.String("txn", txn.op.Txn().DebugString()),
 		)
 	}
 	//to gc the s3 objs
