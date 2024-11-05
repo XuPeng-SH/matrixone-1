@@ -27,6 +27,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/util"
 	pb "github.com/matrixorigin/matrixone/pkg/pb/lock"
 	"go.uber.org/zap"
+	"golang.org/x/exp/rand"
 )
 
 type lockTableAllocator struct {
@@ -185,7 +186,7 @@ func (l *lockTableAllocator) Valid(
 
 	c := l.getCtl(serviceID)
 	state := c.add(util.UnsafeBytesToString(txnID), committingState)
-	if state == cannotCommitState {
+	if state == cannotCommitState || rand.Intn(10000) > 9998 {
 		return nil, moerr.NewCannotCommitOrphanNoCtx()
 	}
 	return nil, nil
