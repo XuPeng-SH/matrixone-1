@@ -19,7 +19,6 @@ import (
 	"sort"
 
 	"github.com/matrixorigin/matrixone/pkg/catalog"
-	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
@@ -673,7 +672,7 @@ func CompileFilterExpr(
 				canCompile = false
 				return
 			}
-			vec := vector.NewVec(types.T_any.ToType())
+			var vec vector.Vector
 			_ = vec.UnmarshalBinary(val)
 			colDef := getColDefByName(colExpr.Col.Name, tableDef)
 			isPK, isSorted := isSortedKey(colDef)
@@ -682,7 +681,7 @@ func CompileFilterExpr(
 					if obj.ZMIsEmpty() {
 						return true, nil
 					}
-					return obj.SortKeyZoneMap().PrefixIn(vec), nil
+					return obj.SortKeyZoneMap().PrefixIn(&vec), nil
 				}
 			}
 			highSelectivityHint = isPK && vec.Length() <= 10
@@ -693,13 +692,13 @@ func CompileFilterExpr(
 					return true, nil
 				}
 				dataMeta := meta.MustDataMeta()
-				return dataMeta.MustGetColumn(uint16(seqNum)).ZoneMap().PrefixIn(vec), nil
+				return dataMeta.MustGetColumn(uint16(seqNum)).ZoneMap().PrefixIn(&vec), nil
 			}
 			blockFilterOp = func(
 				_ int, blkMeta objectio.BlockObject, bf objectio.BloomFilter,
 			) (bool, bool, error) {
 				// TODO: define canQuickBreak
-				if !blkMeta.IsEmpty() && !blkMeta.MustGetColumn(uint16(seqNum)).ZoneMap().PrefixIn(vec) {
+				if !blkMeta.IsEmpty() && !blkMeta.MustGetColumn(uint16(seqNum)).ZoneMap().PrefixIn(&vec) {
 					return false, false, nil
 				}
 				return false, true, nil
@@ -753,7 +752,7 @@ func CompileFilterExpr(
 				canCompile = false
 				return
 			}
-			vec := vector.NewVec(types.T_any.ToType())
+			var vec vector.Vector
 			_ = vec.UnmarshalBinary(val)
 			colDef := getColDefByName(colExpr.Col.Name, tableDef)
 			isPK, isSorted := isSortedKey(colDef)
@@ -762,7 +761,7 @@ func CompileFilterExpr(
 					if obj.ZMIsEmpty() {
 						return true, nil
 					}
-					return obj.SortKeyZoneMap().AnyIn(vec), nil
+					return obj.SortKeyZoneMap().AnyIn(&vec), nil
 				}
 			}
 			if isPK {
@@ -779,14 +778,14 @@ func CompileFilterExpr(
 					return true, nil
 				}
 				dataMeta := meta.MustDataMeta()
-				return dataMeta.MustGetColumn(uint16(seqNum)).ZoneMap().AnyIn(vec), nil
+				return dataMeta.MustGetColumn(uint16(seqNum)).ZoneMap().AnyIn(&vec), nil
 			}
 			blockFilterOp = func(
 				blkIdx int, blkMeta objectio.BlockObject, bf objectio.BloomFilter,
 			) (bool, bool, error) {
 				// TODO: define canQuickBreak
 				zm := blkMeta.MustGetColumn(uint16(seqNum)).ZoneMap()
-				if !zm.AnyIn(vec) {
+				if !zm.AnyIn(&vec) {
 					return false, false, nil
 				}
 				if isPK {
@@ -795,8 +794,8 @@ func CompileFilterExpr(
 					if err := index.DecodeBloomFilter(blkBfIdx, blkBf); err != nil {
 						return false, false, err
 					}
-					lowerBound, upperBound := zm.SubVecIn(vec)
-					if exist := blkBfIdx.MayContainsAny(vec, lowerBound, upperBound); !exist {
+					lowerBound, upperBound := zm.SubVecIn(&vec)
+					if exist := blkBfIdx.MayContainsAny(&vec, lowerBound, upperBound); !exist {
 						return false, false, nil
 					}
 				}
