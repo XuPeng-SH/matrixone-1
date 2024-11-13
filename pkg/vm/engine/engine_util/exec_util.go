@@ -222,6 +222,46 @@ func FilterObjects(
 	return
 }
 
+func MayContainsAnyPKInCommittedObjects(
+	ctx context.Context,
+	tableDef *plan.TableDef,
+	pkValues *vector.Vector,
+	ps *logtailreplay.PartitionState,
+	from, to types.TS,
+	fs fileservice.FileService,
+) (yes bool, err error) {
+	// TODO: optimize me
+	delObjs, cObjs := ps.GetChangedObjsBetween(from.Next(), to)
+	if len(delObjs)+len(cObjs) == 0 {
+		return false, nil
+	}
+	objs := make([]logtailreplay.ObjectInfo, 0, len(delObjs)+len(cObjs))
+	for name := range delObjs {
+		if obj, ok := ps.GetObject(name); ok {
+			objs = append(objs, obj)
+		}
+	}
+	for name := range cObjs {
+		if obj, ok := ps.GetObject(name); ok {
+			objs = append(objs, obj)
+		}
+	}
+
+	pos := 0
+	nextObjectFn := func() (objectio.ObjectStats, error) {
+		if pos >= len(objs) {
+			return objectio.ZeroObjectStats, ErrNoMore
+		}
+		obj := objs[pos]
+		pos++
+		return obj.ObjectStats, nil
+	}
+
+	return MayContainsAnyPKInObjects(
+		ctx, tableDef, pkValues, nextObjectFn, fs,
+	)
+}
+
 func MayContainsAnyPKInObjects(
 	ctx context.Context,
 	tableDef *plan.TableDef,
