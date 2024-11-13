@@ -88,8 +88,10 @@ func (o ObjectEntry) ObjectDTSIndexLess(than ObjectEntry) bool {
 	if !x.Equal(&y) {
 		return x.LT(&y)
 	}
-
-	return o.CreateTime.LT(&than.CreateTime)
+	if v := o.CreateTime.Compare(&than.CreateTime); v != 0 {
+		return v < 0
+	}
+	return bytes.Compare((*o.ObjectShortName())[:], (*than.ObjectShortName())[:]) < 0
 }
 
 func (o ObjectEntry) IsEmpty() bool {
