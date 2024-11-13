@@ -21,6 +21,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/mpool"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/container/types"
+	"github.com/matrixorigin/matrixone/pkg/container/vector"
 	"github.com/matrixorigin/matrixone/pkg/fileservice"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
@@ -33,6 +34,7 @@ import (
 )
 
 var ErrNoMore = moerr.NewInternalErrorNoCtx("no more")
+var ErrQuickReturn = moerr.NewInternalErrorNoCtx("quick return")
 
 func StreamBatchProcess(
 	ctx context.Context,
@@ -107,6 +109,7 @@ func FilterObjects(
 	latestObjects []objectio.ObjectStats,
 	extraObjects []objectio.ObjectStats,
 	outBlocks *objectio.BlockInfoSlice,
+	atMostOneOut bool,
 	highSelectivityHint bool,
 	fs fileservice.FileService,
 ) (
@@ -200,6 +203,9 @@ func FilterObjects(
 			var blk objectio.BlockInfo
 			objStats.ConstructBlockInfoTo(uint16(pos), &blk)
 			outBlocks.AppendBlockInfo(&blk)
+			if atMostOneOut {
+				return ErrQuickReturn
+			}
 		}
 
 		return
@@ -210,6 +216,54 @@ func FilterObjects(
 		latestObjects,
 		extraObjects,
 	)
+	if err != nil && err == ErrQuickReturn {
+		err = nil
+	}
+	return
+}
+
+func MayContainsAnyPKInObjects(
+	ctx context.Context,
+	tableDef *plan.TableDef,
+	pkValues *vector.Vector,
+	nextObjectFn func() (objectio.ObjectStats, error),
+	fs fileservice.FileService,
+) (yes bool, err error) {
+	// 1. Make InExpr
+	inExpr := ConstructInExpr(
+		ctx, tableDef.Pkey.PkeyColName, pkValues,
+	)
+
+	// 2. Compile InExpr
+	fastFilterOp, loadOp, objectFilterOp, blockFilterOp, seekOp, ok, highSelectivityHint := CompileFilterExprs(
+		[]*plan.Expr{inExpr}, tableDef, fs,
+	)
+	if !ok {
+		// should not happen
+		return false, moerr.NewInternalErrorNoCtx("failed to compile filter exprs")
+	}
+
+	// 3. Filter objects by InExpr
+	var outBlocks objectio.BlockInfoSlice
+	if _, _, _, _, _, _, _, _, err = FilterObjects(
+		ctx,
+		fastFilterOp,
+		loadOp,
+		objectFilterOp,
+		blockFilterOp,
+		seekOp,
+		nextObjectFn,
+		nil,
+		nil,
+		&outBlocks,
+		true,
+		highSelectivityHint,
+		fs,
+	); err != nil {
+		return
+	}
+
+	yes = outBlocks.Len() > 0
 	return
 }
 
@@ -306,6 +360,7 @@ func FilterTxnObjects(
 		uncommittedObjects,
 		extraCommittedObjects,
 		outBlocks,
+		false,
 		highSelectivityHint,
 		fs,
 	)
