@@ -1914,6 +1914,24 @@ func (tbl *txnTable) tryToSubscribe(ctx context.Context) (ps *logtailreplay.Part
 
 }
 
+func (tbl *txnTable) PKMayPersistedBetween(
+	ps *logtailreplay.PartitionState,
+	from, to types.TS,
+	keys *vector.Vector,
+) (bool, error) {
+	ctx := tbl.proc.Load().Ctx
+	fs := tbl.getTxn().engine.fs
+	return engine_util.MayContainsAnyPKInCommittedObjects(
+		ctx,
+		tbl.tableDef,
+		keys,
+		ps,
+		from,
+		to,
+		fs,
+	)
+}
+
 func (tbl *txnTable) PKPersistedBetween(
 	p *logtailreplay.PartitionState,
 	from types.TS,
