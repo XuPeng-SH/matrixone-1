@@ -1923,7 +1923,10 @@ func (tbl *txnTable) PKPersistedBetween(
 	to types.TS,
 	keys *vector.Vector,
 ) (bool, error) {
-	if strings.Contains(tbl.tableName, "bmsql_") {
+	if strings.Contains(tbl.tableName, "bmsql_") && !strings.Contains(tbl.tableName, "history") {
+		// if rand.Intn(1000) > 990 {
+		// 	return true, nil
+		// }
 		return true, nil
 	}
 
