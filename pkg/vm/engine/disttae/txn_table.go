@@ -1923,6 +1923,9 @@ func (tbl *txnTable) PKPersistedBetween(
 	to types.TS,
 	keys *vector.Vector,
 ) (bool, error) {
+	if strings.Contains(tbl.tableName, "bmsql_") {
+		return true, nil
+	}
 
 	ctx := tbl.proc.Load().Ctx
 	fs := tbl.getTxn().engine.fs
@@ -2086,7 +2089,6 @@ func (tbl *txnTable) PrimaryKeysMayBeModified(
 		return false,
 			moerr.NewInternalErrorNoCtx("primary key modification is not allowed in snapshot transaction")
 	}
-	return true, nil
 
 	//snap, err := tbl.getPartitionState(ctx)
 	//if err != nil {
