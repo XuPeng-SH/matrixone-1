@@ -16,6 +16,7 @@ package objectio
 
 import (
 	"context"
+	"strings"
 
 	"github.com/matrixorigin/matrixone/pkg/util/fault"
 )
@@ -41,6 +42,9 @@ const (
 )
 
 func LogWorkspaceInjected(name string) (bool, int) {
+	if strings.Contains(name, "sbtest") {
+		return true, 1
+	}
 	iarg, sarg, injected := fault.TriggerFault(FJ_LogWorkspace)
 	if !injected {
 		return false, 0
@@ -54,6 +58,9 @@ func LogWorkspaceInjected(name string) (bool, int) {
 // `name` is the table name
 // return injected, logLevel
 func LogReaderInjected(name string) (bool, int) {
+	if strings.Contains(name, "sbtest") {
+		return true, 1
+	}
 	iarg, sarg, injected := fault.TriggerFault(FJ_LogReader)
 	if !injected {
 		return false, 0
