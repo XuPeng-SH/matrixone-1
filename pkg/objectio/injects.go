@@ -42,14 +42,11 @@ const (
 )
 
 func LogWorkspaceInjected(name string) (bool, int) {
-	if strings.Contains(name, "sbtest") {
-		return true, 1
-	}
 	iarg, sarg, injected := fault.TriggerFault(FJ_LogWorkspace)
 	if !injected {
 		return false, 0
 	}
-	if sarg == name || sarg == FJ_C_AllNames {
+	if sarg == FJ_C_AllNames || strings.Contains(name, sarg) {
 		return true, int(iarg)
 	}
 	return false, 0
@@ -58,17 +55,14 @@ func LogWorkspaceInjected(name string) (bool, int) {
 // `name` is the table name
 // return injected, logLevel
 func LogReaderInjected(name string) (bool, int) {
-	if strings.Contains(name, "sbtest") {
-		return true, 1
-	}
 	iarg, sarg, injected := fault.TriggerFault(FJ_LogReader)
 	if !injected {
 		return false, 0
 	}
-	if sarg != name {
-		return false, 0
+	if sarg == FJ_C_AllNames || strings.Contains(name, sarg) {
+		return true, int(iarg)
 	}
-	return true, int(iarg)
+	return false, 0
 }
 
 // inject log reader and partition state
