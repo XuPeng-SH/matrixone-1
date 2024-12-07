@@ -627,7 +627,7 @@ func (tbl *txnTable) doRanges(
 
 		if tbl.enableLogFilterExpr.Load() || strings.Contains(tbl.tableDef.Name, "statement_info") {
 			logutil.Info(
-				"TXN-FILTER-RANGE-LOG",
+				"DEBUG-SLOW-TXN-RANGES",
 				zap.String("name", tbl.tableDef.Name),
 				zap.String("exprs", plan2.FormatExprs(exprs)),
 				zap.Int("ranges-len", blocks.Len()),

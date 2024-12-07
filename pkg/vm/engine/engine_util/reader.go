@@ -424,7 +424,7 @@ func (r *reader) Read(
 			}
 			if logLevel == 0 {
 				logutil.Info(
-					"LOGREADER-INJECTED-1",
+					"DEBUG-SLOW-TXN-READER",
 					zap.String("name", r.name),
 					zap.String("ts", r.ts.DebugString()),
 					zap.Int("data-len", outBatch.RowCount()),

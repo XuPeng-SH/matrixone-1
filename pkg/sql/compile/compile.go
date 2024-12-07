@@ -726,14 +726,14 @@ func (c *Compile) lockMetaTables() error {
 				txnStr = txn.Txn().DebugString()
 			}
 			logutil.Infof(
-				"lock meta error=%s, cost=%s, isDefChange=%v, stack=%s, db=%s,table=%s,txn=%s",
-				names[0],
-				names[1],
-				txnStr,
+				"DEBUG-SLOW-TXN-x lock meta error=%s, cost=%s, isDefChange=%v, stack=%s, db=%s,table=%s,txn=%s",
 				err.Error(),
 				timeCost.String(),
 				isDefChange,
 				string(debug.Stack()),
+				names[0],
+				names[1],
+				txnStr,
 			)
 
 			// if get error in locking mocatalog.mo_tables by it's dbName & tblName
