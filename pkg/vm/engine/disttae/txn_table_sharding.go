@@ -734,6 +734,7 @@ func (tbl *txnTableDelegate) BuildShardingReaders(
 				ds,
 				engine_util.GetThresholdForReader(newNum),
 				engine.FilterHint{},
+				proc.GetTxnOperator().Txn().DebugString(),
 			)
 			if err != nil {
 				return nil, err

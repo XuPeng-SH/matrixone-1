@@ -1823,6 +1823,7 @@ func (tbl *txnTable) BuildReaders(
 			ds,
 			engine_util.GetThresholdForReader(newNum),
 			filterHint,
+			proc.GetTxnOperator().Txn().DebugString(),
 		)
 		if err != nil {
 			return nil, err

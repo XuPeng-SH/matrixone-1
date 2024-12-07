@@ -17,13 +17,14 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"os"
 	"os/user"
 	"path"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/engine_util"
@@ -236,6 +237,7 @@ func NewDefaultTableReader(
 		source,
 		engine_util.GetThresholdForReader(1),
 		engine.FilterHint{Must: true},
+		"",
 	)
 }
 

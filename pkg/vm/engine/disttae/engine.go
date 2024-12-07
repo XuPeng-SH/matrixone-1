@@ -653,6 +653,7 @@ func (e *Engine) BuildBlockReaders(
 
 	mod := blkCnt % newNum
 	divide := blkCnt / newNum
+	txn := proc.GetTxnOperator().Txn().DebugString()
 	for i := 0; i < newNum; i++ {
 		if i == 0 {
 			shard = relData.DataSlice(i*divide, (i+1)*divide+mod)
@@ -675,6 +676,7 @@ func (e *Engine) BuildBlockReaders(
 			ds,
 			engine_util.GetThresholdForReader(newNum),
 			engine.FilterHint{},
+			txn,
 		)
 		if err != nil {
 			return nil, err

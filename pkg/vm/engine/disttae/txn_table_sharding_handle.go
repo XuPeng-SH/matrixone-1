@@ -286,6 +286,7 @@ func HandleShardingReadBuildReader(
 		ds,
 		engine_util.GetThresholdForReader(1),
 		engine.FilterHint{},
+		tbl.proc.Load().GetTxnOperator().Txn().DebugString(),
 	)
 	if err != nil {
 		return nil, err

@@ -204,6 +204,7 @@ type withFilterMixin struct {
 	ts       timestamp.Timestamp
 	tableDef *plan.TableDef
 	name     string
+	msg      string
 
 	// columns used for reading
 	columns struct {
@@ -322,6 +323,7 @@ func NewReader(
 	source engine.DataSource,
 	threshHold uint64,
 	filterHint engine.FilterHint,
+	msg string,
 ) (*reader, error) {
 
 	baseFilter, err := ConstructBasePKFilter(
@@ -358,6 +360,7 @@ func NewReader(
 			ts:       ts,
 			tableDef: tableDef,
 			name:     tableDef.Name,
+			msg:      msg,
 		},
 		source: source,
 	}
