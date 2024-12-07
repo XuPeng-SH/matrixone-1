@@ -35,6 +35,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/index"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/options"
 	"github.com/matrixorigin/matrixone/pkg/vm/process"
+	"go.uber.org/zap"
 )
 
 // S3Writer is used to write table data to S3 and package a series of `BlockWriter` write operations
@@ -314,7 +315,13 @@ func getVarlenaCols(bats []*batch.Batch, idx int) (cols []struct {
 
 func (w *S3Writer) FlushTailBatch(ctx context.Context, proc *process.Process) ([]objectio.BlockInfo, objectio.ObjectStats, error) {
 	if w.batSize >= TagS3SizeForMOLogger {
-		return w.SortAndSync(ctx, proc)
+		infos, stats, err := w.SortAndSync(ctx, proc)
+		logutil.Info(
+			"DEBUG-SLOW-TXN-OBJ-FTB",
+			zap.String("table", w.tablename),
+			zap.String("name", stats.String()),
+		)
+		return infos, stats, err
 	}
 	return nil, objectio.ObjectStats{}, w.writeBatsToBlockInfoBat(proc.GetMPool())
 }

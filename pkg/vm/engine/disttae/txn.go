@@ -584,6 +584,10 @@ func (txn *Transaction) dumpInsertBatchLocked(ctx context.Context, offset int, s
 		if err != nil {
 			return err
 		}
+		logutil.Info(
+			"DEBUG-SLOW-TXN-OBJ-DUMP",
+			zap.String("name", stats.String()),
+		)
 		err = s3Writer.FillBlockInfoBat(blockInfos, stats, txn.proc.GetMPool())
 		if err != nil {
 			return err
@@ -1071,6 +1075,10 @@ func (txn *Transaction) compactionBlksLocked(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		logutil.Info(
+			"DEBUG-SLOW-TXN-OBJ-COMP",
+			zap.String("name", stats.String()),
+		)
 		if len(createdBlks) > 0 {
 			bat := batch.NewWithSize(2)
 			bat.Attrs = []string{catalog.BlockMeta_BlockInfo, catalog.ObjectMeta_ObjectStats}
