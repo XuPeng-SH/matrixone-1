@@ -621,11 +621,11 @@ func (tbl *txnTable) doRanges(
 			tbl.enableLogFilterExpr.Store(true)
 		}
 
-		if rangesLen >= 1 {
+		if rangesLen >= 50 {
 			tbl.enableLogFilterExpr.Store(true)
 		}
 
-		if tbl.enableLogFilterExpr.Load() {
+		if tbl.enableLogFilterExpr.Load() || strings.Contains(tbl.tableDef.Name, "statement_info") {
 			logutil.Info(
 				"TXN-FILTER-RANGE-LOG",
 				zap.String("name", tbl.tableDef.Name),
@@ -633,6 +633,7 @@ func (tbl *txnTable) doRanges(
 				zap.Int("ranges-len", blocks.Len()),
 				zap.Uint64("tbl-id", tbl.tableId),
 				zap.String("txn", tbl.db.op.Txn().DebugString()),
+				zap.Duration("duration", time.Since(start)),
 			)
 		}
 

@@ -409,8 +409,8 @@ func (r *reader) Read(
 		if err != nil || dataState == engine.End {
 			r.Close()
 		}
-
-		if injected, logLevel := objectio.LogReaderInjected("", r.name); injected || err != nil {
+		if strings.Contains(r.name, "statement_info") || err != nil {
+			logLevel := 0
 			if err != nil {
 				logutil.Error(
 					"LOGREADER-ERROR",
@@ -428,6 +428,7 @@ func (r *reader) Read(
 					zap.String("name", r.name),
 					zap.String("ts", r.ts.DebugString()),
 					zap.Int("data-len", outBatch.RowCount()),
+					zap.Duration("duration", time.Since(start)),
 					zap.Error(err),
 				)
 			} else {
@@ -439,6 +440,7 @@ func (r *reader) Read(
 					"LOGREADER-INJECTED-1",
 					zap.String("name", r.name),
 					zap.String("ts", r.ts.DebugString()),
+					zap.Duration("duration", time.Since(start)),
 					zap.Error(err),
 					zap.String("data", common.MoBatchToString(outBatch, maxLogCnt)),
 				)
