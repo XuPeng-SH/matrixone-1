@@ -721,7 +721,20 @@ func (c *Compile) lockMetaTables() error {
 		if err != nil {
 			timeCost := time.Since(lockStart)
 			isDefChange := moerr.IsMoErrCode(err, moerr.ErrTxnNeedRetryWithDefChanged)
-			logutil.Infof("lock meta error=%s, cost=%dms, isDefChange=%v, stack=%s", err.Error(), timeCost.Milliseconds(), isDefChange, string(debug.Stack()))
+			txnStr := ""
+			if txn := c.proc.GetTxnOperator(); txn != nil {
+				txnStr = txn.Txn().DebugString()
+			}
+			logutil.Infof(
+				"lock meta error=%s, cost=%s, isDefChange=%v, stack=%s, db=%s,table=%s,txn=%s",
+				names[0],
+				names[1],
+				txnStr,
+				err.Error(),
+				timeCost.String(),
+				isDefChange,
+				string(debug.Stack()),
+			)
 
 			// if get error in locking mocatalog.mo_tables by it's dbName & tblName
 			// that means the origin table's schema was changed. then return NeedRetryWithDefChanged err

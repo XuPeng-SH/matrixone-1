@@ -26,6 +26,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/container/batch"
 	"github.com/matrixorigin/matrixone/pkg/defines"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/plan"
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
 	"github.com/matrixorigin/matrixone/pkg/sql/parsers/tree"
@@ -229,6 +230,11 @@ func (c *Compile) Run(_ uint64) (queryResult *util2.RunResult, err error) {
 	queryResult = &util2.RunResult{}
 	v2.TxnStatementTotalCounter.Inc()
 	for {
+		logutil.Info(
+			"DEBUG-SLOW-TXN-1",
+			zap.String("txn", txnOperator.Txn().DebugString()),
+			zap.Int("retry-time", retryTimes),
+		)
 		// Record the time from the beginning of Run to just before runOnce().
 		preRunOnceStart := time.Now()
 		// Before compile.runOnce, Reset the 'StatsInfo' execution related resources in context
@@ -242,7 +248,17 @@ func (c *Compile) Run(_ uint64) (queryResult *util2.RunResult, err error) {
 				stats.StoreCompilePreRunOnceDuration(time.Since(preRunOnceStart))
 			}
 
+			logutil.Info(
+				"DEBUG-SLOW-TXN-2",
+				zap.String("txn", txnOperator.Txn().DebugString()),
+				zap.Int("retry-time", retryTimes),
+			)
 			if err = runC.runOnce(); err == nil {
+				logutil.Info(
+					"DEBUG-SLOW-TXN-3",
+					zap.String("txn", txnOperator.Txn().DebugString()),
+					zap.Int("retry-time", retryTimes),
+				)
 				if runC.anal != nil {
 					runC.anal.retryTimes = retryTimes
 				}
@@ -283,6 +299,11 @@ func (c *Compile) Run(_ uint64) (queryResult *util2.RunResult, err error) {
 		if runC, err = c.prepareRetry(defChanged); err != nil {
 			return nil, err
 		}
+		logutil.Info(
+			"DEBUG-SLOW-TXN-4",
+			zap.String("txn", txnOperator.Txn().DebugString()),
+			zap.Int("retry-time", retryTimes),
+		)
 
 		// rebuild context for the retry.
 		runC.InitPipelineContextToReryQuery()
