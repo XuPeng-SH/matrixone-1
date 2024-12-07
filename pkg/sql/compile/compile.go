@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -715,8 +716,13 @@ func (c *Compile) lockMetaTables() error {
 	for _, table := range tables {
 		names := strings.SplitN(table, " ", 2)
 
+		lockStart := time.Now()
 		err := lockMoTable(c, names[0], names[1], lock.LockMode_Shared)
 		if err != nil {
+			timeCost := time.Since(lockStart)
+			isDefChange := moerr.IsMoErrCode(err, moerr.ErrTxnNeedRetryWithDefChanged)
+			logutil.Infof("lock meta error=%s, cost=%dms, isDefChange=%v, stack=%s", err.Error(), timeCost.Milliseconds(), isDefChange, string(debug.Stack()))
+
 			// if get error in locking mocatalog.mo_tables by it's dbName & tblName
 			// that means the origin table's schema was changed. then return NeedRetryWithDefChanged err
 			if moerr.IsMoErrCode(err, moerr.ErrTxnNeedRetry) ||
