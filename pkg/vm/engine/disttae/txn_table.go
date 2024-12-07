@@ -621,7 +621,7 @@ func (tbl *txnTable) doRanges(
 			tbl.enableLogFilterExpr.Store(true)
 		}
 
-		if rangesLen >= 60 {
+		if rangesLen >= 1 {
 			tbl.enableLogFilterExpr.Store(true)
 		}
 
