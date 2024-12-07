@@ -423,12 +423,17 @@ func (r *reader) Read(
 				return
 			}
 			if logLevel == 0 {
+				blkStr := "nil"
+				if blkInfo != nil {
+					blkStr = blkInfo.String()
+				}
 				logutil.Info(
 					"DEBUG-SLOW-TXN-READER",
 					zap.String("name", r.name),
 					zap.String("ts", r.ts.DebugString()),
 					zap.Int("data-len", outBatch.RowCount()),
 					zap.Duration("duration", time.Since(start)),
+					zap.String("blk", blkStr),
 					zap.Error(err),
 				)
 			} else {
