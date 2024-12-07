@@ -470,7 +470,7 @@ func (s *S3FS) Read(ctx context.Context, vector *IOVector) (err error) {
 	LogEvent(ctx, str_s3fs_read, vector)
 	defer func() {
 		LogEvent(ctx, str_read_return)
-		LogSlowEvent(ctx, time.Millisecond*500)
+		LogSlowEvent(ctx, time.Millisecond*100)
 	}()
 
 	if len(vector.Entries) == 0 {
