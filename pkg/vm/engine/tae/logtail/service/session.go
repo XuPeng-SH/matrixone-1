@@ -26,9 +26,11 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/common/log"
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/common/morpc"
+	"github.com/matrixorigin/matrixone/pkg/logutil"
 	"github.com/matrixorigin/matrixone/pkg/pb/api"
 	"github.com/matrixorigin/matrixone/pkg/pb/logtail"
 	"github.com/matrixorigin/matrixone/pkg/pb/timestamp"
+	"github.com/matrixorigin/matrixone/pkg/util/fault"
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 )
 
@@ -289,7 +291,7 @@ func NewSession(
 		defer ss.wg.Done()
 
 		var cnt int64
-		timer := time.NewTimer(100 * time.Second)
+		timer := time.NewTimer(20 * time.Second)
 
 		for {
 			select {
@@ -311,6 +313,14 @@ func NewSession(
 					ss.logger.Info("session sender channel closed")
 					return
 				}
+				iarg, _, injected := fault.TriggerFault("fj/block/push")
+				if injected {
+					logutil.Info(
+						"FJ_BLOCK_PUSH",
+					)
+					time.Sleep(time.Duration(iarg) * time.Second)
+				}
+
 				v2.LogTailSendQueueSizeGauge.Set(float64(len(ss.sendChan)))
 				sendFunc := func() error {
 					defer ss.responses.Release(msg.response)
