@@ -23,6 +23,7 @@ import (
 	"github.com/matrixorigin/matrixone/pkg/perfcounter"
 	"go.uber.org/zap"
 
+	"github.com/matrixorigin/matrixone/pkg/common/moerr"
 	"github.com/matrixorigin/matrixone/pkg/objectio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/blockio"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/catalog"
@@ -86,6 +87,21 @@ func (task *flushObjTask) Execute(ctx context.Context) (err error) {
 	seg := task.meta.ID.Segment()
 	name := objectio.BuildObjectName(seg, 0)
 	task.name = name
+	defer func() {
+		if r := recover(); r != nil {
+			err = moerr.NewInternalErrorNoCtxf(
+				"flushObjTask panic: %v", r,
+			)
+			stats := task.meta.GetObjectStats()
+			logutil.Error(
+				"flushObjTask-panic",
+				zap.String("meta", task.meta.GetTable().GetLastestSchema().Name),
+				zap.String("obj-stats", stats.String()),
+				zap.String("task", task.Name()),
+			)
+		}
+		return
+	}()
 	writer, err := blockio.NewBlockWriterNew(task.fs.Service, name, task.schemaVer, task.seqnums)
 	if err != nil {
 		return err
