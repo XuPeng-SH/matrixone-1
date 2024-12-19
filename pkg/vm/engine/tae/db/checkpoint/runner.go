@@ -399,7 +399,7 @@ func (r *runner) onIncrementalCheckpointEntries(items ...any) {
 }
 
 func (r *runner) saveCheckpoint(start, end types.TS, ckpLSN, truncateLSN uint64) (name string, err error) {
-	bat := r.collectCheckpointMetadata(start, end, ckpLSN, truncateLSN)
+	bat := r.store.MakeMetadataBatch(r.ctx, start, end, ckpLSN, truncateLSN)
 	defer bat.Close()
 	name = blockio.EncodeCheckpointMetadataFileName(CheckpointDir, PrefixMetadata, start, end)
 	writer, err := objectio.NewObjectWriterSpecial(objectio.WriterCheckpoint, name, r.rt.Fs.Service)
@@ -602,7 +602,6 @@ func (r *runner) TryScheduleCheckpoint(endts types.TS) {
 		}
 
 		if !check() {
-			logutil.Debugf("%s is waiting", entry.String())
 			return
 		}
 		entry.SetState(ST_Running)
