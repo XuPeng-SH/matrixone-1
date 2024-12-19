@@ -51,6 +51,7 @@ func newRunnerStore(
 			NoLocks: true,
 		},
 	)
+	s.metaFiles = make(map[string]struct{})
 	return s
 }
 
@@ -63,12 +64,34 @@ type runnerStore struct {
 	incrementals *btree.BTreeG[*CheckpointEntry]
 	globals      *btree.BTreeG[*CheckpointEntry]
 	compacted    atomic.Pointer[CheckpointEntry]
-	// metaFiles    map[string]struct{}
+	metaFiles    map[string]struct{}
 
 	gcIntent    types.TS
 	gcCount     int
 	gcTime      time.Time
 	gcWatermark atomic.Value
+}
+
+func (r *runnerStore) AddMetaFile(name string) {
+	r.Lock()
+	defer r.Unlock()
+	r.metaFiles[name] = struct{}{}
+}
+
+func (r *runnerStore) RemoveMetaFile(name string) {
+	r.Lock()
+	defer r.Unlock()
+	delete(r.metaFiles, name)
+}
+
+func (r *runnerStore) GetMetaFiles() map[string]struct{} {
+	r.RLock()
+	defer r.RUnlock()
+	ret := make(map[string]struct{}, len(r.metaFiles))
+	for k, v := range r.metaFiles {
+		ret[k] = v
+	}
+	return ret
 }
 
 func (s *runnerStore) ExportStatsLocked() []zap.Field {
