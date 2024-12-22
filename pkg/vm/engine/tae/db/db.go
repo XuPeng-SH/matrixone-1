@@ -187,7 +187,7 @@ func (db *DB) ForceCheckpoint(
 			logger = logutil.Error
 		}
 		logger(
-			"Control-Force-Checkpoint",
+			"Force-Incremental-Checkpoint",
 			zap.Error(err),
 			zap.Duration("total-cost", time.Since(t0)),
 			zap.String("ts", ts.ToString()),

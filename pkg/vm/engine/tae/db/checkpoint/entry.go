@@ -173,6 +173,8 @@ func (e *CheckpointEntry) SetVersion(version uint32) {
 }
 
 func (e *CheckpointEntry) SetLSN(ckpLSN, truncateLSN uint64) {
+	e.Lock()
+	defer e.Unlock()
 	e.ckpLSN = ckpLSN
 	e.truncateLSN = truncateLSN
 }
@@ -192,6 +194,8 @@ func (e *CheckpointEntry) TooOld() bool {
 	return time.Since(e.bornTime) > time.Minute*4*time.Duration(e.refreshCnt+1)
 }
 func (e *CheckpointEntry) LSNString() string {
+	e.RLock()
+	defer e.RUnlock()
 	return fmt.Sprintf("%d-%d", e.ckpLSN, e.truncateLSN)
 }
 
