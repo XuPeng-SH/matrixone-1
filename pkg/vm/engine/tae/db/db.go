@@ -170,10 +170,6 @@ func (db *DB) ForceCheckpoint(
 	ts types.TS,
 	flushDuration time.Duration,
 ) (err error) {
-	// FIXME: cannot disable with a running job
-	db.BGCheckpointRunner.DisableCheckpoint()
-	defer db.BGCheckpointRunner.EnableCheckpoint()
-	db.BGCheckpointRunner.CleanPenddingCheckpoint()
 	if flushDuration == 0 {
 		flushDuration = time.Minute * 3 / 2
 	}
