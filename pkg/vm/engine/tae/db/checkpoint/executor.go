@@ -28,17 +28,54 @@ import (
 )
 
 type checkpointJob struct {
-	doneCh          chan struct{}
-	runner          *runner
+	doneCh chan struct{}
+	runner *runner
+
+	// global checkpoint related configurations
 	minGCKPTS       types.TS
 	historyDuration time.Duration
+	force           bool
+	rule            func(*types.TS) bool
 
+	// for mock test
 	runICKPFunc func(context.Context, *runner) error
 	runGCKPFunc func(context.Context, *runner) error
 }
 
 func (job *checkpointJob) RunGCKP(ctx context.Context) (err error) {
-	// TODO
+	if job.runGCKPFunc != nil {
+		return job.runGCKPFunc(ctx, job.runner)
+	}
+
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	default:
+	}
+
+	checkpoited := job.runner.store.MaxGlobalCheckpoint()
+
+	// if the max checkpoint contains the minGCKPTS,
+	// then we don't need to do the checkpoint
+	if checkpoited != nil && job.minGCKPTS.LE(&checkpoited.end) {
+		logutil.Info(
+			"GCKP-Execute-Skip",
+			zap.String("checkpointed", checkpoited.String()),
+			zap.String("wanted", job.minGCKPTS.ToString()),
+		)
+		return
+	}
+
+	// if the force flag is set, we need to do the checkpoint
+	// if the force flag is not set, we need to check the rule
+	if !job.force && job.rule != nil && !job.rule(&job.minGCKPTS) {
+		err = ErrRuleConflict
+		return
+	}
+
+	// _, err = job.runner.doGlobalCheckpoint(
+	// 	job.minGCKPTS,
+
 	return
 }
 
@@ -208,6 +245,7 @@ func (e *checkpointExecutor) StopWithCause(cause error) {
 
 func (e *checkpointExecutor) RunGCKP(
 	minTS types.TS,
+	force bool,
 	historyDuration time.Duration,
 ) (err error) {
 	if !e.active.Load() {
@@ -224,6 +262,7 @@ func (e *checkpointExecutor) RunGCKP(
 		runICKPFunc:     e.runGCKPFunc,
 		minGCKPTS:       minTS,
 		historyDuration: historyDuration,
+		force:           force,
 	}
 	if !e.runningGCKPJob.CompareAndSwap(nil, job) {
 		err = ErrPendingCheckpoint

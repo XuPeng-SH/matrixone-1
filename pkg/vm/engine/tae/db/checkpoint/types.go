@@ -27,6 +27,7 @@ import (
 var ErrPendingCheckpoint = moerr.NewPrevCheckpointNotFinished()
 var ErrCheckpointDisabled = moerr.NewInternalErrorNoCtxf("checkpoint disabled")
 var ErrExecutorRestarted = moerr.NewInternalErrorNoCtxf("executor restarted")
+var ErrRuleConflict = moerr.NewInternalErrorNoCtxf("rule conflict")
 
 type State int8
 
