@@ -159,10 +159,11 @@ func (job *checkpointJob) Done() {
 }
 
 type checkpointExecutor struct {
-	ctx     context.Context
-	cancel  context.CancelCauseFunc
-	active  atomic.Bool
-	running atomic.Pointer[checkpointJob]
+	ctx            context.Context
+	cancel         context.CancelCauseFunc
+	active         atomic.Bool
+	runningICKPJob atomic.Pointer[checkpointJob]
+	runningGCKPJob atomic.Pointer[checkpointJob]
 
 	runner      *runner
 	runICKPFunc func(context.Context, *runner) error
@@ -187,20 +188,31 @@ func (e *checkpointExecutor) StopWithCause(cause error) {
 		cause = ErrCheckpointDisabled
 	}
 	e.cancel(cause)
-	job := e.running.Load()
+	job := e.runningICKPJob.Load()
 	if job != nil {
 		<-job.WaitC()
 	}
-	e.running.Store(nil)
+	e.runningICKPJob.Store(nil)
 	e.runner = nil
 }
+
+// func (e *checkpointExecutor) RunGCKP(
+// 	minTS types.TS,
+// 	historyDuration time.Duration,
+// ) (err error) {
+// 	if !e.active.Load() {
+// 		err = ErrCheckpointDisabled
+// 		return
+// 	}
+// 	return
+// }
 
 func (e *checkpointExecutor) RunICKP() (err error) {
 	if !e.active.Load() {
 		err = ErrCheckpointDisabled
 		return
 	}
-	if e.running.Load() != nil {
+	if e.runningICKPJob.Load() != nil {
 		err = ErrPendingCheckpoint
 	}
 	job := &checkpointJob{
@@ -208,13 +220,13 @@ func (e *checkpointExecutor) RunICKP() (err error) {
 		runner:      e.runner,
 		runICKPFunc: e.runICKPFunc,
 	}
-	if !e.running.CompareAndSwap(nil, job) {
+	if !e.runningICKPJob.CompareAndSwap(nil, job) {
 		err = ErrPendingCheckpoint
 		return
 	}
 	defer func() {
 		job.Done()
-		e.running.Store(nil)
+		e.runningICKPJob.Store(nil)
 	}()
 	err = job.RunICKP(e.ctx)
 	return
