@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/matrixorigin/matrixone/pkg/common/moerr"
+	"github.com/matrixorigin/matrixone/pkg/container/types"
 	"github.com/matrixorigin/matrixone/pkg/logutil"
 	v2 "github.com/matrixorigin/matrixone/pkg/util/metric/v2"
 	"github.com/matrixorigin/matrixone/pkg/vm/engine/tae/wal"
@@ -27,10 +28,18 @@ import (
 )
 
 type checkpointJob struct {
-	doneCh chan struct{}
-	runner *runner
+	doneCh          chan struct{}
+	runner          *runner
+	minGCKPTS       types.TS
+	historyDuration time.Duration
 
 	runICKPFunc func(context.Context, *runner) error
+	runGCKPFunc func(context.Context, *runner) error
+}
+
+func (job *checkpointJob) RunGCKP(ctx context.Context) (err error) {
+	// TODO
+	return
 }
 
 func (job *checkpointJob) RunICKP(ctx context.Context) (err error) {
@@ -167,6 +176,7 @@ type checkpointExecutor struct {
 
 	runner      *runner
 	runICKPFunc func(context.Context, *runner) error
+	runGCKPFunc func(context.Context, *runner) error
 }
 
 func newCheckpointExecutor(
@@ -196,16 +206,36 @@ func (e *checkpointExecutor) StopWithCause(cause error) {
 	e.runner = nil
 }
 
-// func (e *checkpointExecutor) RunGCKP(
-// 	minTS types.TS,
-// 	historyDuration time.Duration,
-// ) (err error) {
-// 	if !e.active.Load() {
-// 		err = ErrCheckpointDisabled
-// 		return
-// 	}
-// 	return
-// }
+func (e *checkpointExecutor) RunGCKP(
+	minTS types.TS,
+	historyDuration time.Duration,
+) (err error) {
+	if !e.active.Load() {
+		err = ErrCheckpointDisabled
+		return
+	}
+	if e.runningGCKPJob.Load() != nil {
+		err = ErrPendingCheckpoint
+		return
+	}
+	job := &checkpointJob{
+		doneCh:          make(chan struct{}),
+		runner:          e.runner,
+		runICKPFunc:     e.runGCKPFunc,
+		minGCKPTS:       minTS,
+		historyDuration: historyDuration,
+	}
+	if !e.runningGCKPJob.CompareAndSwap(nil, job) {
+		err = ErrPendingCheckpoint
+		return
+	}
+	defer func() {
+		job.Done()
+		e.runningGCKPJob.Store(nil)
+	}()
+	err = job.RunGCKP(e.ctx)
+	return
+}
 
 func (e *checkpointExecutor) RunICKP() (err error) {
 	if !e.active.Load() {
@@ -214,6 +244,7 @@ func (e *checkpointExecutor) RunICKP() (err error) {
 	}
 	if e.runningICKPJob.Load() != nil {
 		err = ErrPendingCheckpoint
+		return
 	}
 	job := &checkpointJob{
 		doneCh:      make(chan struct{}),
