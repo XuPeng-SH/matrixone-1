@@ -66,12 +66,11 @@ func (r *runner) ForceGlobalCheckpoint(end types.TS, interval time.Duration) err
 	if r.GetPenddingIncrementalCount() != 0 {
 		end2 := r.MaxIncrementalCheckpoint().GetEnd()
 		if end2.GE(&end) {
-			r.globalCheckpointQueue.Enqueue(&globalCheckpointContext{
+			return r.TryTriggerExecuteGCKP(globalCheckpointContext{
 				force:    true,
 				end:      end2,
 				interval: interval,
 			})
-			return nil
 		}
 	}
 	var (
@@ -108,12 +107,11 @@ func (r *runner) ForceGlobalCheckpoint(end types.TS, interval time.Duration) err
 				}
 				return err
 			}
-			r.globalCheckpointQueue.Enqueue(&globalCheckpointContext{
+			return r.TryTriggerExecuteGCKP(globalCheckpointContext{
 				force:    true,
 				end:      end,
 				interval: interval,
 			})
-			return nil
 		}
 	}
 }
