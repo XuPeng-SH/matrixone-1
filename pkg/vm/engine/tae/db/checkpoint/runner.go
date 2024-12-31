@@ -439,6 +439,7 @@ func (r *runner) onReplayCheckpoint(entries ...any) {
 
 // TODO: call this always in the executor
 func (r *runner) doIncrementalCheckpoint(
+	ctx context.Context,
 	cfg *CheckpointCfg,
 	entry *CheckpointEntry,
 ) (fields []zap.Field, files []string, err error) {
@@ -451,7 +452,7 @@ func (r *runner) doIncrementalCheckpoint(
 	defer data.Close()
 	var cnLocation, tnLocation objectio.Location
 	cnLocation, tnLocation, files, err = data.WriteTo(
-		r.rt.Fs.Service, cfg.BlockMaxRowsHint, cfg.SizeHint,
+		ctx, cfg.BlockMaxRowsHint, cfg.SizeHint, r.rt.Fs.Service,
 	)
 	if err != nil {
 		return

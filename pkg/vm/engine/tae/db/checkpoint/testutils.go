@@ -293,7 +293,7 @@ func (r *runner) CreateSpecialCheckpointFile(
 		cnLocation, tnLocation objectio.Location
 	)
 	if cnLocation, tnLocation, _, err = data.WriteTo(
-		r.rt.Fs.Service, cfg.BlockMaxRowsHint, cfg.SizeHint,
+		ctx, cfg.BlockMaxRowsHint, cfg.SizeHint, r.rt.Fs.Service,
 	); err != nil {
 		return
 	}
