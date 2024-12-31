@@ -387,27 +387,6 @@ func (r *runner) getRunningCKPJob(gckp bool) (job *checkpointJob, err error) {
 	return
 }
 
-func (r *runner) doCheckpointForBackup(_ context.Context, cfg *CheckpointCfg, entry *CheckpointEntry) (location string, err error) {
-	factory := logtail.BackupCheckpointDataFactory(r.rt.SID(), entry.start, entry.end)
-	data, err := factory(r.catalog)
-	if err != nil {
-		return
-	}
-	defer data.Close()
-	cnLocation, tnLocation, _, err := data.WriteTo(
-		r.rt.Fs.Service, cfg.BlockMaxRowsHint, cfg.SizeHint,
-	)
-	if err != nil {
-		return
-	}
-	entry.SetLocation(cnLocation, tnLocation)
-	location = fmt.Sprintf("%s:%d:%s:%s:%s", cnLocation.String(), entry.GetVersion(), entry.end.ToString(), tnLocation.String(), entry.start.ToString())
-	perfcounter.Update(r.ctx, func(counter *perfcounter.CounterSet) {
-		counter.TAE.CheckPoint.DoIncrementalCheckpoint.Add(1)
-	})
-	return
-}
-
 func (r *runner) replayOneEntry(entry *CheckpointEntry) {
 	defer entry.Done()
 	if !entry.IsFinished() {
