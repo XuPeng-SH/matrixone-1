@@ -439,6 +439,7 @@ func LoadCheckpointEntries(
 		v2.LogTailLoadCheckpointDurationHistogram.Observe(time.Since(now).Seconds())
 	}()
 	locationsAndVersions := strings.Split(metaLoc, ";")
+	logutil.Info("DEBUG-PANIC", zap.String("loc", metaLoc), zap.Strings("locs", locationsAndVersions))
 
 	datas := make([]*CNCheckpointData, len(locationsAndVersions)/2)
 
